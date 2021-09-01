@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+
+  geoip-policyd:
+    image: docker.roessner-net.de/mail/geoip-policyd:latest
+    logging:
+      driver: journald
+      options:
+        tag: geoip-policyd
+    network_mode: host
+    environment:
+      - TZ=Europe/Berlin
+      - SERVER_ADDRESS=127.0.0.1
+      - SERVER_PORT=46464
+      - REDIS_ADDRESS=127.0.0.1
+      - REDIS_PORT=6379
+      - GEOIP_PATH=/GeoLite2-City.mmdb
+    volumes:
+      - /usr/share/GeoIP/GeoLite2-City.mmdb:/GeoLite2-City.mmdb:ro,Z
+
