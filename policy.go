@@ -67,7 +67,7 @@ func getPolicyResponse() string {
 			if sender, ok = policyRequest["sender"]; ok {
 				if len(sender) > 0 {
 					if clientIP, ok = policyRequest["client_address"]; ok {
-						key := fmt.Sprintf("%s%s", redisPrefix, sender)
+						key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
 
 						// Check Redis for the current sender
 						if reply, err := redisConn.Do("GET", key); err != nil {
@@ -91,7 +91,7 @@ func getPolicyResponse() string {
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
 						if len(countryCode) == 0 {
-							if cfg.verbose {
+							if cfg.Verbose {
 								log.Println("Debug: No country countryCode present for", clientIP)
 							}
 						} else {
@@ -106,7 +106,7 @@ func getPolicyResponse() string {
 
 						// For each request update the expiry timestamp
 						if _, err := redisConn.Do("EXPIRE",
-							redis.Args{}.Add(key).Add(redisTTL)...); err != nil {
+							redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
 							log.Println("Error:", err)
 							return deferText
 						}
@@ -116,11 +116,11 @@ func getPolicyResponse() string {
 							sender, remote.Countries, remote.Ips,
 							len(remote.Countries), maxCountries, len(remote.Ips), maxIps)
 
-						if len(remote.Countries) >= maxCountries {
+						if len(remote.Countries) >= cfg.MaxCountries {
 							return rejectText
 						}
 
-						if len(remote.Ips) >= maxIps {
+						if len(remote.Ips) >= cfg.MaxIps {
 							return rejectText
 						}
 					}

@@ -9,28 +9,32 @@ import (
 )
 
 // Defaults
-const serverAddress = "127.0.0.1"
-const serverPort = 4646
-const redisAddress = "127.0.0.1"
-const redisPort = 6379
-const geoipPath = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+const (
+	serverAddress = "127.0.0.1"
+	serverPort    = 4646
+	redisAddress  = "127.0.0.1"
+	redisPort     = 6379
+	geoipPath     = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+	redisPrefix   = "geopol_"
+	redisTTL      = 3600
+	maxCountries  = 3
+	maxIps        = 10
+)
 
-// TODO: Make the following constants configurable
-const redisPrefix = "geopol_"
-const redisTTL = 3600
-const maxCountries = 3
-const maxIps = 10
-
-type config struct {
-	serverAddress string
-	serverPort    int
-	redisAddress  string
-	redisPort     int
-	geoipPath     string
-	verbose		  bool
+type Config struct {
+	ServerAddress string
+	ServerPort    int
+	RedisAddress  string
+	RedisPort     int
+	RedisPrefix   string
+	RedisTTL      int
+	GeoipPath     string
+	MaxCountries  int
+	MaxIps        int
+	Verbose       bool
 }
 
-var cfg config
+var cfg Config
 
 func initConfig(args []string) {
 	parser := argparse.NewParser("geoip-policyd", "Detect compromised e-mail accounts")
@@ -40,31 +44,111 @@ func initConfig(args []string) {
 	argServerAddress := commandServer.String(
 		"a", "server-address", &argparse.Options{
 			Required: false,
-			Help: "IPv4, IPv6 address or Unix-path for the policy service; default(" + serverAddress + ")",
+			Help:     "IPv4, IPv6 address or Unix-path for the policy service; default(" + serverAddress + ")",
 		},
 	)
-	argServerPort := commandServer.String(
+	argServerPort := commandServer.Int(
 		"p", "server-port", &argparse.Options{
 			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if !(arg > 0 && arg <= 65535) {
+						return fmt.Errorf("%s is not a valid port number", opt[0])
+					}
+				}
+				return nil
+			},
 			Help: "Port for the policy service; default(" + strconv.Itoa(serverPort) + ")",
 		},
 	)
 	argRedisAddress := commandServer.String(
 		"A", "redis-address", &argparse.Options{
 			Required: false,
-			Help: "IPv4, IPv6 address or Unix-path for the Redis service; default(" + redisAddress + ")",
+			Help:     "IPv4, IPv6 address or Unix-path for the Redis service; default(" + redisAddress + ")",
 		},
 	)
-	argRedisPort := commandServer.String(
+	argRedisPort := commandServer.Int(
 		"P", "redis-port", &argparse.Options{
 			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if !(arg > 0 && arg <= 65535) {
+						return fmt.Errorf("%s is not a valid port number", opt[0])
+					}
+				}
+				return nil
+			},
 			Help: "Port for the Redis service; default(" + strconv.Itoa(redisPort) + ")",
 		},
 	)
 	argGeoIPDB := commandServer.String(
 		"g", "geoip-path", &argparse.Options{
 			Required: false,
-			Help: "Full path to the GeoIP database file",
+			Validate: func(opt []string) error {
+				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
+					return fmt.Errorf("%s: %s", opt[0], err)
+				}
+				return nil
+			},
+			Help: "Full path to the GeoIP database file; default(" + geoipPath + ")",
+		},
+	)
+	argRedisPrefix := commandServer.String(
+		"", "redis-prefix", &argparse.Options{
+			Required: false,
+			Help:     "Redis prefix; default(" + redisPrefix + ")",
+		},
+	)
+	argRedisTTL := commandServer.Int(
+		"", "redis-ttl", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if arg < 1 {
+						return fmt.Errorf("%d must be an unsigned integer and not 0", arg)
+					}
+				}
+				return nil
+			},
+			Help: "Redis TTL; default(" + strconv.Itoa(redisTTL) + ")",
+		},
+	)
+	argMaxCountries := commandServer.Int(
+		"", "max-countries", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if arg < 2 {
+						return fmt.Errorf("%d must be an unsigned integer and greate or equal than 2", arg)
+					}
+				}
+				return nil
+			},
+			Help: "Maximum number of countries before rejecting e-mails; default(" + strconv.Itoa(maxCountries) + ")",
+		},
+	)
+	argMaxIps := commandServer.Int(
+		"", "max-ips", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if arg < 1 {
+						return fmt.Errorf("%d must be an unsigned integer and not 0", arg)
+					}
+				}
+				return nil
+			},
+			Help: "Maximum number of IP addresses before rejecting e-mails; default(" + strconv.Itoa(maxIps) + ")",
 		},
 	)
 
@@ -84,12 +168,17 @@ func initConfig(args []string) {
 		log.Fatalln(parser.Usage(err))
 	}
 
-	cfg = config{
-		serverAddress: serverAddress,
-		serverPort: serverPort,
-		redisAddress: redisAddress,
-		redisPort: redisPort,
-		geoipPath: geoipPath,
+	// Map defaults
+	cfg = Config{
+		ServerAddress: serverAddress,
+		ServerPort:    serverPort,
+		RedisAddress:  redisAddress,
+		RedisPort:     redisPort,
+		RedisPrefix:   redisPrefix,
+		RedisTTL:      redisTTL,
+		GeoipPath:     geoipPath,
+		MaxCountries:  maxCountries,
+		MaxIps:        maxIps,
 	}
 
 	if *argVersion {
@@ -97,13 +186,13 @@ func initConfig(args []string) {
 		os.Exit(0)
 	}
 
-	cfg.verbose = *argVerbose
+	cfg.Verbose = *argVerbose
 
 	if val := os.Getenv("SERVER_ADDRESS"); val != "" {
-		cfg.serverAddress = val
+		cfg.ServerAddress = val
 	} else {
-		if len(*argServerAddress) > 0 {
-			cfg.serverAddress = *argServerAddress
+		if *argServerAddress != "" {
+			cfg.ServerAddress = *argServerAddress
 		}
 	}
 
@@ -112,22 +201,18 @@ func initConfig(args []string) {
 		if err != nil {
 			log.Fatalln("Error: SERVER_PORT an not be used:", parser.Usage(err))
 		}
-		cfg.serverPort = p
+		cfg.ServerPort = p
 	} else {
-		if len(*argServerPort) > 0 {
-			p, err := strconv.Atoi(*argServerPort)
-			if err != nil {
-				log.Fatalln("Error: --server-port can not be used:", parser.Usage(err))
-			}
-			cfg.serverPort = p
+		if *argServerPort != 0 {
+			cfg.ServerPort = *argServerPort
 		}
 	}
 
 	if val := os.Getenv("REDIS_ADDRESS"); val != "" {
-		cfg.redisAddress = val
+		cfg.RedisAddress = val
 	} else {
-		if len(*argRedisAddress) > 0 {
-			cfg.redisAddress = *argRedisAddress
+		if *argRedisAddress != "" {
+			cfg.RedisAddress = *argRedisAddress
 		}
 	}
 
@@ -136,22 +221,62 @@ func initConfig(args []string) {
 		if err != nil {
 			log.Fatalln("Error: REDIS_PORT can not be used:", parser.Usage(err))
 		}
-		cfg.redisPort = p
+		cfg.RedisPort = p
 	} else {
-		if len(*argRedisPort) > 0 {
-			p, err := strconv.Atoi(*argRedisPort)
-			if err != nil {
-				log.Fatalln("Error: --redis-port can not be used", parser.Usage(err))
-			}
-			cfg.redisPort = p
+		if *argRedisPort != 0 {
+			cfg.RedisPort = *argRedisPort
 		}
 	}
 
 	if val := os.Getenv("GEOIP_PATH"); val != "" {
-		cfg.geoipPath = val
+		cfg.GeoipPath = val
 	} else {
-		if len(*argGeoIPDB) > 0 {
-			cfg.geoipPath = *argGeoIPDB
+		if *argGeoIPDB != "" {
+			cfg.GeoipPath = *argGeoIPDB
+		}
+	}
+
+	if val := os.Getenv("REDIS_PREFIX"); val != "" {
+		cfg.RedisPrefix = val
+	} else {
+		if *argRedisPrefix != "" {
+			cfg.RedisPrefix = *argRedisPrefix
+		}
+	}
+
+	if val := os.Getenv("REDIS_TTL"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: REDIS_TTL can not be used:", parser.Usage(err))
+		}
+		cfg.RedisTTL = p
+	} else {
+		if *argRedisTTL != 0 {
+			cfg.RedisTTL = *argRedisTTL
+		}
+	}
+
+	if val := os.Getenv("MAX_COUNTRIES"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: MAX_COUNTRIES can not be used:", parser.Usage(err))
+		}
+		cfg.MaxCountries = p
+	} else {
+		if *argMaxCountries != 0 {
+			cfg.MaxCountries = *argMaxCountries
+		}
+	}
+
+	if val := os.Getenv("MAX_IPS"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: MAX_IPS can not be used:", parser.Usage(err))
+		}
+		cfg.MaxIps = p
+	} else {
+		if *argMaxIps != 0 {
+			cfg.MaxIps = *argMaxIps
 		}
 	}
 }

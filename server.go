@@ -40,7 +40,7 @@ func handleConnection(client net.Conn) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			if cfg.verbose {
+			if cfg.Verbose {
 				fmt.Println("Debug:", policyRequest)
 			}
 
