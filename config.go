@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/akamensky/argparse"
 	"log"
+	"net"
 	"os"
 	"strconv"
 )
@@ -44,7 +45,15 @@ func initConfig(args []string) {
 	argServerAddress := commandServer.String(
 		"a", "server-address", &argparse.Options{
 			Required: false,
-			Help:     "IPv4, IPv6 address or Unix-path for the policy service; default(" + serverAddress + ")",
+			Validate: func(opt []string) error {
+				if addr := net.ParseIP(opt[0]); addr == nil {
+					if _, err := net.LookupHost(opt[0]); err != nil {
+						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+					}
+				}
+				return nil
+			},
+			Help: "IPv4, IPv6 address or Unix-path for the policy service; default(" + serverAddress + ")",
 		},
 	)
 	argServerPort := commandServer.Int(
@@ -66,7 +75,15 @@ func initConfig(args []string) {
 	argRedisAddress := commandServer.String(
 		"A", "redis-address", &argparse.Options{
 			Required: false,
-			Help:     "IPv4, IPv6 address or Unix-path for the Redis service; default(" + redisAddress + ")",
+			Validate: func(opt []string) error {
+				if addr := net.ParseIP(opt[0]); addr == nil {
+					if _, err := net.LookupHost(opt[0]); err != nil {
+						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+					}
+				}
+				return nil
+			},
+			Help: "IPv4, IPv6 address or Unix-path for the Redis service; default(" + redisAddress + ")",
 		},
 	)
 	argRedisPort := commandServer.Int(
