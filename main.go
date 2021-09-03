@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version string = "2021.0.2"
+const version string = "2021.0.3"
 
 func main() {
 	var (
