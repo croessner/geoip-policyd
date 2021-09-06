@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/akamensky/argparse"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -33,9 +35,21 @@ type Config struct {
 	MaxCountries  int
 	MaxIps        int
 	Verbose       bool
+	WhiteList     Data
+}
+
+type Data struct {
+	Data []Account `json:"data"`
+}
+
+type Account struct {
+	Sender    string `json:"sender"`
+	Ips       int    `json:"ips"`
+	Countries int    `json:"countries"`
 }
 
 var cfg Config
+var data Data
 
 func initConfig(args []string) {
 	parser := argparse.NewParser("geoip-policyd", "Detect compromised e-mail accounts")
@@ -168,6 +182,12 @@ func initConfig(args []string) {
 			Help: "Maximum number of IP addresses before rejecting e-mails; default(" + strconv.Itoa(maxIps) + ")",
 		},
 	)
+	argWhiteList := commandServer.String(
+		"w", "whitelist-path", &argparse.Options{
+			Required: false,
+			Help:     "Whitelist with different IP and country limits; no default",
+		},
+	)
 
 	argVerbose := parser.Flag(
 		"v", "verbose", &argparse.Options{
@@ -295,5 +315,32 @@ func initConfig(args []string) {
 		if *argMaxIps != 0 {
 			cfg.MaxIps = *argMaxIps
 		}
+	}
+
+	var wlFileName string
+
+	if val := os.Getenv("WHITELIST_PATH"); val != "" {
+		wlFileName = val
+	} else {
+		if *argWhiteList != "" {
+			wlFileName = *argWhiteList
+		}
+	}
+
+	if wlFileName != "" {
+		jsonFile, err := os.Open(wlFileName)
+		if err != nil {
+			log.Fatalln("Error:", err)
+		}
+
+		//goland:noinspection GoUnhandledErrorResult
+		defer jsonFile.Close()
+
+		byteValue, _ := ioutil.ReadAll(jsonFile)
+		if err := json.Unmarshal(byteValue, &data); err != nil {
+			log.Fatalln("Error:", err)
+		}
+
+		cfg.WhiteList = data
 	}
 }

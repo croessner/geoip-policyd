@@ -51,12 +51,14 @@ func (r *RemoteClient) addIPAddress(ip string) {
 
 func getPolicyResponse() string {
 	var (
-		ok        bool
-		request   string
-		sender    string
-		clientIP  string
-		remote    RemoteClient
-		redisConn = redisPool.Get()
+		ok               bool
+		request          string
+		sender           string
+		clientIP         string
+		remote           RemoteClient
+		redisConn        = redisPool.Get()
+		usedMaxIps       = cfg.MaxIps
+		usedMaxCountries = cfg.MaxCountries
 	)
 
 	//goland:noinspection GoUnhandledErrorResult
@@ -111,16 +113,29 @@ func getPolicyResponse() string {
 							return deferText
 						}
 
+						if len(cfg.WhiteList.Data) > 0 {
+							for _, record := range cfg.WhiteList.Data {
+								if record.Sender == sender {
+									if record.Ips > 0 {
+										usedMaxIps = record.Ips
+									}
+									if record.Countries > 0 {
+										usedMaxCountries = record.Countries
+									}
+									break // First match wins!
+								}
+							}
+						}
 						log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
 							"#countries=%d/%d; #ip_addresses=%d/%d\n",
 							sender, remote.Countries, remote.Ips,
-							len(remote.Countries), maxCountries, len(remote.Ips), maxIps)
+							len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps)
 
-						if len(remote.Countries) >= cfg.MaxCountries {
+						if len(remote.Countries) > usedMaxCountries {
 							return rejectText
 						}
 
-						if len(remote.Ips) >= cfg.MaxIps {
+						if len(remote.Ips) > usedMaxIps {
 							return rejectText
 						}
 					}

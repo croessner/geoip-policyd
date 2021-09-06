@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "sender": "christian@roessner.email",
+      "ips": 5,
+      "countries": 2
+    },
+    {
+      "sender": "test1@example.com",
+      "countries": 4
+    },
+    {
+      "sender": "test2@example.com",
+      "ips": 30
+    }
+  ]
+}

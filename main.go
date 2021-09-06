@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-const version string = "2021.0.4"
+const version string = "2021.0.5"
 
 func main() {
 	var (
