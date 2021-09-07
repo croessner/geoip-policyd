@@ -82,6 +82,7 @@ Arguments:
 
   -h  --help                          Print help information
   -a  --server-address                IPv4 or IPv6 address for the policy service; default(127.0.0.1)
+      --http-address                  HTTP address for incoming requests; default(:8080)
   -p  --server-port                   Port for the policy service; default(4646)
   -A  --redis-address                 IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
   -P  --redis-port                    Port for the Redis service; default(6379)
@@ -104,15 +105,41 @@ Arguments:
 
 ```
 
+## Reload options
+
+```shell
+geoip-policyd reload --help
+```
+
+produces the following output:
+
+```
+usage: geoip-policyd reload [-h|--help] [--http-uri "<value>"] [-v|--verbose]
+                     [--version]
+
+                     Reload the geoip-policyd server
+
+Arguments:
+
+  -h  --help      Print help information
+      --http-uri  HTTP URI to the REST server; default(http://127.0.0.1:8080)
+  -v  --verbose   Verbose mode
+      --version   Current version
+
+```
+
 ## Environment variables
 
 The following environment variables can be used to configure the policy service. This is especially useful, if you plan
 on running the service as a docker service.
 
+### Server
+
 Variable | Description
 ---|---
 SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
 SERVER_PORT | Port for the policy service; default(4646)
+HTTP_ADDRESS | HTTP address for incoming requests; default(:8080)
 REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
 REDIS_PORT | Port for the Redis service; default(6379)
 REDIS_DATABASE_NUMBER | Redis database number
@@ -129,3 +156,9 @@ GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoL
 MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
 MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
 WHITELIST_PATH | Whitelist with different IP and country limits
+
+### Reload
+
+Variable | Description
+---|---
+HTTP_URI | http://127.0.0.1:8080

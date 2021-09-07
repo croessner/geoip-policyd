@@ -12,12 +12,13 @@ services:
     environment:
       - TZ=Europe/Berlin
       - SERVER_ADDRESS=127.0.0.1
-      - SERVER_PORT=46464
+      - SERVER_PORT=4646
       - REDIS_ADDRESS=127.0.0.1
       - REDIS_PORT=6379
       - REDIS_DATABASE_NUMBER=0
       - GEOIP_PATH=/GeoLite2-City.mmdb
       - WHITELIST_PATH=/whitelist.json
+      - HTTP_ADDRESS=127.0.0.1:8080
     volumes:
       - /usr/share/GeoIP/GeoLite2-City.mmdb:/GeoLite2-City.mmdb:ro,Z
       - ./whitelist.json:/whitelist.json:ro,Z

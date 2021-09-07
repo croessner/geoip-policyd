@@ -20,5 +20,8 @@ LABEL description="Postfix policy service that blocks clients, if they come from
 # Copy binary to destination image
 COPY --from=builder ["/build/geoip-policyd", "/"]
 
+EXPOSE 4646
+EXPOSE 8080
+
 ENTRYPOINT ["/geoip-policyd"]
 CMD ["server"]
