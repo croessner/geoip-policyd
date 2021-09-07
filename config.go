@@ -25,20 +25,29 @@ const (
 )
 
 type Config struct {
-	ServerAddress string
-	ServerPort    int
-	RedisAddress  string
-	RedisPort     int
-	RedisDB       int
-	RedisUsername string
-	RedisPassword string
-	RedisPrefix   string
-	RedisTTL      int
-	GeoipPath     string
-	MaxCountries  int
-	MaxIps        int
-	Verbose       bool
-	WhiteList     Data
+	ServerAddress  string
+	ServerPort     int
+
+	RedisAddress   string
+	RedisPort      int
+	RedisDB        int
+	RedisUsername  string
+	RedisPassword  string
+
+	RedisAddressW  string
+	RedisPortW     int
+	RedisDBW       int
+	RedisUsernameW string
+	RedisPasswordW string
+
+	RedisPrefix    string
+	RedisTTL       int
+
+	GeoipPath      string
+	MaxCountries   int
+	MaxIps         int
+	Verbose        bool
+	WhiteList      Data
 }
 
 type Data struct {
@@ -60,6 +69,9 @@ func initConfig(args []string) {
 
 	commandServer := parser.NewCommand("server", "Run a geoip policy server")
 
+	/*
+	 * GeoIP policy server options
+	 */
 	argServerAddress := commandServer.String(
 		"a", "server-address", &argparse.Options{
 			Required: false,
@@ -71,7 +83,7 @@ func initConfig(args []string) {
 				}
 				return nil
 			},
-			Help: "IPv4, IPv6 address or Unix-path for the policy service; default(" + serverAddress + ")",
+			Help: "IPv4 or IPv6 address for the policy service; default(" + serverAddress + ")",
 		},
 	)
 	argServerPort := commandServer.Int(
@@ -91,6 +103,9 @@ func initConfig(args []string) {
 		},
 	)
 
+	/*
+	 * Redis options for read and/or write requests
+	 */
 	argRedisAddress := commandServer.String(
 		"A", "redis-address", &argparse.Options{
 			Required: false,
@@ -102,7 +117,7 @@ func initConfig(args []string) {
 				}
 				return nil
 			},
-			Help: "IPv4, IPv6 address or Unix-path for the Redis service; default(" + redisAddress + ")",
+			Help: "IPv4 or IPv6 address for the Redis service; default(" + redisAddress + ")",
 		},
 	)
 	argRedisPort := commandServer.Int(
@@ -140,18 +155,61 @@ func initConfig(args []string) {
 		},
 	)
 
-	argGeoIPDB := commandServer.String(
-		"g", "geoip-path", &argparse.Options{
+	/*
+	 * Redis options for write requests
+	 */
+	argRedisAddressW := commandServer.String(
+		"", "redis-writer-address", &argparse.Options{
 			Required: false,
 			Validate: func(opt []string) error {
-				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return fmt.Errorf("%s: %s", opt[0], err)
+				if addr := net.ParseIP(opt[0]); addr == nil {
+					if _, err := net.LookupHost(opt[0]); err != nil {
+						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+					}
 				}
 				return nil
 			},
-			Help: "Full path to the GeoIP database file; default(" + geoipPath + ")",
+			Help: "IPv4 or IPv6 address for a Redis service (writer)",
 		},
 	)
+	argRedisPortW := commandServer.Int(
+		"", "redis-writer-port", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if !(arg > 0 && arg <= 65535) {
+						return fmt.Errorf("%s is not a valid port number", opt[0])
+					}
+				}
+				return nil
+			},
+			Help: "Port for a Redis service (writer)",
+		},
+	)
+	argRedisDBW := commandServer.Int(
+		"", "redis-writer-database-number", &argparse.Options{
+			Required: false,
+			Help:     "Redis database number (writer)",
+		},
+	)
+	argRedisUsernameW := commandServer.String(
+		"", "redis-writer-username", &argparse.Options{
+			Required: false,
+			Help:     "Redis username (writer)",
+		},
+	)
+	argRedisPasswordW := commandServer.String(
+		"", "redis-writer-password", &argparse.Options{
+			Required: false,
+			Help:     "Redis password (writer)",
+		},
+	)
+
+	/*
+	 * Common Redis options
+	 */
 	argRedisPrefix := commandServer.String(
 		"", "redis-prefix", &argparse.Options{
 			Required: false,
@@ -172,6 +230,22 @@ func initConfig(args []string) {
 				return nil
 			},
 			Help: "Redis TTL; default(" + strconv.Itoa(redisTTL) + ")",
+		},
+	)
+
+	/*
+	 * Other config options
+	 */
+	argGeoIPDB := commandServer.String(
+		"g", "geoip-path", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
+					return fmt.Errorf("%s: %s", opt[0], err)
+				}
+				return nil
+			},
+			Help: "Full path to the GeoIP database file; default(" + geoipPath + ")",
 		},
 	)
 	argMaxCountries := commandServer.Int(
@@ -209,7 +283,7 @@ func initConfig(args []string) {
 	argWhiteList := commandServer.String(
 		"w", "whitelist-path", &argparse.Options{
 			Required: false,
-			Help:     "Whitelist with different IP and country limits; no default",
+			Help:     "Whitelist with different IP and country limits",
 		},
 	)
 
@@ -235,6 +309,8 @@ func initConfig(args []string) {
 		ServerPort:    serverPort,
 		RedisAddress:  redisAddress,
 		RedisPort:     redisPort,
+		RedisAddressW: redisAddress,
+		RedisPortW:    redisPort,
 		RedisPrefix:   redisPrefix,
 		RedisTTL:      redisTTL,
 		GeoipPath:     geoipPath,
@@ -311,6 +387,51 @@ func initConfig(args []string) {
 			cfg.RedisPassword = *argRedisPassword
 		}
 	}
+
+	if val := os.Getenv("REDIS_WRITER_ADDRESS"); val != "" {
+		cfg.RedisAddressW = val
+	} else {
+		if *argRedisAddressW != "" {
+			cfg.RedisAddressW = *argRedisAddressW
+		}
+	}
+	if val := os.Getenv("REDIS_WRITER_PORT"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: REDIS_WRITER_PORT can not be used:", parser.Usage(err))
+		}
+		cfg.RedisPortW = p
+	} else {
+		if *argRedisPortW != 0 {
+			cfg.RedisPortW = *argRedisPortW
+		}
+	}
+	if val := os.Getenv("REDIS_WRITER_DATABASE_NUMBER"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: REDIS_WRITER_DATABASE_NUMBER can not be used:", parser.Usage(err))
+		}
+		cfg.RedisDBW = p
+	} else {
+		if *argRedisDBW > 0 {
+			cfg.RedisDBW = *argRedisDBW
+		}
+	}
+	if val := os.Getenv("REDIS_WRITER_USERNAME"); val != "" {
+		cfg.RedisUsernameW = val
+	} else {
+		if *argRedisUsernameW != "" {
+			cfg.RedisUsernameW = *argRedisUsernameW
+		}
+	}
+	if val := os.Getenv("REDIS_WRITER_PASSWORD"); val != "" {
+		cfg.RedisPasswordW = val
+	} else {
+		if *argRedisPasswordW != "" {
+			cfg.RedisPasswordW = *argRedisPasswordW
+		}
+	}
+
 	if val := os.Getenv("REDIS_PREFIX"); val != "" {
 		cfg.RedisPrefix = val
 	} else {

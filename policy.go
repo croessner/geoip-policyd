@@ -56,11 +56,39 @@ func getPolicyResponse() string {
 		sender           string
 		clientIP         string
 		remote           RemoteClient
-		redisConn        = redisPool.Get()
+		redisConn        = newRedisPool(
+			cfg.RedisAddress,
+			cfg.RedisPort,
+			cfg.RedisDB,
+			cfg.RedisUsername,
+			cfg.RedisPassword,
+		).Get()
+		redisConnW       redis.Conn
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
 		actionText       = "DUNNO"
 	)
+
+	if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
+		redisConnW = newRedisPool(
+			cfg.RedisAddressW,
+			cfg.RedisPortW,
+			cfg.RedisDBW,
+			cfg.RedisUsernameW,
+			cfg.RedisPasswordW,
+		).Get()
+		if cfg.Verbose {
+			log.Printf("Debug: Redis read server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
+			log.Printf("Debug: Redis write server: %s:%d\n", cfg.RedisAddressW, cfg.RedisPortW)
+		}
+		//goland:noinspection GoUnhandledErrorResult
+		defer redisConnW.Close()
+	} else {
+		redisConnW = redisConn
+		if cfg.Verbose {
+			log.Printf("Debug: Redis read and write server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
+		}
+	}
 
 	//goland:noinspection GoUnhandledErrorResult
 	defer redisConn.Close()
@@ -100,7 +128,7 @@ func getPolicyResponse() string {
 						} else {
 							remote.addCountryCode(countryCode)
 							redisValue, _ := json.Marshal(remote)
-							if _, err := redisConn.Do("SET",
+							if _, err := redisConnW.Do("SET",
 								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
 								log.Println("Error:", err)
 								return fmt.Sprintf("action=%s", deferText)
@@ -108,7 +136,7 @@ func getPolicyResponse() string {
 						}
 
 						// For each request update the expiry timestamp
-						if _, err := redisConn.Do("EXPIRE",
+						if _, err := redisConnW.Do("EXPIRE",
 							redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
 							log.Println("Error:", err)
 							return fmt.Sprintf("action=%s", deferText)
