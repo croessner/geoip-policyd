@@ -14,7 +14,7 @@ FROM scratch
 
 LABEL org.opencontainers.image.authors="christian@roessner.email"
 LABEL com.roessner-network-solutions.vendor="Rößner-Network-Solutions"
-LABEL version="2021.0.6"
+LABEL version="2021.0.7"
 LABEL description="Postfix policy service that blocks clients, if they come from too many countires or IP addresses."
 
 # Copy binary to destination image
