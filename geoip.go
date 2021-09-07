@@ -4,9 +4,15 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 	"log"
 	"net"
+	"sync"
 )
 
-var geoipReader *maxminddb.Reader
+type GeoIP struct {
+	Mu     sync.Mutex
+	Reader *maxminddb.Reader
+}
+
+var geoip GeoIP
 
 //goland:noinspection GoUnhandledErrorResult
 func getCountryCode(s string) string {
@@ -19,7 +25,7 @@ func getCountryCode(s string) string {
 
 	ip := net.ParseIP(s)
 	if ip != nil {
-		err = geoipReader.Lookup(ip, &record)
+		err = geoip.Reader.Lookup(ip, &record)
 		if err != nil {
 			log.Panic("Panic: Critical error while looking up ISO code:", err)
 		}
