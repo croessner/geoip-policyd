@@ -29,6 +29,9 @@ type Config struct {
 	ServerPort    int
 	RedisAddress  string
 	RedisPort     int
+	RedisDB       int
+	RedisUsername string
+	RedisPassword string
 	RedisPrefix   string
 	RedisTTL      int
 	GeoipPath     string
@@ -87,6 +90,7 @@ func initConfig(args []string) {
 			Help: "Port for the policy service; default(" + strconv.Itoa(serverPort) + ")",
 		},
 	)
+
 	argRedisAddress := commandServer.String(
 		"A", "redis-address", &argparse.Options{
 			Required: false,
@@ -117,6 +121,25 @@ func initConfig(args []string) {
 			Help: "Port for the Redis service; default(" + strconv.Itoa(redisPort) + ")",
 		},
 	)
+	argRedisDB := commandServer.Int(
+		"", "redis-database-number", &argparse.Options{
+			Required: false,
+			Help:     "Redis database number",
+		},
+	)
+	argRedisUsername := commandServer.String(
+		"", "redis-username", &argparse.Options{
+			Required: false,
+			Help:     "Redis username",
+		},
+	)
+	argRedisPassword := commandServer.String(
+		"", "redis-password", &argparse.Options{
+			Required: false,
+			Help:     "Redis password",
+		},
+	)
+
 	argGeoIPDB := commandServer.String(
 		"g", "geoip-path", &argparse.Options{
 			Required: false,
@@ -233,7 +256,6 @@ func initConfig(args []string) {
 			cfg.ServerAddress = *argServerAddress
 		}
 	}
-
 	if val := os.Getenv("SERVER_PORT"); val != "" {
 		p, err := strconv.Atoi(val)
 		if err != nil {
@@ -253,7 +275,6 @@ func initConfig(args []string) {
 			cfg.RedisAddress = *argRedisAddress
 		}
 	}
-
 	if val := os.Getenv("REDIS_PORT"); val != "" {
 		p, err := strconv.Atoi(val)
 		if err != nil {
@@ -265,15 +286,31 @@ func initConfig(args []string) {
 			cfg.RedisPort = *argRedisPort
 		}
 	}
-
-	if val := os.Getenv("GEOIP_PATH"); val != "" {
-		cfg.GeoipPath = val
+	if val := os.Getenv("REDIS_DATABASE_NUMBER"); val != "" {
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			log.Fatalln("Error: REDIS_DATABASE_NUMBER can not be used:", parser.Usage(err))
+		}
+		cfg.RedisDB = p
 	} else {
-		if *argGeoIPDB != "" {
-			cfg.GeoipPath = *argGeoIPDB
+		if *argRedisDB > 0 {
+			cfg.RedisDB = *argRedisDB
 		}
 	}
-
+	if val := os.Getenv("REDIS_USERNAME"); val != "" {
+		cfg.RedisUsername = val
+	} else {
+		if *argRedisUsername != "" {
+			cfg.RedisUsername = *argRedisUsername
+		}
+	}
+	if val := os.Getenv("REDIS_PASSWORD"); val != "" {
+		cfg.RedisPassword = val
+	} else {
+		if *argRedisPassword != "" {
+			cfg.RedisPassword = *argRedisPassword
+		}
+	}
 	if val := os.Getenv("REDIS_PREFIX"); val != "" {
 		cfg.RedisPrefix = val
 	} else {
@@ -281,7 +318,6 @@ func initConfig(args []string) {
 			cfg.RedisPrefix = *argRedisPrefix
 		}
 	}
-
 	if val := os.Getenv("REDIS_TTL"); val != "" {
 		p, err := strconv.Atoi(val)
 		if err != nil {
@@ -291,6 +327,14 @@ func initConfig(args []string) {
 	} else {
 		if *argRedisTTL != 0 {
 			cfg.RedisTTL = *argRedisTTL
+		}
+	}
+
+	if val := os.Getenv("GEOIP_PATH"); val != "" {
+		cfg.GeoipPath = val
+	} else {
+		if *argGeoIPDB != "" {
+			cfg.GeoipPath = *argGeoIPDB
 		}
 	}
 
@@ -305,7 +349,6 @@ func initConfig(args []string) {
 			cfg.MaxCountries = *argMaxCountries
 		}
 	}
-
 	if val := os.Getenv("MAX_IPS"); val != "" {
 		p, err := strconv.Atoi(val)
 		if err != nil {
