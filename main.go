@@ -73,6 +73,7 @@ func main() {
 		resp, err := http.Get(fmt.Sprintf("%s%s", cfg.HttpURI, "/reload"))
 		if err != nil {
 			fmt.Println("Error", err)
+			os.Exit(1)
 		}
 		fmt.Printf("Reload-status: %s\n", resp.Status)
 	}
