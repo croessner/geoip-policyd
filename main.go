@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-const version string = "2021.0.8.1"
+const version string = "2021.0.8.2"
 
 func httpRootPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -41,9 +41,9 @@ func main() {
 
 	initConfig(os.Args)
 
-	log.Printf("Starting with configuration: %+v", cfg)
-
 	if cfg.CommandServer {
+		log.Printf("Starting with configuration: %+v", cfg)
+
 		geoip.Mu.Lock()
 		geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 		geoip.Mu.Unlock()

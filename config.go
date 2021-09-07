@@ -30,6 +30,8 @@ const (
 type Config struct {
 	ServerAddress string
 	ServerPort    int
+	HttpAddress   string
+	HttpURI       string
 
 	RedisAddress  string
 	RedisPort     int
@@ -50,12 +52,11 @@ type Config struct {
 	MaxCountries int
 	MaxIps       int
 	Verbose      bool
-	WhiteList    Data
-	HttpAddress  string
-	HttpURI      string
 
 	CommandServer bool
 	CommandReload bool
+
+	WhiteList Data
 }
 
 type Data struct {
@@ -546,7 +547,7 @@ func initConfig(args []string) {
 		}
 
 		if commandReload.Happened() {
-			if val := os.Getenv("SERVER_HTTP_URI"); val != "" {
+			if val := os.Getenv("RELOAD_HTTP_URI"); val != "" {
 				cfg.HttpURI = val
 			} else {
 				if *argReloadHttpURI != "" {
