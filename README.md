@@ -139,7 +139,7 @@ Variable | Description
 ---|---
 SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
 SERVER_PORT | Port for the policy service; default(4646)
-HTTP_ADDRESS | HTTP address for incoming requests; default(:8080)
+SERVER_HTTP_ADDRESS | HTTP address for incoming requests; default(:8080)
 REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
 REDIS_PORT | Port for the Redis service; default(6379)
 REDIS_DATABASE_NUMBER | Redis database number
@@ -161,4 +161,4 @@ WHITELIST_PATH | Whitelist with different IP and country limits
 
 Variable | Description
 ---|---
-HTTP_URI | http://127.0.0.1:8080
+RELOAD_HTTP_URI | http://127.0.0.1:8080

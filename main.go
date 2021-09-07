@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-const version string = "2021.0.8"
+const version string = "2021.0.8.1"
 
 func httpRootPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
