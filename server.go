@@ -16,7 +16,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 				fmt.Println("Error: Couldn't accept connection:", err)
 				continue
 			}
-			fmt.Printf("Connection from %v established\n", client.RemoteAddr())
+			fmt.Printf("Connection %v established\n", client.RemoteAddr())
 			ch <- client
 		}
 	}()
@@ -31,6 +31,7 @@ func handleConnection(client net.Conn) {
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
+			fmt.Printf("Connection %v disconnected\n", client.RemoteAddr())
 			client.Close()
 			break
 		}

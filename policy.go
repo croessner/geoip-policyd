@@ -7,8 +7,8 @@ import (
 	"log"
 )
 
-const deferText = "action=DEFER Service temporarily not available"
-const rejectText = "action=REJECT Your account seems to be compromised. Please contact your support"
+const deferText = "DEFER Service temporarily not available"
+const rejectText = "REJECT Your account seems to be compromised. Please contact your support"
 
 type RemoteClient struct {
 	Ips       []string `redis:"ips"`       // All known IP addresses
@@ -59,6 +59,7 @@ func getPolicyResponse() string {
 		redisConn        = redisPool.Get()
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
+		actionText       = "DUNNO"
 	)
 
 	//goland:noinspection GoUnhandledErrorResult
@@ -74,12 +75,12 @@ func getPolicyResponse() string {
 						// Check Redis for the current sender
 						if reply, err := redisConn.Do("GET", key); err != nil {
 							log.Println("Error:", err)
-							return deferText
+							return fmt.Sprintf("action=%s", deferText)
 						} else {
 							if reply != nil {
 								if redisValue, err := redis.Bytes(reply, err); err != nil {
 									log.Println("Error:", err)
-									return deferText
+									return fmt.Sprintf("action=%s", deferText)
 								} else {
 									if err := json.Unmarshal(redisValue, &remote); err != nil {
 										log.Println("Error:", err)
@@ -102,7 +103,7 @@ func getPolicyResponse() string {
 							if _, err := redisConn.Do("SET",
 								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
 								log.Println("Error:", err)
-								return deferText
+								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
 
@@ -110,7 +111,7 @@ func getPolicyResponse() string {
 						if _, err := redisConn.Do("EXPIRE",
 							redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
 							log.Println("Error:", err)
-							return deferText
+							return fmt.Sprintf("action=%s", deferText)
 						}
 
 						if len(cfg.WhiteList.Data) > 0 {
@@ -126,17 +127,13 @@ func getPolicyResponse() string {
 								}
 							}
 						}
-						log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
-							"#countries=%d/%d; #ip_addresses=%d/%d\n",
-							sender, remote.Countries, remote.Ips,
-							len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps)
 
 						if len(remote.Countries) > usedMaxCountries {
-							return rejectText
+							actionText = rejectText
 						}
 
 						if len(remote.Ips) > usedMaxIps {
-							return rejectText
+							actionText = rejectText
 						}
 					}
 				}
@@ -144,5 +141,10 @@ func getPolicyResponse() string {
 		}
 	}
 
-	return "action=DUNNO"
+	log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
+		"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
+		sender, remote.Countries, remote.Ips,
+		len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
+
+	return fmt.Sprintf("action=%s", actionText)
 }

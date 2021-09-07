@@ -1,15 +1,18 @@
 {
   "data": [
     {
+      "comment": "Allow only two countries and a maximum of 5 IP addresses",
       "sender": "christian@roessner.email",
       "ips": 5,
       "countries": 2
     },
     {
+      "comment": "Allow at least 4 countries and go with the default IP address limit",
       "sender": "test1@example.com",
       "countries": 4
     },
     {
+      "comment": "Go with the default country limit, but allow up to 30 IP addresses",
       "sender": "test2@example.com",
       "ips": 30
     }

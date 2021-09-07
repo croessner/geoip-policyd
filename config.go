@@ -43,6 +43,7 @@ type Data struct {
 }
 
 type Account struct {
+	Comment   string `json:"comment"`
 	Sender    string `json:"sender"`
 	Ips       int    `json:"ips"`
 	Countries int    `json:"countries"`
