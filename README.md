@@ -128,6 +128,28 @@ Arguments:
 
 ```
 
+## Stats options
+
+```shell
+geoip-policyd stats --help
+```
+
+produces the following output:
+
+```
+usage: geoip-policyd stats [-h|--help] [--print-whitelist] [--http-uri
+                     "<value>"] [-v|--verbose] [--version]
+
+                     Get statistics from geoip-policyd server
+
+Arguments:
+
+  -h  --help             Print help information
+      --print-whitelist  Print out the currently loaded whitelist (JSON-format)
+      --http-uri         HTTP URI to the REST server; default(http://127.0.0.1:8080)
+  -v  --verbose          Verbose mode
+      --version          Current version
+```
 ## Environment variables
 
 The following environment variables can be used to configure the policy service. This is especially useful, if you plan
@@ -158,6 +180,12 @@ MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
 WHITELIST_PATH | Whitelist with different IP and country limits
 
 ### Reload
+
+Variable | Description
+---|---
+HTTP_URI | http://127.0.0.1:8080
+
+### Stats
 
 Variable | Description
 ---|---
