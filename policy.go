@@ -15,8 +15,6 @@ type RemoteClient struct {
 	Countries []string `redis:"countries"` // All known country codes
 }
 
-var policyRequest map[string]string
-
 func (r *RemoteClient) addCountryCode(countryCode string) {
 	if len(r.Countries) == 0 {
 		r.Countries = append(r.Countries, countryCode)
@@ -49,7 +47,7 @@ func (r *RemoteClient) addIPAddress(ip string) {
 	}
 }
 
-func getPolicyResponse() string {
+func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) string {
 	var (
 		ok               bool
 		request          string

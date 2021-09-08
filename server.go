@@ -24,9 +24,9 @@ func clientConnections(listener net.Listener) chan net.Conn {
 }
 
 //goland:noinspection GoUnhandledErrorResult
-func handleConnection(client net.Conn) {
+func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	b := bufio.NewReader(client)
-	policyRequest = make(map[string]string)
+	var policyRequest = make(map[string]string)
 
 	for {
 		lineBytes, err := b.ReadBytes('\n')
@@ -45,7 +45,7 @@ func handleConnection(client net.Conn) {
 				log.Println("Debug:", policyRequest)
 			}
 
-			result := getPolicyResponse()
+			result := getPolicyResponse(cfg, policyRequest)
 			client.Write([]byte(result + "\n\n"))
 			policyRequest = make(map[string]string) // Clear policy request for next connection
 		}

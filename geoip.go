@@ -12,8 +12,6 @@ type GeoIP struct {
 	Reader *maxminddb.Reader
 }
 
-var geoip GeoIP
-
 //goland:noinspection GoUnhandledErrorResult
 func getCountryCode(s string) string {
 	var record struct {

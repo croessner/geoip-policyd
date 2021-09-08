@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/akamensky/argparse"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Defaults
@@ -27,7 +26,7 @@ const (
 	httpURI       = "http://127.0.0.1:8080"
 )
 
-type Config struct {
+type CmdLineConfig struct {
 	ServerAddress string
 	ServerPort    int
 	HttpAddress   string
@@ -56,10 +55,12 @@ type Config struct {
 	CommandServer bool
 	CommandReload bool
 
-	WhiteList Data
+	WhiteListPath string
+	WhiteList     WhiteList
 }
 
-type Data struct {
+type WhiteList struct {
+	Mu sync.Mutex
 	Data []Account `json:"data"`
 }
 
@@ -70,10 +71,7 @@ type Account struct {
 	Countries int    `json:"countries"`
 }
 
-var cfg Config
-var data Data
-
-func initConfig(args []string) {
+func (c *CmdLineConfig) Init(args []string) {
 	parser := argparse.NewParser("geoip-policyd", "Detect compromised e-mail accounts")
 
 	commandServer := parser.NewCommand("server", "Run a geoip policy server")
@@ -295,7 +293,7 @@ func initConfig(args []string) {
 			Help: "Maximum number of IP addresses before rejecting e-mails; default(" + strconv.Itoa(maxIps) + ")",
 		},
 	)
-	argServerWhiteList := commandServer.String(
+	argServerWhiteListPath := commandServer.String(
 		"w", "whitelist-path", &argparse.Options{
 			Required: false,
 			Help:     "Whitelist with different IP and country limits",
@@ -328,38 +326,36 @@ func initConfig(args []string) {
 	}
 
 	// Map defaults
-	cfg = Config{
-		ServerAddress: serverAddress,
-		ServerPort:    serverPort,
-		RedisAddress:  redisAddress,
-		RedisPort:     redisPort,
-		RedisAddressW: redisAddress,
-		RedisPortW:    redisPort,
-		RedisPrefix:   redisPrefix,
-		RedisTTL:      redisTTL,
-		GeoipPath:     geoipPath,
-		MaxCountries:  maxCountries,
-		MaxIps:        maxIps,
-		HttpAddress:   httpAddress,
-		HttpURI:       httpURI,
-	}
+	c.ServerAddress = serverAddress
+	c.ServerPort = serverPort
+	c.RedisAddress  =  redisAddress
+	c.RedisPort = redisPort
+	c.RedisAddressW = redisAddress
+	c.RedisPortW = redisPort
+	c.RedisPrefix = redisPrefix
+	c.RedisTTL = redisTTL
+	c.GeoipPath = geoipPath
+	c.MaxCountries = maxCountries
+	c.MaxIps = maxIps
+	c.HttpAddress = httpAddress
+	c.HttpURI = httpURI
 
 	if *argVersion {
 		fmt.Println("Version:", version)
 		os.Exit(0)
 	}
 
-	cfg.Verbose = *argVerbose
+	c.Verbose = *argVerbose
 
-	cfg.CommandServer = commandServer.Happened()
-	cfg.CommandReload = commandReload.Happened()
+	c.CommandServer = commandServer.Happened()
+	c.CommandReload = commandReload.Happened()
 
 	if commandServer.Happened() {
 		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
-			cfg.ServerAddress = val
+			c.ServerAddress = val
 		} else {
 			if *argServerAddress != "" {
-				cfg.ServerAddress = *argServerAddress
+				c.ServerAddress = *argServerAddress
 			}
 		}
 		if val := os.Getenv("SERVER_PORT"); val != "" {
@@ -367,25 +363,25 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: SERVER_PORT an not be used:", parser.Usage(err))
 			}
-			cfg.ServerPort = p
+			c.ServerPort = p
 		} else {
 			if *argServerPort != 0 {
-				cfg.ServerPort = *argServerPort
+				c.ServerPort = *argServerPort
 			}
 		}
 		if val := os.Getenv("SERVER_HTTP_ADDRESS"); val != "" {
-			cfg.HttpAddress = val
+			c.HttpAddress = val
 		} else {
 			if *argServerHttpAddress != "" {
-				cfg.HttpAddress = *argServerHttpAddress
+				c.HttpAddress = *argServerHttpAddress
 			}
 		}
 
 		if val := os.Getenv("REDIS_ADDRESS"); val != "" {
-			cfg.RedisAddress = val
+			c.RedisAddress = val
 		} else {
 			if *argServerRedisAddress != "" {
-				cfg.RedisAddress = *argServerRedisAddress
+				c.RedisAddress = *argServerRedisAddress
 			}
 		}
 		if val := os.Getenv("REDIS_PORT"); val != "" {
@@ -393,10 +389,10 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: REDIS_PORT can not be used:", parser.Usage(err))
 			}
-			cfg.RedisPort = p
+			c.RedisPort = p
 		} else {
 			if *argServerRedisPort != 0 {
-				cfg.RedisPort = *argServerRedisPort
+				c.RedisPort = *argServerRedisPort
 			}
 		}
 		if val := os.Getenv("REDIS_DATABASE_NUMBER"); val != "" {
@@ -404,32 +400,32 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: REDIS_DATABASE_NUMBER can not be used:", parser.Usage(err))
 			}
-			cfg.RedisDB = p
+			c.RedisDB = p
 		} else {
 			if *argServerRedisDB > 0 {
-				cfg.RedisDB = *argServerRedisDB
+				c.RedisDB = *argServerRedisDB
 			}
 		}
 		if val := os.Getenv("REDIS_USERNAME"); val != "" {
-			cfg.RedisUsername = val
+			c.RedisUsername = val
 		} else {
 			if *argServerRedisUsername != "" {
-				cfg.RedisUsername = *argServerRedisUsername
+				c.RedisUsername = *argServerRedisUsername
 			}
 		}
 		if val := os.Getenv("REDIS_PASSWORD"); val != "" {
-			cfg.RedisPassword = val
+			c.RedisPassword = val
 		} else {
 			if *argServerRedisPassword != "" {
-				cfg.RedisPassword = *argServerRedisPassword
+				c.RedisPassword = *argServerRedisPassword
 			}
 		}
 
 		if val := os.Getenv("REDIS_WRITER_ADDRESS"); val != "" {
-			cfg.RedisAddressW = val
+			c.RedisAddressW = val
 		} else {
 			if *argServerRedisAddressW != "" {
-				cfg.RedisAddressW = *argServerRedisAddressW
+				c.RedisAddressW = *argServerRedisAddressW
 			}
 		}
 		if val := os.Getenv("REDIS_WRITER_PORT"); val != "" {
@@ -437,10 +433,10 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: REDIS_WRITER_PORT can not be used:", parser.Usage(err))
 			}
-			cfg.RedisPortW = p
+			c.RedisPortW = p
 		} else {
 			if *argServerRedisPortW != 0 {
-				cfg.RedisPortW = *argServerRedisPortW
+				c.RedisPortW = *argServerRedisPortW
 			}
 		}
 		if val := os.Getenv("REDIS_WRITER_DATABASE_NUMBER"); val != "" {
@@ -448,32 +444,32 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: REDIS_WRITER_DATABASE_NUMBER can not be used:", parser.Usage(err))
 			}
-			cfg.RedisDBW = p
+			c.RedisDBW = p
 		} else {
 			if *argServerRedisDBW > 0 {
-				cfg.RedisDBW = *argServerRedisDBW
+				c.RedisDBW = *argServerRedisDBW
 			}
 		}
 		if val := os.Getenv("REDIS_WRITER_USERNAME"); val != "" {
-			cfg.RedisUsernameW = val
+			c.RedisUsernameW = val
 		} else {
 			if *argServerRedisUsernameW != "" {
-				cfg.RedisUsernameW = *argServerRedisUsernameW
+				c.RedisUsernameW = *argServerRedisUsernameW
 			}
 		}
 		if val := os.Getenv("REDIS_WRITER_PASSWORD"); val != "" {
-			cfg.RedisPasswordW = val
+			c.RedisPasswordW = val
 		} else {
 			if *argServerRedisPasswordW != "" {
-				cfg.RedisPasswordW = *argServerRedisPasswordW
+				c.RedisPasswordW = *argServerRedisPasswordW
 			}
 		}
 
 		if val := os.Getenv("REDIS_PREFIX"); val != "" {
-			cfg.RedisPrefix = val
+			c.RedisPrefix = val
 		} else {
 			if *argServerRedisPrefix != "" {
-				cfg.RedisPrefix = *argServerRedisPrefix
+				c.RedisPrefix = *argServerRedisPrefix
 			}
 		}
 		if val := os.Getenv("REDIS_TTL"); val != "" {
@@ -481,18 +477,18 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: REDIS_TTL can not be used:", parser.Usage(err))
 			}
-			cfg.RedisTTL = p
+			c.RedisTTL = p
 		} else {
 			if *argServerRedisTTL != 0 {
-				cfg.RedisTTL = *argServerRedisTTL
+				c.RedisTTL = *argServerRedisTTL
 			}
 		}
 
 		if val := os.Getenv("GEOIP_PATH"); val != "" {
-			cfg.GeoipPath = val
+			c.GeoipPath = val
 		} else {
 			if *argServerGeoIPDB != "" {
-				cfg.GeoipPath = *argServerGeoIPDB
+				c.GeoipPath = *argServerGeoIPDB
 			}
 		}
 
@@ -501,10 +497,10 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: MAX_COUNTRIES can not be used:", parser.Usage(err))
 			}
-			cfg.MaxCountries = p
+			c.MaxCountries = p
 		} else {
 			if *argServerMaxCountries != 0 {
-				cfg.MaxCountries = *argServerMaxCountries
+				c.MaxCountries = *argServerMaxCountries
 			}
 		}
 		if val := os.Getenv("MAX_IPS"); val != "" {
@@ -512,51 +508,32 @@ func initConfig(args []string) {
 			if err != nil {
 				log.Fatalln("Error: MAX_IPS can not be used:", parser.Usage(err))
 			}
-			cfg.MaxIps = p
+			c.MaxIps = p
 		} else {
 			if *argServerMaxIps != 0 {
-				cfg.MaxIps = *argServerMaxIps
+				c.MaxIps = *argServerMaxIps
 			}
 		}
-
-		var wlFileName string
 
 		if val := os.Getenv("WHITELIST_PATH"); val != "" {
-			wlFileName = val
+			c.WhiteListPath = val
 		} else {
-			if *argServerWhiteList != "" {
-				wlFileName = *argServerWhiteList
+			if *argServerWhiteListPath != "" {
+				c.WhiteListPath = *argServerWhiteListPath
 			}
 		}
+	}
 
-		if wlFileName != "" {
-			jsonFile, err := os.Open(wlFileName)
-			if err != nil {
-				log.Fatalln("Error:", err)
+	if commandReload.Happened() {
+		if val := os.Getenv("RELOAD_HTTP_URI"); val != "" {
+			c.HttpURI = val
+		} else {
+			if *argReloadHttpURI != "" {
+				c.HttpURI = *argReloadHttpURI
 			}
-
-			//goland:noinspection GoUnhandledErrorResult
-			defer jsonFile.Close()
-
-			byteValue, _ := ioutil.ReadAll(jsonFile)
-			if err := json.Unmarshal(byteValue, &data); err != nil {
-				log.Fatalln("Error:", err)
-			}
-
-			cfg.WhiteList = data
 		}
-
-		if commandReload.Happened() {
-			if val := os.Getenv("RELOAD_HTTP_URI"); val != "" {
-				cfg.HttpURI = val
-			} else {
-				if *argReloadHttpURI != "" {
-					cfg.HttpURI = *argReloadHttpURI
-				}
-			}
-			if strings.HasSuffix(cfg.HttpURI, "/") {
-				cfg.HttpURI = cfg.HttpURI[:len(cfg.HttpURI)-1]
-			}
+		if strings.HasSuffix(c.HttpURI, "/") {
+			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
 		}
 	}
 }

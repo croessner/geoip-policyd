@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/oschwald/maxminddb-golang"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -10,7 +12,12 @@ import (
 	"strconv"
 )
 
-const version string = "2021.0.8.2"
+const version string = "2021.0.9"
+
+var (
+	cfg *CmdLineConfig
+	geoip *GeoIP
+)
 
 func httpRootPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -27,8 +34,35 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Println("Reloaded GeoLite2-City database file")
 
+			if cfg.WhiteListPath != "" {
+				initWhitelist(cfg)
+				log.Println("Reloaded whitelist file")
+			}
+
 			//goland:noinspection GoUnhandledErrorResult
 			fmt.Fprintf(w, "OK reload")
+		}
+	}
+}
+
+func initWhitelist(cfg *CmdLineConfig) {
+	if cfg.WhiteListPath != "" {
+		jsonFile, err := os.Open(cfg.WhiteListPath)
+		if err != nil {
+			log.Fatalln("Error:", err)
+		}
+
+		//goland:noinspection GoUnhandledErrorResult
+		defer jsonFile.Close()
+
+		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
+			log.Fatalln("Error:", err)
+		} else {
+			cfg.WhiteList.Mu.Lock()
+			if err := json.Unmarshal(byteValue, &cfg.WhiteList); err != nil {
+				log.Fatalln("Error:", err)
+			}
+			cfg.WhiteList.Mu.Unlock()
 		}
 	}
 }
@@ -39,11 +73,15 @@ func main() {
 		server net.Listener
 	)
 
-	initConfig(os.Args)
+	cfg = new(CmdLineConfig)
+	cfg.Init(os.Args)
 
 	if cfg.CommandServer {
+		initWhitelist(cfg)
+
 		log.Printf("Starting with configuration: %+v", cfg)
 
+		geoip = new(GeoIP)
 		geoip.Mu.Lock()
 		geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 		geoip.Mu.Unlock()
@@ -59,13 +97,14 @@ func main() {
 			log.Fatal(http.ListenAndServe(cfg.HttpAddress, nil))
 		}()
 
+
 		server, err = net.Listen("tcp", cfg.ServerAddress+":"+strconv.Itoa(cfg.ServerPort))
 		if server == nil {
 			log.Panic("Error: Unable to start server:", err)
 		}
 		clientChannel := clientConnections(server)
 		for {
-			go handleConnection(<-clientChannel)
+			go handleConnection(<-clientChannel, cfg)
 		}
 	}
 
