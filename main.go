@@ -9,13 +9,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
-const version string = "2021.0.9"
+const version string = "2021.0.10"
 
 var (
-	cfg *CmdLineConfig
+	cfg   *CmdLineConfig
 	geoip *GeoIP
 )
 
@@ -73,13 +75,24 @@ func main() {
 		server net.Listener
 	)
 
+	sigs := make(chan os.Signal, 1)
+
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
 	cfg = new(CmdLineConfig)
 	cfg.Init(os.Args)
+
+	go func() {
+		sig := <-sigs
+		log.Println("Shutting down. Received signal:", sig)
+		os.Exit(0)
+	}()
 
 	if cfg.CommandServer {
 		initWhitelist(cfg)
 
-		log.Printf("Starting with configuration: %+v", cfg)
+		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
+		log.Printf("Starting geoip-policyd HTTP service with address: '%s'", cfg.HttpAddress)
 
 		geoip = new(GeoIP)
 		geoip.Mu.Lock()
@@ -96,7 +109,6 @@ func main() {
 			http.HandleFunc("/", httpRootPage)
 			log.Fatal(http.ListenAndServe(cfg.HttpAddress, nil))
 		}()
-
 
 		server, err = net.Listen("tcp", cfg.ServerAddress+":"+strconv.Itoa(cfg.ServerPort))
 		if server == nil {
