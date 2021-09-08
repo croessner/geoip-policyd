@@ -44,6 +44,10 @@ const (
 	httpURI       = "http://127.0.0.1:8080"
 )
 
+type CommandStatsOption struct {
+	printWhitelist bool
+}
+
 type CmdLineConfig struct {
 	ServerAddress string
 	ServerPort    int
@@ -72,6 +76,8 @@ type CmdLineConfig struct {
 
 	CommandServer bool
 	CommandReload bool
+	CommandStats  bool
+	CommandStatsOption
 
 	WhiteListPath string
 	WhiteList     WhiteList
@@ -338,6 +344,21 @@ func (c *CmdLineConfig) Init(args []string) {
 		},
 	)
 
+	commandStats := parser.NewCommand("stats", "Get statistics from geoip-policyd server")
+
+	argStatsPrintWhitelist := commandStats.Flag(
+		"", "print-whitelist", &argparse.Options{
+			Required: false,
+			Help:     "Print out the currently loaded whitelist (JSON-format)",
+		},
+	)
+	argStatsHttpURI := commandStats.String(
+		"", "http-uri", &argparse.Options{
+			Required: false,
+			Help:     "HTTP URI to the REST server; default(" + httpURI + ")",
+		},
+	)
+
 	err := parser.Parse(args)
 	if err != nil {
 		log.Fatalln(parser.Usage(err))
@@ -367,6 +388,7 @@ func (c *CmdLineConfig) Init(args []string) {
 
 	c.CommandServer = commandServer.Happened()
 	c.CommandReload = commandReload.Happened()
+	c.CommandStats = commandStats.Happened()
 
 	if commandServer.Happened() {
 		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
@@ -543,7 +565,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	}
 
 	if commandReload.Happened() {
-		if val := os.Getenv("RELOAD_HTTP_URI"); val != "" {
+		if val := os.Getenv("HTTP_URI"); val != "" {
 			c.HttpURI = val
 		} else {
 			if *argReloadHttpURI != "" {
@@ -552,6 +574,23 @@ func (c *CmdLineConfig) Init(args []string) {
 		}
 		if strings.HasSuffix(c.HttpURI, "/") {
 			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
+		}
+	}
+
+	if commandStats.Happened() {
+		if val := os.Getenv("HTTP_URI"); val != "" {
+			c.HttpURI = val
+		} else {
+			if *argStatsHttpURI != "" {
+				c.HttpURI = *argStatsHttpURI
+			}
+		}
+		if strings.HasSuffix(c.HttpURI, "/") {
+			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
+		}
+
+		if *argStatsPrintWhitelist {
+			c.CommandStatsOption.printWhitelist = true
 		}
 	}
 }

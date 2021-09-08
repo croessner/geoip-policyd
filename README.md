@@ -161,4 +161,4 @@ WHITELIST_PATH | Whitelist with different IP and country limits
 
 Variable | Description
 ---|---
-RELOAD_HTTP_URI | http://127.0.0.1:8080
+HTTP_URI | http://127.0.0.1:8080

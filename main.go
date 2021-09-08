@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/oschwald/maxminddb-golang"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -32,7 +33,7 @@ import (
 	"syscall"
 )
 
-const version string = "2021.0.10"
+const version string = "2021.0.11"
 
 var (
 	cfg   *CmdLineConfig
@@ -155,5 +156,17 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("Reload-status: %s\n", resp.Status)
+	}
+
+	if cfg.CommandStats {
+		if cfg.CommandStatsOption.printWhitelist {
+			resp, err := http.Get(fmt.Sprintf("%s%s", cfg.HttpURI, "/whitelist"))
+			if err != nil {
+				fmt.Println("Error", err)
+				os.Exit(1)
+			}
+			//goland:noinspection GoUnhandledErrorResult
+			io.Copy(os.Stdout, resp.Body)
+		}
 	}
 }
