@@ -62,6 +62,16 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 			//goland:noinspection GoUnhandledErrorResult
 			fmt.Fprintf(w, "OK reload")
 		}
+
+		if r.RequestURI == "/whitelist" {
+			if jsonValue, err := json.Marshal(cfg.WhiteList.Data); err != nil {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintln(w, "[]")
+			} else {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintf(w, "%+v\n", string(jsonValue))
+			}
+		}
 	}
 }
 
