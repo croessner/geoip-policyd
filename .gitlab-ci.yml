@@ -2,6 +2,9 @@ image: golang:1.16-alpine
 
 variables:
   REPO_NAME: gitlab.roessner-net.de/croessner/geoip-policyd
+  CGO_ENABLED: 0
+  GOOS: linux
+  GOARCH: amd64
 
 before_script:
   - mkdir -p $GOPATH/src/$(dirname $REPO_NAME)
