@@ -33,7 +33,7 @@ import (
 	"syscall"
 )
 
-const version string = "2021.0.11"
+const version string = "@@gittag@@-@@gitcommit@@"
 
 var (
 	cfg   *CmdLineConfig
