@@ -21,6 +21,7 @@ package main
 import (
 	"fmt"
 	"github.com/akamensky/argparse"
+	"github.com/go-ldap/ldap/v3"
 	"log"
 	"net"
 	"os"
@@ -42,6 +43,7 @@ const (
 	maxIps        = 10
 	httpAddress   = ":8080"
 	httpURI       = "http://127.0.0.1:8080"
+	maxRetries    = 9
 )
 
 type CommandStatsOption struct {
@@ -80,7 +82,11 @@ type CmdLineConfig struct {
 	CommandStatsOption
 
 	WhiteListPath string
-	WhiteList     WhiteList
+	WhiteList
+
+	// Addons
+	UseLDAP bool
+	LDAP
 }
 
 type WhiteList struct {
@@ -323,6 +329,109 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help:     "Whitelist with different IP and country limits",
 		},
 	)
+	argServerUseLDAP := commandServer.Flag(
+		"", "use-ldap", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Enable LDAP support; default(false)",
+		},
+	)
+	argServerLDAPServerURIs := commandServer.StringList(
+		"", "ldap-server-uri", &argparse.Options{
+			Required: false,
+			Default:  []string{"ldap://127.0.0.1:389/"},
+			Help:     "Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)",
+		},
+	)
+	argServerLDAPBaseDN := commandServer.String(
+		"", "ldap-basedn", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "Base DN; default(empty)",
+		},
+	)
+	argServerLDAPBindDN := commandServer.String(
+		"", "ldap-binddn", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "Bind DN; default(empty)",
+		},
+	)
+	argServerLDAPBindPWPATH := commandServer.String(
+		"", "ldap-bindpw-path", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "File containing the LDAP users password; default(empty)",
+		},
+	)
+	argServerLDAPFilter := commandServer.String(
+		"", "ldap-filter", &argparse.Options{
+			Required: false,
+			Default:  "(&(objectClass=*)(mailAlias=%s))",
+			Help:     "Filter with %s placeholder; default('(&(objectClass=*)(mailAlias=%s))')",
+		},
+	)
+	argServerLDAPResultAttr := commandServer.String(
+		"", "ldap-result-attribute", &argparse.Options{
+			Required: false,
+			Default:  "mailAccount",
+			Help:     "Result attribute for the requested mail sender; default(mailAccount)",
+		},
+	)
+	argServerLDAPStartTLS := commandServer.Flag(
+		"", "ldap-starttls", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "If this option is given, use StartTLS",
+		},
+	)
+	argServerLDAPTLSCAFile := commandServer.String(
+		"", "ldap-tls-cafile", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "File containing TLS CA certificate(s); default(empty)",
+		},
+	)
+	argServerLDAPTLSClientCert := commandServer.String(
+		"", "ldap-tls-client-cert", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "File containing a TLS client certificate; default(empty)",
+		},
+	)
+	argServerLDAPTLSClientKey := commandServer.String(
+		"", "ldap-tls-client-key", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "File containing a TLS client key; default(empty)",
+		},
+	)
+	argServerLDAPSASLExternal := commandServer.Flag(
+		"", "ldap-sasl-external", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Use SASL/EXTERNAL instead of a simple bind",
+		},
+	)
+	argServerLDAPScope := commandServer.String(
+		"", "ldap-scope", &argparse.Options{
+			Required: false,
+			Default:  "sub",
+			Validate: func(opt []string) error {
+				switch {
+				case opt[0] == "base":
+					return nil
+				case opt[0] == "one":
+					return nil
+				case opt[0] == "sub":
+					return nil
+				default:
+					return fmt.Errorf("value '%s' must be one of: one, base or sub", opt[0])
+				}
+			},
+			Help: "LDAP search scope [base, one, sub]; default(sub)",
+		},
+	)
 
 	argVerbose := parser.Flag(
 		"v", "verbose", &argparse.Options{
@@ -560,6 +669,107 @@ func (c *CmdLineConfig) Init(args []string) {
 		} else {
 			if *argServerWhiteListPath != "" {
 				c.WhiteListPath = *argServerWhiteListPath
+			}
+		}
+
+		if val := os.Getenv("USE_LDAP"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err)
+			}
+			c.UseLDAP = p
+		} else {
+			c.UseLDAP = *argServerUseLDAP
+		}
+
+		if c.UseLDAP {
+			if val := os.Getenv("LDAP_SERVER_URIS"); val != "" {
+				p := strings.Split(val, ",")
+				for i, uri := range p {
+					p[i] = strings.TrimSpace(uri)
+				}
+				c.LDAP.ServerURIs = p
+			} else {
+				c.LDAP.ServerURIs = *argServerLDAPServerURIs
+			}
+			if val := os.Getenv("LDAP_BASEDN"); val != "" {
+				c.LDAP.BaseDN = val
+			} else {
+				c.LDAP.BaseDN = *argServerLDAPBaseDN
+			}
+			if val := os.Getenv("LDAP_BINDDN"); val != "" {
+				c.LDAP.BindDN = val
+			} else {
+				c.LDAP.BindDN = *argServerLDAPBindDN
+			}
+			if val := os.Getenv("LDAP_BINDPW_PATH"); val != "" {
+				c.LDAP.BindPWPATH = val
+			} else {
+				c.LDAP.BindPWPATH = *argServerLDAPBindPWPATH
+			}
+			if val := os.Getenv("LDAP_FILTER"); val != "" {
+				c.LDAP.Filter = val
+			} else {
+				c.LDAP.Filter = *argServerLDAPFilter
+			}
+			if val := os.Getenv("LDAP_RESULT_ATTRIBUTE"); val != "" {
+				c.LDAP.ResultAttr = []string{val}
+			} else {
+				c.LDAP.ResultAttr = []string{*argServerLDAPResultAttr}
+			}
+			if val := os.Getenv("LDAP_STARTTLS"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.LDAP.StartTLS = p
+			} else {
+				c.LDAP.StartTLS = *argServerLDAPStartTLS
+			}
+			if val := os.Getenv("LDAP_TLS_CAFILE"); val != "" {
+				c.LDAP.TLSCAFile = val
+			} else {
+				c.LDAP.TLSCAFile = *argServerLDAPTLSCAFile
+			}
+			if val := os.Getenv("LDAP_TLS_CLIENT_CERT"); val != "" {
+				c.LDAP.TLSClientCert = val
+			} else {
+				c.LDAP.TLSClientCert = *argServerLDAPTLSClientCert
+			}
+			if val := os.Getenv("LDAP_TLS_CLIENT_KEY"); val != "" {
+				c.LDAP.TLSClientKey = val
+			} else {
+				c.LDAP.TLSClientKey = *argServerLDAPTLSClientKey
+			}
+			if val := os.Getenv("LDAP_SASL_EXTERNAL"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.LDAP.SASLExternal = p
+			} else {
+				c.LDAP.SASLExternal = *argServerLDAPSASLExternal
+			}
+			if val := os.Getenv("LDAP_SCOPE"); val != "" {
+				switch val {
+				case "base":
+					c.LDAP.Scope = ldap.ScopeBaseObject
+				case "one":
+					c.LDAP.Scope = ldap.ScopeSingleLevel
+				case "sub":
+					c.LDAP.Scope = ldap.ScopeWholeSubtree
+				default:
+					log.Fatalln(parser.Usage(fmt.Sprintf("value '%s' must be one of: one, base or sub", val)))
+				}
+			} else {
+				switch *argServerLDAPScope {
+				case "base":
+					c.LDAP.Scope = ldap.ScopeBaseObject
+				case "one":
+					c.LDAP.Scope = ldap.ScopeSingleLevel
+				case "sub":
+					c.LDAP.Scope = ldap.ScopeWholeSubtree
+				}
 			}
 		}
 	}

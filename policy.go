@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"log"
+	"strings"
 )
 
 const deferText = "DEFER Service temporarily not available"
@@ -67,12 +68,14 @@ func (r *RemoteClient) addIPAddress(ip string) {
 
 func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) string {
 	var (
-		ok        bool
-		request   string
-		sender    string
-		clientIP  string
-		remote    RemoteClient
-		redisConn = newRedisPool(
+		ok         bool
+		request    string
+		sender     string
+		clientIP   string
+		ldapResult string
+		err        error
+		remote     RemoteClient
+		redisConn  = newRedisPool(
 			cfg.RedisAddress,
 			cfg.RedisPort,
 			cfg.RedisDB,
@@ -83,6 +86,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
 		actionText       = "DUNNO"
+		ldapServer       = &cfg.LDAP
 	)
 
 	if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
@@ -113,6 +117,21 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		if request == "smtpd_access_policy" {
 			if sender, ok = policyRequest["sender"]; ok {
 				if len(sender) > 0 {
+					if ldapResult, err = ldapServer.Search(sender); err != nil {
+						log.Println("Info:", err)
+						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
+							ldapServer.Mu.Lock()
+							if ldapServer.LDAPConn == nil {
+								ldapServer.Connect()
+								ldapServer.Bind()
+							}
+							ldapServer.Mu.Unlock()
+							ldapResult, _ = ldapServer.Search(sender)
+						}
+					}
+					if ldapResult != "" {
+						sender = ldapResult
+					}
 					if clientIP, ok = policyRequest["client_address"]; ok {
 						key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
 

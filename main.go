@@ -100,8 +100,9 @@ func initWhitelist(cfg *CmdLineConfig) {
 
 func main() {
 	var (
-		err    error
-		server net.Listener
+		err        error
+		server     net.Listener
+		ldapServer *LDAP
 	)
 
 	sigs := make(chan os.Signal, 1)
@@ -122,6 +123,12 @@ func main() {
 
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 		log.Printf("Starting geoip-policyd HTTP service with address: '%s'", cfg.HttpAddress)
+
+		if cfg.UseLDAP {
+			ldapServer = &cfg.LDAP
+			ldapServer.Connect()
+			ldapServer.Bind()
+		}
 
 		geoip = new(GeoIP)
 		geoip.Mu.Lock()
