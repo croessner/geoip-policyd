@@ -60,7 +60,6 @@ func (l *LDAP) Connect() {
 			log.Fatalln("Error: Could not connect to any LDAP servers")
 		}
 
-		ldapCounter += 1
 		if ldapCounter > len(l.ServerURIs)-1 {
 			ldapCounter = 0
 		}
@@ -70,6 +69,7 @@ func (l *LDAP) Connect() {
 		}
 		l.LDAPConn, err = ldap.DialURL(l.ServerURIs[ldapCounter])
 		if err != nil {
+			ldapCounter += 1
 			retryLimit += 1
 			continue
 		}
