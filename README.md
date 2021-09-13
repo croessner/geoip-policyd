@@ -63,8 +63,8 @@ produces the following output:
 
 ```
 usage: geoip-policyd server [-h|--help] [-a|--server-address "<value>"]
-                     [-p|--server-port <integer>] [-A|--redis-address
-                     "<value>"] [-P|--redis-port <integer>]
+                     [-p|--server-port <integer>] [--http-address "<value>"]
+                     [-A|--redis-address "<value>"] [-P|--redis-port <integer>]
                      [--redis-database-number <integer>] [--redis-username
                      "<value>"] [--redis-password "<value>"]
                      [--redis-writer-address "<value>"] [--redis-writer-port
@@ -73,36 +73,55 @@ usage: geoip-policyd server [-h|--help] [-a|--server-address "<value>"]
                      [--redis-writer-password "<value>"] [--redis-prefix
                      "<value>"] [--redis-ttl <integer>] [-g|--geoip-path
                      "<value>"] [--max-countries <integer>] [--max-ips
-                     <integer>] [-w|--whitelist-path "<value>"] [-v|--verbose]
-                     [--version]
+                     <integer>] [-w|--whitelist-path "<value>"] [--use-ldap]
+                     [--ldap-server-uri "<value>" [--ldap-server-uri "<value>" ...]]
+                     [--ldap-basedn "<value>"] [--ldap-binddn "<value>"]
+                     [--ldap-bindpw-path "<value>"] [--ldap-filter "<value>"]
+                     [--ldap-result-attribute "<value>"] [--ldap-starttls]
+                     [--ldap-tls-cafile "<value>"] [--ldap-tls-client-cert
+                     "<value>"] [--ldap-tls-client-key "<value>"]
+                     [--ldap-sasl-external] [--ldap-scope "<value>"]
+                     [-v|--verbose] [--version]
 
                      Run a geoip policy server
 
 Arguments:
 
   -h  --help                          Print help information
-  -a  --server-address                IPv4 or IPv6 address for the policy service; default(127.0.0.1)
-      --http-address                  HTTP address for incoming requests; default(:8080)
-  -p  --server-port                   Port for the policy service; default(4646)
-  -A  --redis-address                 IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
-  -P  --redis-port                    Port for the Redis service; default(6379)
-      --redis-database-number         Redis database number
-      --redis-username                Redis username
-      --redis-password                Redis password
-      --redis-writer-address          IPv4 or IPv6 address for a Redis service (writer)
-      --redis-writer-port             Port for a Redis service (writer)
-      --redis-writer-database-number  Redis database number (writer)
-      --redis-writer-username         Redis username (writer)
-      --redis-writer-password         Redis password (writer)
-      --redis-prefix                  Redis prefix; default(geopol_)
-      --redis-ttl                     Redis TTL; default(3600)
-  -g  --geoip-path                    Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)
-      --max-countries                 Maximum number of countries before rejecting e-mails; default(3)
-      --max-ips                       Maximum number of IP addresses before rejecting e-mails; default(10)
-  -w  --whitelist-path                Whitelist with different IP and country limits
+  -a  --server-address                IPv4 or IPv6 address for the policy service. Default: 127.0.0.1
+  -p  --server-port                   Port for the policy service. Default: 4646
+      --http-address                  HTTP address for incoming requests. Default: :8080
+  -A  --redis-address                 IPv4 or IPv6 address for the Redis service. Default: 127.0.0.1
+  -P  --redis-port                    Port for the Redis service. Default: 6379
+      --redis-database-number         Redis database number. Default: 0
+      --redis-username                Redis username. Default:
+      --redis-password                Redis password. Default:
+      --redis-writer-address          IPv4 or IPv6 address for a Redis service (writer). Default: 127.0.0.1
+      --redis-writer-port             Port for a Redis service (writer). Default: 6379
+      --redis-writer-database-number  Redis database number (writer). Default: 0
+      --redis-writer-username         Redis username (writer). Default:
+      --redis-writer-password         Redis password (writer). Default:
+      --redis-prefix                  Redis prefix. Default: geopol_
+      --redis-ttl                     Redis TTL in seconds. Default: 3600
+  -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
+      --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
+      --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
+  -w  --whitelist-path                Whitelist with different IP and country limits. Default:
+      --use-ldap                      Enable LDAP support. Default: false
+      --ldap-server-uri               Server URI. Specify multiple times, if you need more than one server. Default: [ldap://127.0.0.1:389/]
+      --ldap-basedn                   Base DN. Default:
+      --ldap-binddn                   Bind DN. Default:
+      --ldap-bindpw-path              File containing the LDAP users password. Default:
+      --ldap-filter                   Filter with %s placeholder. Default: (&(objectClass=*)(mailAlias=%s))
+      --ldap-result-attribute         Result attribute for the requested mail sender. Default: mailAccount
+      --ldap-starttls                 If this option is given, use StartTLS. Default: false
+      --ldap-tls-cafile               File containing TLS CA certificate(s). Default:
+      --ldap-tls-client-cert          File containing a TLS client certificate. Default:
+      --ldap-tls-client-key           File containing a TLS client key. Default:
+      --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
+      --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
   -v  --verbose                       Verbose mode
       --version                       Current version
-
 ```
 
 ## Reload options
@@ -178,6 +197,19 @@ GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoL
 MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
 MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
 WHITELIST_PATH | Whitelist with different IP and country limits
+USE_LDAP | Enable LDAP support; default(false)
+LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
+LDAP_BASEDN | Base DN
+LDAP_BINDDN | Bind DN 
+LDAP_BINDPW_PATH | File containing the LDAP users password
+LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
+LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
+LDAP_STARTTLS | If this option is given, use StartTLS
+LDAP_TLS_CAFILE | File containing TLS CA certificate(s)
+LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
+LDAP_TLS_CLIENT_KEY | File containing a TLS client key
+LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
+LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
 
 ### Reload
 
