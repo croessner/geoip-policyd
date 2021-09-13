@@ -112,6 +112,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerAddress := commandServer.String(
 		"a", "server-address", &argparse.Options{
 			Required: false,
+			Default:  serverAddress,
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
@@ -120,12 +121,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "IPv4 or IPv6 address for the policy service; default(" + serverAddress + ")",
+			Help: "IPv4 or IPv6 address for the policy service",
 		},
 	)
 	argServerPort := commandServer.Int(
 		"p", "server-port", &argparse.Options{
 			Required: false,
+			Default:  serverPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -136,13 +138,14 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "Port for the policy service; default(" + strconv.Itoa(serverPort) + ")",
+			Help: "Port for the policy service",
 		},
 	)
 	argServerHttpAddress := commandServer.String(
 		"", "http-address", &argparse.Options{
 			Required: false,
-			Help:     "HTTP address for incoming requests; default(" + httpAddress + ")",
+			Default:  httpAddress,
+			Help:     "HTTP address for incoming requests",
 		},
 	)
 
@@ -152,6 +155,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerRedisAddress := commandServer.String(
 		"A", "redis-address", &argparse.Options{
 			Required: false,
+			Default:  redisAddress,
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
@@ -160,12 +164,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "IPv4 or IPv6 address for the Redis service; default(" + redisAddress + ")",
+			Help: "IPv4 or IPv6 address for the Redis service",
 		},
 	)
 	argServerRedisPort := commandServer.Int(
 		"P", "redis-port", &argparse.Options{
 			Required: false,
+			Default:  redisPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -176,24 +181,27 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "Port for the Redis service; default(" + strconv.Itoa(redisPort) + ")",
+			Help: "Port for the Redis service",
 		},
 	)
 	argServerRedisDB := commandServer.Int(
 		"", "redis-database-number", &argparse.Options{
 			Required: false,
+			Default:  0,
 			Help:     "Redis database number",
 		},
 	)
 	argServerRedisUsername := commandServer.String(
 		"", "redis-username", &argparse.Options{
 			Required: false,
+			Default:  "",
 			Help:     "Redis username",
 		},
 	)
 	argServerRedisPassword := commandServer.String(
 		"", "redis-password", &argparse.Options{
 			Required: false,
+			Default:  "",
 			Help:     "Redis password",
 		},
 	)
@@ -204,6 +212,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerRedisAddressW := commandServer.String(
 		"", "redis-writer-address", &argparse.Options{
 			Required: false,
+			Default:  redisAddress,
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
@@ -218,6 +227,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerRedisPortW := commandServer.Int(
 		"", "redis-writer-port", &argparse.Options{
 			Required: false,
+			Default:  redisPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -234,18 +244,21 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerRedisDBW := commandServer.Int(
 		"", "redis-writer-database-number", &argparse.Options{
 			Required: false,
+			Default:  0,
 			Help:     "Redis database number (writer)",
 		},
 	)
 	argServerRedisUsernameW := commandServer.String(
 		"", "redis-writer-username", &argparse.Options{
 			Required: false,
+			Default:  "",
 			Help:     "Redis username (writer)",
 		},
 	)
 	argServerRedisPasswordW := commandServer.String(
 		"", "redis-writer-password", &argparse.Options{
 			Required: false,
+			Default:  "",
 			Help:     "Redis password (writer)",
 		},
 	)
@@ -256,12 +269,14 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerRedisPrefix := commandServer.String(
 		"", "redis-prefix", &argparse.Options{
 			Required: false,
-			Help:     "Redis prefix; default(" + redisPrefix + ")",
+			Default:  redisPrefix,
+			Help:     "Redis prefix",
 		},
 	)
 	argServerRedisTTL := commandServer.Int(
 		"", "redis-ttl", &argparse.Options{
 			Required: false,
+			Default:  redisTTL,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -272,7 +287,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "Redis TTL; default(" + strconv.Itoa(redisTTL) + ")",
+			Help: "Redis TTL in seconds",
 		},
 	)
 
@@ -282,18 +297,20 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerGeoIPDB := commandServer.String(
 		"g", "geoip-path", &argparse.Options{
 			Required: false,
+			Default:  geoipPath,
 			Validate: func(opt []string) error {
 				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
 					return fmt.Errorf("%s: %s", opt[0], err)
 				}
 				return nil
 			},
-			Help: "Full path to the GeoIP database file; default(" + geoipPath + ")",
+			Help: "Full path to the GeoIP database file",
 		},
 	)
 	argServerMaxCountries := commandServer.Int(
 		"", "max-countries", &argparse.Options{
 			Required: false,
+			Default:  maxCountries,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -304,12 +321,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "Maximum number of countries before rejecting e-mails; default(" + strconv.Itoa(maxCountries) + ")",
+			Help: "Maximum number of countries before rejecting e-mails",
 		},
 	)
 	argServerMaxIps := commandServer.Int(
 		"", "max-ips", &argparse.Options{
 			Required: false,
+			Default:  maxIps,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
 					return fmt.Errorf("%s is not an integer", opt[0])
@@ -320,12 +338,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "Maximum number of IP addresses before rejecting e-mails; default(" + strconv.Itoa(maxIps) + ")",
+			Help: "Maximum number of IP addresses before rejecting e-mails",
 		},
 	)
 	argServerWhiteListPath := commandServer.String(
 		"w", "whitelist-path", &argparse.Options{
 			Required: false,
+			Default:  "",
 			Help:     "Whitelist with different IP and country limits",
 		},
 	)
@@ -333,49 +352,49 @@ func (c *CmdLineConfig) Init(args []string) {
 		"", "use-ldap", &argparse.Options{
 			Required: false,
 			Default:  false,
-			Help:     "Enable LDAP support; default(false)",
+			Help:     "Enable LDAP support",
 		},
 	)
 	argServerLDAPServerURIs := commandServer.StringList(
 		"", "ldap-server-uri", &argparse.Options{
 			Required: false,
 			Default:  []string{"ldap://127.0.0.1:389/"},
-			Help:     "Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)",
+			Help:     "Server URI. Specify multiple times, if you need more than one server",
 		},
 	)
 	argServerLDAPBaseDN := commandServer.String(
 		"", "ldap-basedn", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Base DN; default(empty)",
+			Help:     "Base DN",
 		},
 	)
 	argServerLDAPBindDN := commandServer.String(
 		"", "ldap-binddn", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Bind DN; default(empty)",
+			Help:     "Bind DN",
 		},
 	)
 	argServerLDAPBindPWPATH := commandServer.String(
 		"", "ldap-bindpw-path", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "File containing the LDAP users password; default(empty)",
+			Help:     "File containing the LDAP users password",
 		},
 	)
 	argServerLDAPFilter := commandServer.String(
 		"", "ldap-filter", &argparse.Options{
 			Required: false,
 			Default:  "(&(objectClass=*)(mailAlias=%s))",
-			Help:     "Filter with %s placeholder; default('(&(objectClass=*)(mailAlias=%s))')",
+			Help:     "Filter with %s placeholder",
 		},
 	)
 	argServerLDAPResultAttr := commandServer.String(
 		"", "ldap-result-attribute", &argparse.Options{
 			Required: false,
 			Default:  "mailAccount",
-			Help:     "Result attribute for the requested mail sender; default(mailAccount)",
+			Help:     "Result attribute for the requested mail sender",
 		},
 	)
 	argServerLDAPStartTLS := commandServer.Flag(
@@ -389,21 +408,21 @@ func (c *CmdLineConfig) Init(args []string) {
 		"", "ldap-tls-cafile", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "File containing TLS CA certificate(s); default(empty)",
+			Help:     "File containing TLS CA certificate(s)",
 		},
 	)
 	argServerLDAPTLSClientCert := commandServer.String(
 		"", "ldap-tls-client-cert", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "File containing a TLS client certificate; default(empty)",
+			Help:     "File containing a TLS client certificate",
 		},
 	)
 	argServerLDAPTLSClientKey := commandServer.String(
 		"", "ldap-tls-client-key", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "File containing a TLS client key; default(empty)",
+			Help:     "File containing a TLS client key",
 		},
 	)
 	argServerLDAPSASLExternal := commandServer.Flag(
@@ -429,7 +448,7 @@ func (c *CmdLineConfig) Init(args []string) {
 					return fmt.Errorf("value '%s' must be one of: one, base or sub", opt[0])
 				}
 			},
-			Help: "LDAP search scope [base, one, sub]; default(sub)",
+			Help: "LDAP search scope [base, one, sub]",
 		},
 	)
 
@@ -473,21 +492,6 @@ func (c *CmdLineConfig) Init(args []string) {
 		log.Fatalln(parser.Usage(err))
 	}
 
-	// Map defaults
-	c.ServerAddress = serverAddress
-	c.ServerPort = serverPort
-	c.RedisAddress = redisAddress
-	c.RedisPort = redisPort
-	c.RedisAddressW = redisAddress
-	c.RedisPortW = redisPort
-	c.RedisPrefix = redisPrefix
-	c.RedisTTL = redisTTL
-	c.GeoipPath = geoipPath
-	c.MaxCountries = maxCountries
-	c.MaxIps = maxIps
-	c.HttpAddress = httpAddress
-	c.HttpURI = httpURI
-
 	if *argVersion {
 		fmt.Println("Version:", version)
 		os.Exit(0)
@@ -503,9 +507,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
 			c.ServerAddress = val
 		} else {
-			if *argServerAddress != "" {
-				c.ServerAddress = *argServerAddress
-			}
+			c.ServerAddress = *argServerAddress
 		}
 		if val := os.Getenv("SERVER_PORT"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -514,24 +516,18 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.ServerPort = p
 		} else {
-			if *argServerPort != 0 {
-				c.ServerPort = *argServerPort
-			}
+			c.ServerPort = *argServerPort
 		}
 		if val := os.Getenv("SERVER_HTTP_ADDRESS"); val != "" {
 			c.HttpAddress = val
 		} else {
-			if *argServerHttpAddress != "" {
-				c.HttpAddress = *argServerHttpAddress
-			}
+			c.HttpAddress = *argServerHttpAddress
 		}
 
 		if val := os.Getenv("REDIS_ADDRESS"); val != "" {
 			c.RedisAddress = val
 		} else {
-			if *argServerRedisAddress != "" {
-				c.RedisAddress = *argServerRedisAddress
-			}
+			c.RedisAddress = *argServerRedisAddress
 		}
 		if val := os.Getenv("REDIS_PORT"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -540,9 +536,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.RedisPort = p
 		} else {
-			if *argServerRedisPort != 0 {
-				c.RedisPort = *argServerRedisPort
-			}
+			c.RedisPort = *argServerRedisPort
 		}
 		if val := os.Getenv("REDIS_DATABASE_NUMBER"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -551,31 +545,23 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.RedisDB = p
 		} else {
-			if *argServerRedisDB > 0 {
-				c.RedisDB = *argServerRedisDB
-			}
+			c.RedisDB = *argServerRedisDB
 		}
 		if val := os.Getenv("REDIS_USERNAME"); val != "" {
 			c.RedisUsername = val
 		} else {
-			if *argServerRedisUsername != "" {
-				c.RedisUsername = *argServerRedisUsername
-			}
+			c.RedisUsername = *argServerRedisUsername
 		}
 		if val := os.Getenv("REDIS_PASSWORD"); val != "" {
 			c.RedisPassword = val
 		} else {
-			if *argServerRedisPassword != "" {
-				c.RedisPassword = *argServerRedisPassword
-			}
+			c.RedisPassword = *argServerRedisPassword
 		}
 
 		if val := os.Getenv("REDIS_WRITER_ADDRESS"); val != "" {
 			c.RedisAddressW = val
 		} else {
-			if *argServerRedisAddressW != "" {
-				c.RedisAddressW = *argServerRedisAddressW
-			}
+			c.RedisAddressW = *argServerRedisAddressW
 		}
 		if val := os.Getenv("REDIS_WRITER_PORT"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -584,9 +570,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.RedisPortW = p
 		} else {
-			if *argServerRedisPortW != 0 {
-				c.RedisPortW = *argServerRedisPortW
-			}
+			c.RedisPortW = *argServerRedisPortW
 		}
 		if val := os.Getenv("REDIS_WRITER_DATABASE_NUMBER"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -595,31 +579,23 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.RedisDBW = p
 		} else {
-			if *argServerRedisDBW > 0 {
-				c.RedisDBW = *argServerRedisDBW
-			}
+			c.RedisDBW = *argServerRedisDBW
 		}
 		if val := os.Getenv("REDIS_WRITER_USERNAME"); val != "" {
 			c.RedisUsernameW = val
 		} else {
-			if *argServerRedisUsernameW != "" {
-				c.RedisUsernameW = *argServerRedisUsernameW
-			}
+			c.RedisUsernameW = *argServerRedisUsernameW
 		}
 		if val := os.Getenv("REDIS_WRITER_PASSWORD"); val != "" {
 			c.RedisPasswordW = val
 		} else {
-			if *argServerRedisPasswordW != "" {
-				c.RedisPasswordW = *argServerRedisPasswordW
-			}
+			c.RedisPasswordW = *argServerRedisPasswordW
 		}
 
 		if val := os.Getenv("REDIS_PREFIX"); val != "" {
 			c.RedisPrefix = val
 		} else {
-			if *argServerRedisPrefix != "" {
-				c.RedisPrefix = *argServerRedisPrefix
-			}
+			c.RedisPrefix = *argServerRedisPrefix
 		}
 		if val := os.Getenv("REDIS_TTL"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -628,17 +604,13 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.RedisTTL = p
 		} else {
-			if *argServerRedisTTL != 0 {
-				c.RedisTTL = *argServerRedisTTL
-			}
+			c.RedisTTL = *argServerRedisTTL
 		}
 
 		if val := os.Getenv("GEOIP_PATH"); val != "" {
 			c.GeoipPath = val
 		} else {
-			if *argServerGeoIPDB != "" {
-				c.GeoipPath = *argServerGeoIPDB
-			}
+			c.GeoipPath = *argServerGeoIPDB
 		}
 
 		if val := os.Getenv("MAX_COUNTRIES"); val != "" {
@@ -648,9 +620,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.MaxCountries = p
 		} else {
-			if *argServerMaxCountries != 0 {
-				c.MaxCountries = *argServerMaxCountries
-			}
+			c.MaxCountries = *argServerMaxCountries
 		}
 		if val := os.Getenv("MAX_IPS"); val != "" {
 			p, err := strconv.Atoi(val)
@@ -659,17 +629,13 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			c.MaxIps = p
 		} else {
-			if *argServerMaxIps != 0 {
-				c.MaxIps = *argServerMaxIps
-			}
+			c.MaxIps = *argServerMaxIps
 		}
 
 		if val := os.Getenv("WHITELIST_PATH"); val != "" {
 			c.WhiteListPath = val
 		} else {
-			if *argServerWhiteListPath != "" {
-				c.WhiteListPath = *argServerWhiteListPath
-			}
+			c.WhiteListPath = *argServerWhiteListPath
 		}
 
 		if val := os.Getenv("USE_LDAP"); val != "" {

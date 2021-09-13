@@ -169,8 +169,7 @@ func (l *LDAP) Search(sender string) (string, error) {
 			return result, nil
 		}
 	} else {
-		//goland:noinspection GoPrintFunctions
-		log.Println("Warning: LDAP filter does not contain '%s' macro!")
+		log.Printf("Warning: LDAP filter does not contain '%%s' macro!\n")
 	}
 
 	return "", nil

@@ -34,7 +34,7 @@ type RemoteClient struct {
 	Countries []string `redis:"countries"` // All known country codes
 }
 
-func (r *RemoteClient) addCountryCode(countryCode string) {
+func (r *RemoteClient) AddCountryCode(countryCode string) {
 	if len(r.Countries) == 0 {
 		r.Countries = append(r.Countries, countryCode)
 	} else {
@@ -50,7 +50,7 @@ func (r *RemoteClient) addCountryCode(countryCode string) {
 	}
 }
 
-func (r *RemoteClient) addIPAddress(ip string) {
+func (r *RemoteClient) AddIPAddress(ip string) {
 	if len(r.Ips) == 0 {
 		r.Ips = append(r.Ips, ip)
 	} else {
@@ -152,7 +152,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							}
 						}
 
-						remote.addIPAddress(clientIP)
+						remote.AddIPAddress(clientIP)
 
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
@@ -161,7 +161,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 								log.Println("Debug: No country countryCode present for", clientIP)
 							}
 						} else {
-							remote.addCountryCode(countryCode)
+							remote.AddCountryCode(countryCode)
 							redisValue, _ := json.Marshal(remote)
 							if _, err := redisConnW.Do("SET",
 								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
