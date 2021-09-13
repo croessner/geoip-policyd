@@ -46,6 +46,12 @@ const (
 	maxRetries    = 9
 )
 
+const (
+	logLevelNone  = iota
+	logLevelInfo  = iota
+	logLevelDebug = iota
+)
+
 type CommandStatsOption struct {
 	printWhitelist bool
 }
@@ -74,7 +80,7 @@ type CmdLineConfig struct {
 	GeoipPath    string
 	MaxCountries int
 	MaxIps       int
-	Verbose      bool
+	Verbose      int
 
 	CommandServer bool
 	CommandReload bool
@@ -436,24 +442,24 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  "sub",
 			Validate: func(opt []string) error {
-				switch {
-				case opt[0] == "base":
+				switch opt[0] {
+				case "base":
 					return nil
-				case opt[0] == "one":
+				case "one":
 					return nil
-				case opt[0] == "sub":
+				case "sub":
 					return nil
 				default:
-					return fmt.Errorf("value '%s' must be one of: one, base or sub", opt[0])
+					return fmt.Errorf("value '%s' must be one of: 'one', 'base' or 'sub'", opt[0])
 				}
 			},
 			Help: "LDAP search scope [base, one, sub]",
 		},
 	)
 
-	argVerbose := parser.Flag(
+	argVerbose := parser.FlagCounter(
 		"v", "verbose", &argparse.Options{
-			Help: "Verbose mode",
+			Help: "Verbose mode. Repeat this for an increased log level",
 		},
 	)
 	argVersion := parser.Flag(
@@ -497,13 +503,25 @@ func (c *CmdLineConfig) Init(args []string) {
 	}
 
 	if val := os.Getenv("VERBOSE"); val != "" {
-		p, err := strconv.ParseBool(val)
-		if err != nil {
-			log.Fatalln("Error:", err)
+		switch val {
+		case "none":
+			c.Verbose = logLevelNone
+		case "info":
+			c.Verbose = logLevelInfo
+		case "debug":
+			c.Verbose = logLevelDebug
 		}
-		c.Verbose = p
 	} else {
-		c.Verbose = *argVerbose
+		switch *argVerbose {
+		case logLevelNone:
+			c.Verbose = logLevelNone
+		case logLevelInfo:
+			c.Verbose = logLevelInfo
+		case logLevelDebug:
+			c.Verbose = logLevelDebug
+		default:
+			c.Verbose = logLevelDebug
+		}
 	}
 
 	c.CommandServer = commandServer.Happened()

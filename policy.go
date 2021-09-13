@@ -97,7 +97,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 			cfg.RedisUsernameW,
 			cfg.RedisPasswordW,
 		).Get()
-		if cfg.Verbose {
+		if cfg.Verbose == logLevelDebug {
 			log.Printf("Debug: Redis read server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
 			log.Printf("Debug: Redis write server: %s:%d\n", cfg.RedisAddressW, cfg.RedisPortW)
 		}
@@ -105,7 +105,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		defer redisConnW.Close()
 	} else {
 		redisConnW = redisConn
-		if cfg.Verbose {
+		if cfg.Verbose == logLevelDebug {
 			log.Printf("Debug: Redis read and write server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
 		}
 	}
@@ -157,7 +157,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
 						if len(countryCode) == 0 {
-							if cfg.Verbose {
+							if cfg.Verbose == logLevelDebug {
 								log.Println("Debug: No country code present for", clientIP)
 							}
 						} else {
@@ -204,10 +204,12 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		}
 	}
 
-	log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
-		"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
-		sender, remote.Countries, remote.Ips,
-		len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
+	if cfg.Verbose == logLevelInfo {
+		log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
+			"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
+			sender, remote.Countries, remote.Ips,
+			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
+	}
 
 	return fmt.Sprintf("action=%s", actionText)
 }

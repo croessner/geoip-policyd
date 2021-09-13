@@ -59,7 +59,7 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			if cfg.Verbose {
+			if cfg.Verbose == logLevelDebug {
 				log.Println("Debug:", policyRequest)
 			}
 

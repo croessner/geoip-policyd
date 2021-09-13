@@ -63,8 +63,8 @@ func (l *LDAP) Connect() {
 		if ldapCounter > len(l.ServerURIs)-1 {
 			ldapCounter = 0
 		}
-		if cfg.Verbose {
-			log.Printf("Info: Trying %d/%d to connect to LDAP: %s\n",
+		if cfg.Verbose == logLevelDebug {
+			log.Printf("Debug: Trying %d/%d to connect to LDAP: %s\n",
 				retryLimit+1, maxRetries+1, l.ServerURIs[ldapCounter])
 		}
 		l.LDAPConn, err = ldap.DialURL(l.ServerURIs[ldapCounter])
@@ -112,8 +112,8 @@ func (l *LDAP) Connect() {
 		break
 	}
 
-	if cfg.Verbose {
-		log.Println("Info: Connection to LDAP server established")
+	if cfg.Verbose == logLevelDebug {
+		log.Println("Debug: LDAP connection established")
 	}
 }
 
@@ -124,16 +124,16 @@ func (l *LDAP) Bind() {
 	)
 
 	if l.SASLExternal {
-		if cfg.Verbose {
-			log.Println("Info: LDAP: SASL/EXTERNAL")
+		if cfg.Verbose == logLevelDebug {
+			log.Println("Debug: LDAP: SASL/EXTERNAL")
 		}
 		err = l.LDAPConn.ExternalBind()
 		if err != nil {
 			log.Println("Error:", err)
 		}
 	} else {
-		if cfg.Verbose {
-			log.Println("Info: LDAP: simple bind")
+		if cfg.Verbose == logLevelDebug {
+			log.Println("Debug: LDAP: simple bind")
 		}
 		password, err = ioutil.ReadFile(l.BindPWPATH)
 		if err != nil {
@@ -150,7 +150,7 @@ func (l *LDAP) Bind() {
 func (l *LDAP) Search(sender string) (string, error) {
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
-		if cfg.Verbose {
+		if cfg.Verbose == logLevelDebug {
 			log.Println("Debug: Using LDAP filter:", filter)
 		}
 		searchRequest := ldap.NewSearchRequest(
@@ -165,7 +165,7 @@ func (l *LDAP) Search(sender string) (string, error) {
 
 		for _, entry := range searchResult.Entries {
 			result := entry.GetAttributeValue(l.ResultAttr[0])
-			if cfg.Verbose {
+			if cfg.Verbose == logLevelDebug {
 				fmt.Printf("Debug: sender=%s; %s: %s=%v\n", sender, entry.DN, l.ResultAttr[0], result)
 			}
 			return result, nil

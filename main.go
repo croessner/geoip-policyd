@@ -129,7 +129,7 @@ func main() {
 			ldapServer.Connect()
 			ldapServer.Bind()
 		}
-		if cfg.Verbose {
+		if cfg.Verbose == logLevelDebug {
 			log.Printf("Debug: Configuration: %+v", cfg)
 		}
 
