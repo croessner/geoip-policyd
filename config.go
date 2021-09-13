@@ -497,7 +497,15 @@ func (c *CmdLineConfig) Init(args []string) {
 		os.Exit(0)
 	}
 
-	c.Verbose = *argVerbose
+	if val := os.Getenv("VERBOSE"); val != "" {
+		p, err := strconv.ParseBool(val)
+		if err != nil {
+			log.Fatalln("Error:", err)
+		}
+		c.Verbose = p
+	} else {
+		c.Verbose = *argVerbose
+	}
 
 	c.CommandServer = commandServer.Happened()
 	c.CommandReload = commandReload.Happened()
