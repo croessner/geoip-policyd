@@ -64,9 +64,8 @@ func (l *LDAP) Connect() {
 		if ldapCounter > len(l.ServerURIs)-1 {
 			ldapCounter = 0
 		}
-
 		if cfg.Verbose {
-			log.Printf("Debug: Trying %d/%d to connect to LDAP: %s\n",
+			log.Printf("Info: Trying %d/%d to connect to LDAP: %s\n",
 				retryLimit+1, maxRetries+1, l.ServerURIs[ldapCounter])
 		}
 		l.LDAPConn, err = ldap.DialURL(l.ServerURIs[ldapCounter])
@@ -111,7 +110,7 @@ func (l *LDAP) Connect() {
 	}
 
 	if cfg.Verbose {
-		log.Println("Debug: Connection to LDAP server established")
+		log.Println("Info: Connection to LDAP server established")
 	}
 }
 
