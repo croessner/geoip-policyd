@@ -120,7 +120,7 @@ Arguments:
       --ldap-tls-client-key           File containing a TLS client key. Default:
       --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
       --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
-  -v  --verbose                       Verbose mode
+  -v  --verbose                       Verbose mode. Repeat this for an increased log level
       --version                       Current version
 ```
 
@@ -210,15 +210,18 @@ LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
 LDAP_TLS_CLIENT_KEY | File containing a TLS client key
 LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
 LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
+VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
 ### Reload
 
 Variable | Description
 ---|---
 HTTP_URI | http://127.0.0.1:8080
+VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
 ### Stats
 
 Variable | Description
 ---|---
 HTTP_URI | http://127.0.0.1:8080
+VERBOSE | Log level. One of 'none', 'info' or 'debug'
