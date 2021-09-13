@@ -129,6 +129,9 @@ func main() {
 			ldapServer.Connect()
 			ldapServer.Bind()
 		}
+		if cfg.Verbose {
+			log.Printf("Debug: Configuration: %+v", cfg)
+		}
 
 		geoip = new(GeoIP)
 		geoip.Mu.Lock()

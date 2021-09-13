@@ -75,11 +75,14 @@ func (l *LDAP) Connect() {
 		}
 
 		if l.SASLExternal {
-			cert, err := tls.LoadX509KeyPair(l.TLSClientCert, l.TLSClientKey)
-			if err != nil {
-				log.Fatal(err)
+			// Certificates are not needed with ldapi//
+			if l.TLSClientCert != "" && l.TLSClientKey != "" {
+				cert, err := tls.LoadX509KeyPair(l.TLSClientCert, l.TLSClientKey)
+				if err != nil {
+					log.Fatal(err)
+				}
+				certificates = []tls.Certificate{cert}
 			}
-			certificates = []tls.Certificate{cert}
 		}
 
 		if l.StartTLS {
