@@ -158,7 +158,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						countryCode := getCountryCode(clientIP)
 						if len(countryCode) == 0 {
 							if cfg.Verbose {
-								log.Println("Debug: No country countryCode present for", clientIP)
+								log.Println("Debug: No country code present for", clientIP)
 							}
 						} else {
 							remote.AddCountryCode(countryCode)
