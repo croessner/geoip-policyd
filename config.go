@@ -81,12 +81,11 @@ type CmdLineConfig struct {
 	CommandStats  bool
 	CommandStatsOption
 
-	WhiteListPath string
-	WhiteList
-
-	// Addons
 	UseLDAP bool
 	LDAP
+
+	WhiteListPath string
+	WhiteList
 }
 
 type WhiteList struct {
