@@ -204,7 +204,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		}
 	}
 
-	if cfg.Verbose == logLevelInfo {
+	if cfg.Verbose >= logLevelInfo {
 		log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
 			"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
 			sender, remote.Countries, remote.Ips,
