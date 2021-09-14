@@ -115,6 +115,7 @@ Arguments:
       --ldap-filter                   Filter with %s placeholder. Default: (&(objectClass=*)(mailAlias=%s))
       --ldap-result-attribute         Result attribute for the requested mail sender. Default: mailAccount
       --ldap-starttls                 If this option is given, use StartTLS. Default: false
+      --ldap-skip-tls-verify          Skip TLS server name verification. Default: false
       --ldap-tls-cafile               File containing TLS CA certificate(s). Default:
       --ldap-tls-client-cert          File containing a TLS client certificate. Default:
       --ldap-tls-client-key           File containing a TLS client key. Default:
@@ -205,6 +206,7 @@ LDAP_BINDPW_PATH | File containing the LDAP users password
 LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
 LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
 LDAP_STARTTLS | If this option is given, use StartTLS
+LDAP_SKIP_TLS_VERIFY | Skip TLS server name verification
 LDAP_TLS_CAFILE | File containing TLS CA certificate(s)
 LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
 LDAP_TLS_CLIENT_KEY | File containing a TLS client key
