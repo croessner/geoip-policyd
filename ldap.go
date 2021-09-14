@@ -166,7 +166,7 @@ func (l *LDAP) Search(sender string) (string, error) {
 		for _, entry := range searchResult.Entries {
 			result := entry.GetAttributeValue(l.ResultAttr[0])
 			if cfg.Verbose == logLevelDebug {
-				fmt.Printf("Debug: sender=%s; %s: %s=%v\n", sender, entry.DN, l.ResultAttr[0], result)
+				log.Printf("Debug: sender=%s; %s: %s=%v\n", sender, entry.DN, l.ResultAttr[0], result)
 			}
 			return result, nil
 		}
