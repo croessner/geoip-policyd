@@ -25,6 +25,8 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	"io/ioutil"
 	"log"
+	"net"
+	"net/url"
 	"strings"
 	"sync"
 )
@@ -37,6 +39,7 @@ type LDAP struct {
 	Filter        string
 	ResultAttr    []string
 	StartTLS      bool
+	TLSSkipVerify bool
 	TLSCAFile     string
 	TLSClientCert string
 	TLSClientKey  string
@@ -95,10 +98,14 @@ func (l *LDAP) Connect() {
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
 
+			u, _ := url.Parse(l.ServerURIs[ldapCounter])
+			host, _, _ := net.SplitHostPort(u.Host)
+
 			tlsConfig := &tls.Config{
 				Certificates:       certificates,
 				RootCAs:            caCertPool,
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: l.TLSSkipVerify,
+				ServerName:         host,
 			}
 
 			err = l.LDAPConn.StartTLS(tlsConfig)
@@ -106,6 +113,8 @@ func (l *LDAP) Connect() {
 				log.Println("Error:", err)
 				//goland:noinspection GoUnreachableCode
 				l.LDAPConn.Close()
+				ldapCounter += 1
+				retryLimit += 1
 				continue
 			}
 		}

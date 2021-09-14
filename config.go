@@ -409,6 +409,13 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help:     "If this option is given, use StartTLS",
 		},
 	)
+	argServerLDAPTLSVerify := commandServer.Flag(
+		"", "ldap-skip-tls-verify", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Skip TLS server name verification",
+		},
+	)
 	argServerLDAPTLSCAFile := commandServer.String(
 		"", "ldap-tls-cafile", &argparse.Options{
 			Required: false,
@@ -443,11 +450,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "sub",
 			Validate: func(opt []string) error {
 				switch opt[0] {
-				case "base":
-					return nil
-				case "one":
-					return nil
-				case "sub":
+				case "base", "one", "sub":
 					return nil
 				default:
 					return fmt.Errorf("value '%s' must be one of: 'one', 'base' or 'sub'", opt[0])
@@ -716,6 +719,15 @@ func (c *CmdLineConfig) Init(args []string) {
 				c.LDAP.StartTLS = p
 			} else {
 				c.LDAP.StartTLS = *argServerLDAPStartTLS
+			}
+			if val := os.Getenv("LDAP_SKIP_TLS_VERIFY"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.LDAP.TLSSkipVerify = p
+			} else {
+				c.LDAP.TLSSkipVerify = *argServerLDAPTLSVerify
 			}
 			if val := os.Getenv("LDAP_TLS_CAFILE"); val != "" {
 				c.LDAP.TLSCAFile = val
