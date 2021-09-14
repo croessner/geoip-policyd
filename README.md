@@ -225,3 +225,109 @@ Variable | Description
 ---|---
 HTTP_URI | http://127.0.0.1:8080
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
+
+## LDAP
+
+You can use LDAP to send the sender attribute and to retrieve whatever that makes your request unique. If you have
+customers that use virtual aliases and that belong to exactly one account, this may help you to aggregate e-mail sender
+requests.
+
+Example:
+
+virtual alias | real account
+----|----
+user1@example.com | unique@account.net
+foo@bar.org | unique@account.net
+
+Both belong to one and the same account. Without LDAP this would result in two records in Redis. With LDAP it results
+into the real unique account.
+
+It is also possible to not retrieve another unique mail account from LDAP. You can also return the entryUUID field or
+some other field like uid or uniqueIdentifier (LDAP overlay unique to enforce uniqueness!).
+
+Here is my personal example of a docker-compose.yml file that makes use of LDAP:
+
+```yaml
+version: "3.8"
+
+services:
+
+  geoip-policyd:
+    image: ...whatever.../geoip-policyd:latest
+    logging:
+      driver: journald
+      options:
+        tag: geoip-policyd
+    network_mode: host
+    environment:
+      TZ: "Europe/Berlin"
+      VERBOSE: "debug"
+      SERVER_ADDRESS: "127.0.0.1"
+      SERVER_PORT: 4646
+      SERVER_HTTP_ADDRESS: "127.0.0.1:8080"
+      REDIS_ADDRESS: "127.0.0.1"
+      REDIS_PORT: 6379
+      REDIS_DATABASE_NUMBER: 0
+      GEOIP_PATH: "/GeoLite2-City.mmdb"
+      WHITELIST_PATH: "/whitelist.json"
+      USE_LDAP: "true"
+      LDAP_STARTTLS: "true"
+      LDAP_SASL_EXTERNAL: "true"
+      LDAP_SERVER_URIS: "ldap://****:389/, ldap://****:389/"
+      LDAP_BASEDN: "ou=people,..."
+      LDAP_TLS_CAFILE: "/cacert.pem"
+      LDAP_TLS_CLIENT_CERT: "/cert.pem"
+      LDAP_TLS_CLIENT_KEY: "/key.pem"
+      LDAP_FILTER: "(&(objectClass=rnsMSDovecotAccount)(objectClass=rnsMSPostfixAccount)(rnsMSRecipientAddress=%s))"
+      LDAP_RESULT_ATTRIBUTE: "uid"
+    volumes:
+      - /usr/share/GeoIP/GeoLite2-City.mmdb:/GeoLite2-City.mmdb:ro,Z
+      - ./whitelist.json:/whitelist.json:ro,Z
+      - /etc/pki/tls/certs/cacert.pem:/cacert.pem:ro,Z
+      - /etc/ssl/certs/cert.pem:/cert.pem:ro,Z
+      - /etc/ssl/private/key.pem:/key.pem:ro,Z
+```
+
+A result in the logs looks like this:
+
+```
+geoip-policyd_1  | 2021/09/14 06:53:28 Info: sender=<2F7032A7-D2BE-4178-87B2-A8D3AC0F32F1>; countries=[DE]; ip_addresses=[x.x.x.x]; #countries=1/1; #ip_addresses=1/1; action=DUNNO
+```
+
+Redis-result:
+
+    127.0.0.1:6379> get geopol_2F7032A7-D2BE-4178-87B2-A8D3AC0F32F1
+
+```json
+"{\"Ips\":[\"x.x.x.x\"],\"Countries\":[\"DE\"]}"
+```
+
+This way you get some pseudo anonymization.
+
+If you do so, you also have to modify your whitelist.json file, if you use one:
+
+```json
+{
+  "data": [
+    {
+      "comment": "Some comment",
+      "sender": "4FFDDFD3-BE1B-4639-8465-32A9A709F4CF",
+      "ips": 5,
+      "countries": 2
+    },
+    {
+      "comment": "Whatever else",
+      "sender": "2F7032A7-D2BE-4178-87B2-A8D3AC0F32F1",
+      "ips": 1,
+      "countries": 1
+    },
+    {
+      "comment": "And another one goes here",
+      "sender": "6B806FF8-8BA5-40CC-A0FE-602CF2AEEDE2",
+      "countries": 1
+    }
+  ]
+}
+```
+
+Hope you enjoy :-)
