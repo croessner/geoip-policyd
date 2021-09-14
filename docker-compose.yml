@@ -3,7 +3,7 @@ version: "3.8"
 services:
 
   geoip-policyd:
-    image: docker.roessner-net.de/mail/geoip-policyd:latest
+    image: geoip-policyd:latest
     logging:
       driver: journald
       options:
