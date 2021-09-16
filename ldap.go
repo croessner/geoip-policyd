@@ -57,8 +57,17 @@ func (l *LDAP) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "LDAPConn", "Mu":
+		case "LDAPConn":
 			continue
+		case "Scope":
+			switch l.Scope {
+			case ldap.ScopeBaseObject:
+				result += fmt.Sprintf(" %s='base'", typeOfc.Field(i).Name)
+			case ldap.ScopeSingleLevel:
+				result += fmt.Sprintf(" %s='one'", typeOfc.Field(i).Name)
+			case ldap.ScopeWholeSubtree:
+				result += fmt.Sprintf(" %s='sub'", typeOfc.Field(i).Name)
+			}
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
 		}
