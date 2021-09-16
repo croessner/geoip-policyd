@@ -120,13 +120,11 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 					if ldapResult, err = ldapServer.Search(sender); err != nil {
 						log.Println("Info:", err)
 						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-							ldapServer.Mu.Lock()
 							if ldapServer.LDAPConn == nil {
 								ldapServer.Connect()
 								ldapServer.Bind()
+								ldapResult, _ = ldapServer.Search(sender)
 							}
-							ldapServer.Mu.Unlock()
-							ldapResult, _ = ldapServer.Search(sender)
 						}
 					}
 					if ldapResult != "" {
@@ -177,8 +175,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							return fmt.Sprintf("action=%s", deferText)
 						}
 
-						if len(cfg.WhiteList.Data) > 0 {
-							for _, record := range cfg.WhiteList.Data {
+						if len(wl.Data) > 0 {
+							for _, record := range wl.Data {
 								if record.Sender == sender {
 									if record.Ips > 0 {
 										usedMaxIps = record.Ips

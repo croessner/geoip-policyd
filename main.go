@@ -20,7 +20,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	fmt "fmt"
 	"github.com/oschwald/maxminddb-golang"
 	"io"
 	"io/ioutil"
@@ -37,6 +37,7 @@ const version string = "@@gittag@@-@@gitcommit@@"
 
 var (
 	cfg   *CmdLineConfig
+	wl    *WhiteList
 	geoip *GeoIP
 )
 
@@ -45,18 +46,18 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 		if r.RequestURI == "/reload" {
 			var err error
 
-			geoip.Mu.Lock()
 			//goland:noinspection GoUnhandledErrorResult
 			geoip.Reader.Close()
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
-			geoip.Mu.Unlock()
 			if err != nil {
 				log.Fatal("Error: Can not open GeoLite2-City database file", err)
 			}
 			log.Println("Reloaded GeoLite2-City database file")
 
-			if cfg.WhiteListPath != "" {
-				initWhitelist(cfg)
+			if wl != nil {
+				wl.Mu.Lock()
+				wl = initWhitelist(cfg)
+				wl.Mu.Unlock()
 				log.Println("Reloaded whitelist file")
 			}
 
@@ -65,7 +66,12 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if r.RequestURI == "/whitelist" {
-			if jsonValue, err := json.Marshal(cfg.WhiteList.Data); err != nil {
+			if wl == nil {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintln(w, "[]")
+				return
+			}
+			if jsonValue, err := json.Marshal(wl.Data); err != nil {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(w, "[]")
 			} else {
@@ -76,7 +82,8 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initWhitelist(cfg *CmdLineConfig) {
+func initWhitelist(cfg *CmdLineConfig) *WhiteList {
+	w := new(WhiteList)
 	if cfg.WhiteListPath != "" {
 		jsonFile, err := os.Open(cfg.WhiteListPath)
 		if err != nil {
@@ -89,13 +96,12 @@ func initWhitelist(cfg *CmdLineConfig) {
 		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
 			log.Fatalln("Error:", err)
 		} else {
-			cfg.WhiteList.Mu.Lock()
-			if err := json.Unmarshal(byteValue, &cfg.WhiteList); err != nil {
+			if err := json.Unmarshal(byteValue, w); err != nil {
 				log.Fatalln("Error:", err)
 			}
-			cfg.WhiteList.Mu.Unlock()
 		}
 	}
+	return w
 }
 
 func main() {
@@ -119,7 +125,7 @@ func main() {
 	}()
 
 	if cfg.CommandServer {
-		initWhitelist(cfg)
+		wl = initWhitelist(cfg)
 
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 		log.Printf("Starting geoip-policyd HTTP service with address: '%s'", cfg.HttpAddress)

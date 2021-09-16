@@ -29,7 +29,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"sync"
 )
 
 type LDAP struct {
@@ -48,7 +47,6 @@ type LDAP struct {
 	Scope         int
 
 	LDAPConn *ldap.Conn
-	Mu       sync.Mutex
 }
 
 func (l *LDAP) String() string {
@@ -130,7 +128,6 @@ func (l *LDAP) Connect() {
 			err = l.LDAPConn.StartTLS(tlsConfig)
 			if err != nil {
 				log.Println("Error:", err)
-				//goland:noinspection GoUnreachableCode
 				l.LDAPConn.Close()
 				ldapCounter += 1
 				retryLimit += 1

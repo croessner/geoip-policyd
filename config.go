@@ -92,7 +92,6 @@ type CmdLineConfig struct {
 	LDAP
 
 	WhiteListPath string
-	WhiteList
 }
 
 type WhiteList struct {
@@ -115,7 +114,7 @@ func (c *CmdLineConfig) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "WhiteList", "Verbose":
+		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "Verbose":
 			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
@@ -495,7 +494,8 @@ func (c *CmdLineConfig) Init(args []string) {
 	argReloadHttpURI := commandReload.String(
 		"", "http-uri", &argparse.Options{
 			Required: false,
-			Help:     "HTTP URI to the REST server; default(" + httpURI + ")",
+			Default:  httpURI,
+			Help:     "HTTP URI to the REST server",
 		},
 	)
 
@@ -510,7 +510,8 @@ func (c *CmdLineConfig) Init(args []string) {
 	argStatsHttpURI := commandStats.String(
 		"", "http-uri", &argparse.Options{
 			Required: false,
-			Help:     "HTTP URI to the REST server; default(" + httpURI + ")",
+			Default:  httpURI,
+			Help:     "HTTP URI to the REST server",
 		},
 	)
 
@@ -804,18 +805,14 @@ func (c *CmdLineConfig) Init(args []string) {
 				c.HttpURI = *argReloadHttpURI
 			}
 		}
-		if strings.HasSuffix(c.HttpURI, "/") {
-			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
-		}
+		c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
 	}
 
 	if commandStats.Happened() {
 		if val := os.Getenv("HTTP_URI"); val != "" {
 			c.HttpURI = val
 		} else {
-			if *argStatsHttpURI != "" {
-				c.HttpURI = *argStatsHttpURI
-			}
+			c.HttpURI = *argStatsHttpURI
 		}
 		if strings.HasSuffix(c.HttpURI, "/") {
 			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
