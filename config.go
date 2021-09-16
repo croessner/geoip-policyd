@@ -25,6 +25,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,6 +105,24 @@ type Account struct {
 	Sender    string `json:"sender"`
 	Ips       int    `json:"ips"`
 	Countries int    `json:"countries"`
+}
+
+func (c *CmdLineConfig) String() string {
+	var result string
+
+	v := reflect.ValueOf(*c)
+	typeOfc := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		switch typeOfc.Field(i).Name {
+		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "WhiteList", "Verbose":
+			continue
+		default:
+			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
+		}
+	}
+
+	return result[1:]
 }
 
 func (c *CmdLineConfig) Init(args []string) {

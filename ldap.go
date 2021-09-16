@@ -27,6 +27,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -48,6 +49,24 @@ type LDAP struct {
 
 	LDAPConn *ldap.Conn
 	Mu       sync.Mutex
+}
+
+func (l *LDAP) String() string {
+	var result string
+
+	v := reflect.ValueOf(*l)
+	typeOfc := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		switch typeOfc.Field(i).Name {
+		case "LDAPConn", "Mu":
+			continue
+		default:
+			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
+		}
+	}
+
+	return result[1:]
 }
 
 func (l *LDAP) Connect() {

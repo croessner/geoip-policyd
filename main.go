@@ -124,13 +124,17 @@ func main() {
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 		log.Printf("Starting geoip-policyd HTTP service with address: '%s'", cfg.HttpAddress)
 
+		if cfg.Verbose == logLevelDebug {
+			log.Println("Debug:", cfg)
+		}
+
 		if cfg.UseLDAP {
 			ldapServer = &cfg.LDAP
+			if cfg.Verbose == logLevelDebug {
+				log.Println("Debug: LDAP:", ldapServer)
+			}
 			ldapServer.Connect()
 			ldapServer.Bind()
-		}
-		if cfg.Verbose == logLevelDebug {
-			log.Printf("Debug: Configuration: %+v", cfg)
 		}
 
 		geoip = new(GeoIP)
