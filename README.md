@@ -62,28 +62,7 @@ geoip-policyd server --help
 produces the following output:
 
 ```
-usage: geoip-policyd server [-h|--help] [-a|--server-address "<value>"]
-                     [-p|--server-port <integer>] [--http-address "<value>"]
-                     [-A|--redis-address "<value>"] [-P|--redis-port <integer>]
-                     [--redis-database-number <integer>] [--redis-username
-                     "<value>"] [--redis-password "<value>"]
-                     [--redis-writer-address "<value>"] [--redis-writer-port
-                     <integer>] [--redis-writer-database-number <integer>]
-                     [--redis-writer-username "<value>"]
-                     [--redis-writer-password "<value>"] [--redis-prefix
-                     "<value>"] [--redis-ttl <integer>] [-g|--geoip-path
-                     "<value>"] [--max-countries <integer>] [--max-ips
-                     <integer>] [-w|--whitelist-path "<value>"] [--use-ldap]
-                     [--ldap-server-uri "<value>" [--ldap-server-uri "<value>" ...]]
-                     [--ldap-basedn "<value>"] [--ldap-binddn "<value>"]
-                     [--ldap-bindpw-path "<value>"] [--ldap-filter "<value>"]
-                     [--ldap-result-attribute "<value>"] [--ldap-starttls]
-                     [--ldap-tls-cafile "<value>"] [--ldap-tls-client-cert
-                     "<value>"] [--ldap-tls-client-key "<value>"]
-                     [--ldap-sasl-external] [--ldap-scope "<value>"]
-                     [-v|--verbose] [--version]
-
-                     Run a geoip policy server
+...
 
 Arguments:
 
@@ -106,6 +85,7 @@ Arguments:
   -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
+      --blocked-no-expire             Do not expire senders from Redis, if they were blocked in the past: Default false
   -w  --whitelist-path                Whitelist with different IP and country limits. Default:
       --use-ldap                      Enable LDAP support. Default: false
       --ldap-server-uri               Server URI. Specify multiple times, if you need more than one server. Default: [ldap://127.0.0.1:389/]
@@ -134,10 +114,7 @@ geoip-policyd reload --help
 produces the following output:
 
 ```
-usage: geoip-policyd reload [-h|--help] [--http-uri "<value>"] [-v|--verbose]
-                     [--version]
-
-                     Reload the geoip-policyd server
+...
 
 Arguments:
 
@@ -157,10 +134,7 @@ geoip-policyd stats --help
 produces the following output:
 
 ```
-usage: geoip-policyd stats [-h|--help] [--print-whitelist] [--http-uri
-                     "<value>"] [-v|--verbose] [--version]
-
-                     Get statistics from geoip-policyd server
+...
 
 Arguments:
 
@@ -197,6 +171,7 @@ REDIS_TTL | Redis TTL; default(3600)
 GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)
 MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
 MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
+BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
 WHITELIST_PATH | Whitelist with different IP and country limits
 USE_LDAP | Enable LDAP support; default(false)
 LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
