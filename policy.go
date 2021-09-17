@@ -182,20 +182,24 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							}
 						}
 
+						persist := false
+
 						if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
+								persist = true
 							}
 						}
 
 						if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
+								persist = true
 							}
 						}
 
 						// For each request update the expiry timestamp
-						if cfg.BlockedNoExpire {
+						if persist {
 							if _, err := redisConnW.Do("PERSIST",
 								redis.Args{}.Add(key)...); err != nil {
 								log.Println("Error:", err)
