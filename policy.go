@@ -168,13 +168,6 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							}
 						}
 
-						// For each request update the expiry timestamp
-						if _, err := redisConnW.Do("EXPIRE",
-							redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
-							log.Println("Error:", err)
-							return fmt.Sprintf("action=%s", deferText)
-						}
-
 						if len(wl.Data) > 0 {
 							for _, record := range wl.Data {
 								if record.Sender == sender {
@@ -191,10 +184,29 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 						if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
+							if cfg.BlockedNoExpire {
+							}
 						}
 
 						if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
+							if cfg.BlockedNoExpire {
+							}
+						}
+
+						// For each request update the expiry timestamp
+						if cfg.BlockedNoExpire {
+							if _, err := redisConnW.Do("PERSIST",
+								redis.Args{}.Add(key)...); err != nil {
+								log.Println("Error:", err)
+								return fmt.Sprintf("action=%s", deferText)
+							}
+						} else {
+							if _, err := redisConnW.Do("EXPIRE",
+								redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
+								log.Println("Error:", err)
+								return fmt.Sprintf("action=%s", deferText)
+							}
 						}
 					}
 				}

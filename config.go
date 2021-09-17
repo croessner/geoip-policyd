@@ -78,10 +78,11 @@ type CmdLineConfig struct {
 	RedisPrefix string
 	RedisTTL    int
 
-	GeoipPath    string
-	MaxCountries int
-	MaxIps       int
-	Verbose      int
+	GeoipPath       string
+	MaxCountries    int
+	MaxIps          int
+	BlockedNoExpire bool
+	Verbose         int
 
 	CommandServer bool
 	CommandReload bool
@@ -362,6 +363,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Maximum number of IP addresses before rejecting e-mails",
+		},
+	)
+	argServerBlockedNoExpire := commandServer.Flag(
+		"", "blocked-no-expire", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Do not expire senders from Redis, if they were blocked in the past",
 		},
 	)
 	argServerWhiteListPath := commandServer.String(
@@ -678,6 +686,15 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.MaxIps = p
 		} else {
 			c.MaxIps = *argServerMaxIps
+		}
+		if val := os.Getenv("BLOCKED_NO_EXPIRE"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err)
+			}
+			c.BlockedNoExpire = p
+		} else {
+			c.BlockedNoExpire = *argServerBlockedNoExpire
 		}
 
 		if val := os.Getenv("WHITELIST_PATH"); val != "" {
