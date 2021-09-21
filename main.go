@@ -21,6 +21,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"github.com/oschwald/maxminddb-golang"
 	"io"
 	"io/ioutil"
@@ -30,10 +31,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
-const version string = "@@gittag@@-@@gitcommit@@"
+const version = "@@gittag@@-@@gitcommit@@"
 
 var (
 	cfg   *CmdLineConfig
@@ -41,9 +43,25 @@ var (
 	geoip *GeoIP
 )
 
-func httpRootPage(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		if r.RequestURI == "/reload" {
+const (
+	GET    = "GET"
+	DELETE = "DELETE"
+)
+
+func httpRootPage(rw http.ResponseWriter, request *http.Request) {
+	if err := request.ParseForm(); err != nil {
+		log.Println("Error:", err)
+		return
+	}
+
+	method := request.Method
+	values := request.Form
+	uri := request.URL
+
+	switch method {
+	case GET:
+		switch uri.Path {
+		case "/reload":
 			var err error
 
 			//goland:noinspection GoUnhandledErrorResult
@@ -62,25 +80,99 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 			}
 
 			//goland:noinspection GoUnhandledErrorResult
-			fmt.Fprintf(w, "OK reload")
-		}
+			fmt.Fprintf(rw, "OK reload")
 
-		if r.RequestURI == "/whitelist" {
+		case "/whitelist":
 			if wl == nil {
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(w, "[]")
+				fmt.Fprintln(rw, "[]")
 				return
 			}
 			if jsonValue, err := json.Marshal(wl.Data); err != nil {
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(w, "[]")
+				fmt.Fprintln(rw, "[]")
 			} else {
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(w, "%+v\n", string(jsonValue))
+				fmt.Fprintf(rw, "%+v\n", string(jsonValue))
 			}
 		}
-	} else if r.Method == "DELETE" {
 
+	case DELETE:
+		switch uri.Path {
+		case "/remove":
+			if val, ok := values["sender"]; ok {
+				sender := val[0]
+				if sender == "" {
+					//goland:noinspection GoUnhandledErrorResult
+					fmt.Fprintln(rw, "[]")
+					return
+				}
+
+				var (
+					redisConn = newRedisPool(
+						cfg.RedisAddress,
+						cfg.RedisPort,
+						cfg.RedisDB,
+						cfg.RedisUsername,
+						cfg.RedisPassword,
+					).Get()
+					redisConnW redis.Conn
+				)
+
+				if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
+					redisConnW = newRedisPool(
+						cfg.RedisAddressW,
+						cfg.RedisPortW,
+						cfg.RedisDBW,
+						cfg.RedisUsernameW,
+						cfg.RedisPasswordW,
+					).Get()
+					if cfg.Verbose == logLevelDebug {
+						log.Printf("Debug: Redis read server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
+						log.Printf("Debug: Redis write server: %s:%d\n", cfg.RedisAddressW, cfg.RedisPortW)
+					}
+					//goland:noinspection GoUnhandledErrorResult
+					defer redisConnW.Close()
+				} else {
+					redisConnW = redisConn
+					if cfg.Verbose == logLevelDebug {
+						log.Printf("Debug: Redis read and write server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
+					}
+				}
+
+				if cfg.UseLDAP {
+					var err error
+					var ldapResult string
+
+					ldapServer := &cfg.LDAP
+
+					if ldapResult, err = ldapServer.Search(sender); err != nil {
+						log.Println("Info:", err)
+						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
+							if ldapServer.LDAPConn == nil {
+								ldapServer.Connect()
+								ldapServer.Bind()
+								ldapResult, _ = ldapServer.Search(sender)
+							}
+						}
+					}
+					if ldapResult != "" {
+						sender = ldapResult
+					}
+
+				}
+
+				key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
+				if _, err := redisConnW.Do("DEL",
+					redis.Args{}.Add(key)...); err != nil {
+					log.Println("Error:", err)
+				}
+			}
+		}
+
+	default:
+		rw.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 }
 
