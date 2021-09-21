@@ -1085,20 +1085,16 @@ func (c *CmdLineConfig) Init(args []string) {
 	}
 
 	if commandReload.Happened() {
-		if val := os.Getenv("HTTP_URI"); val != "" {
-			c.HttpURI = val
-		} else {
-			if *argReloadHttpURI != "" {
-				c.HttpURI = *argReloadHttpURI
-			}
+		if *argReloadHttpURI != "" {
+			c.HttpURI = *argReloadHttpURI
 		}
-		c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
+		if strings.HasSuffix(c.HttpURI, "/") {
+			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
+		}
 	}
 
 	if commandStats.Happened() {
-		if val := os.Getenv("HTTP_URI"); val != "" {
-			c.HttpURI = val
-		} else {
+		if *argStatsHttpURI != "" {
 			c.HttpURI = *argStatsHttpURI
 		}
 		if strings.HasSuffix(c.HttpURI, "/") {
@@ -1111,19 +1107,13 @@ func (c *CmdLineConfig) Init(args []string) {
 	}
 
 	if commandRemove.Happened() {
-		if val := os.Getenv("HTTP_URI"); val != "" {
-			c.HttpURI = val
-		} else {
+		if *argRemoveHttpURI != "" {
 			c.HttpURI = *argRemoveHttpURI
 		}
 		if strings.HasSuffix(c.HttpURI, "/") {
 			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
 		}
 
-		if val := os.Getenv("SENDER"); val != "" {
-			c.RemoveSender = val
-		} else {
-			c.RemoveSender = *argRemoveSender
-		}
+		c.RemoveSender = *argRemoveSender
 	}
 }
