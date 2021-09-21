@@ -45,6 +45,8 @@ const (
 	httpAddress   = ":8080"
 	httpURI       = "http://127.0.0.1:8080"
 	maxRetries    = 9
+	mailPort      = 587
+	mailSubject   = "[geoip-policyd] An e-mail account was compromised"
 )
 
 const (
@@ -58,17 +60,26 @@ type CommandStatsOption struct {
 }
 
 type CmdLineConfig struct {
+	// Listen address for the policy service
 	ServerAddress string
-	ServerPort    int
-	HttpAddress   string
-	HttpURI       string
 
+	// Prt number for the policy service
+	ServerPort int
+
+	// REST interface of the policy service
+	HttpAddress string
+
+	// URI to the REST service, if called with any other command than server
+	HttpURI string
+
+	// Redis settings for a raed and/or write server pool
 	RedisAddress  string
 	RedisPort     int
 	RedisDB       int
 	RedisUsername string
 	RedisPassword string
 
+	// Redis for a write server pool
 	RedisAddressW  string
 	RedisPortW     int
 	RedisDBW       int
@@ -84,6 +95,7 @@ type CmdLineConfig struct {
 	BlockedNoExpire bool
 	Verbose         int
 
+	// Flag that indicates which command was called
 	CommandServer bool
 	CommandReload bool
 	CommandStats  bool
@@ -93,6 +105,26 @@ type CmdLineConfig struct {
 	LDAP
 
 	WhiteListPath string
+
+	// Global flag that indicates if any action should be taken
+	RunActions bool
+
+	// Flag that indicates, if the operator action should be taken
+	RunActionOperator bool
+
+	// Action that sends a notification to an operator
+	EmailOperatorTo          string
+	EmailOperatorFrom        string
+	EmailOperatorSubject     string
+	EmailOperatorMessageCT   string
+	EmailOperatorMessagePath string
+
+	// Global mail server configuration parameters
+	MailServer       string
+	MailPort         int
+	MailUsername     string
+	MailPasswordPath string
+	MailSSL          bool
 }
 
 type WhiteList struct {
@@ -115,7 +147,7 @@ func (c *CmdLineConfig) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "Verbose":
+		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "MailPasswordPath", "Verbose":
 			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
@@ -497,6 +529,122 @@ func (c *CmdLineConfig) Init(args []string) {
 		},
 	)
 
+	argServerRunActions := commandServer.Flag(
+		"", "run-actions", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Run actions, if a sender is over limits",
+		},
+	)
+	argServerRunActionOperator := commandServer.Flag(
+		"", "run-action-operator", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Run the operator action",
+		},
+	)
+	argServerOperatorTo := commandServer.String(
+		"", "operator-to", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "E-Mail To-header for the operator action",
+		},
+	)
+	argServerOperatorFrom := commandServer.String(
+		"", "operator-from", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "E-Mail From-header for the operator action",
+		},
+	)
+	argServerOperatorSubject := commandServer.String(
+		"", "operator-subject", &argparse.Options{
+			Required: false,
+			Default:  mailSubject,
+			Help:     "E-Mail Subject-header for the operator action",
+		},
+	)
+	argServerOperatorMessageCT := commandServer.String(
+		"", "operator-message-ct", &argparse.Options{
+			Required: false,
+			Default:  "text/plain",
+			Help:     "E-Mail Content-Type-header for the operator action",
+		},
+	)
+	argServerOperatorMessagePath := commandServer.String(
+		"", "operator-message-path", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Validate: func(opt []string) error {
+				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
+					return fmt.Errorf("%s: %s", opt[0], err)
+				}
+				return nil
+			},
+			Help: "Full path to the e-mail message file for the operator action",
+		},
+	)
+
+	argServerMailServer := commandServer.String(
+		"", "mail-server", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Validate: func(opt []string) error {
+				if addr := net.ParseIP(opt[0]); addr == nil {
+					if _, err := net.LookupHost(opt[0]); err != nil {
+						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+					}
+				}
+				return nil
+			},
+			Help: "E-Mail server address for notifications",
+		},
+	)
+	argServerMailPort := commandServer.Int(
+		"", "mail-port", &argparse.Options{
+			Required: false,
+			Default:  mailPort,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return fmt.Errorf("%s is not an integer", opt[0])
+				} else {
+					if !(arg > 0 && arg <= 65535) {
+						return fmt.Errorf("%s is not a valid port number", opt[0])
+					}
+				}
+				return nil
+			},
+			Help: "E-Mail server port number",
+		},
+	)
+	argServerMailUsername := commandServer.String(
+		"", "mail-username", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "E-Mail server username",
+		},
+	)
+	argServerMailPasswordPath := commandServer.String(
+		"", "mail-password-path", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Validate: func(opt []string) error {
+				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
+					return fmt.Errorf("%s: %s", opt[0], err)
+				}
+				return nil
+			},
+			Help: "Full path to the e-mail password file",
+		},
+	)
+	argServerMailSSL := commandServer.Flag(
+		"", "mail-ssl", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Use TLS on connect for the e-mail server",
+		},
+	)
+
 	commandReload := parser.NewCommand("reload", "Reload the geoip-policyd server")
 
 	argReloadHttpURI := commandReload.String(
@@ -810,6 +958,92 @@ func (c *CmdLineConfig) Init(args []string) {
 				case "sub":
 					c.LDAP.Scope = ldap.ScopeWholeSubtree
 				}
+			}
+
+			/*
+			 * Actions
+			 */
+
+			if val := os.Getenv("RUN_ACTIONS"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.RunActions = p
+			} else {
+				c.RunActions = *argServerRunActions
+			}
+			if val := os.Getenv("RUN_ACTION_OPERATOR"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.RunActionOperator = p
+			} else {
+				c.RunActionOperator = *argServerRunActionOperator
+			}
+			if val := os.Getenv("OPERATOR_TO"); val != "" {
+				c.EmailOperatorTo = val
+			} else {
+				c.EmailOperatorTo = *argServerOperatorTo
+			}
+			if val := os.Getenv("OPERATOR_FROM"); val != "" {
+				c.EmailOperatorFrom = val
+			} else {
+				c.EmailOperatorFrom = *argServerOperatorFrom
+			}
+			if val := os.Getenv("OPERATOR_SUBJECT"); val != "" {
+				c.EmailOperatorSubject = val
+			} else {
+				c.EmailOperatorSubject = *argServerOperatorSubject
+			}
+			if val := os.Getenv("OPERATOR_MESSAGE_CT"); val != "" {
+				c.EmailOperatorMessageCT = val
+			} else {
+				c.EmailOperatorMessageCT = *argServerOperatorMessageCT
+			}
+			if val := os.Getenv("OPERATOR_MESSAGE_PATH"); val != "" {
+				c.EmailOperatorMessagePath = val
+			} else {
+				c.EmailOperatorMessagePath = *argServerOperatorMessagePath
+			}
+
+			/*
+			 * Mail server settings
+			 */
+
+			if val := os.Getenv("MAIL_SERVER"); val != "" {
+				c.MailServer = val
+			} else {
+				c.MailServer = *argServerMailServer
+			}
+			if val := os.Getenv("MAIL_PORT"); val != "" {
+				p, err := strconv.Atoi(val)
+				if err != nil {
+					log.Fatalln("Error: MAIL_PORT can not be used:", parser.Usage(err))
+				}
+				c.MailPort = p
+			} else {
+				c.MailPort = *argServerMailPort
+			}
+			if val := os.Getenv("MAIL_USERNAME"); val != "" {
+				c.MailUsername = val
+			} else {
+				c.MailUsername = *argServerMailUsername
+			}
+			if val := os.Getenv("MAIL_PASSWORD_PATH"); val != "" {
+				c.MailPasswordPath = val
+			} else {
+				c.MailPasswordPath = *argServerMailPasswordPath
+			}
+			if val := os.Getenv("MAIL_SSL"); val != "" {
+				p, err := strconv.ParseBool(val)
+				if err != nil {
+					log.Fatalln("Error:", err)
+				}
+				c.MailSSL = p
+			} else {
+				c.MailSSL = *argServerMailSSL
 			}
 		}
 	}

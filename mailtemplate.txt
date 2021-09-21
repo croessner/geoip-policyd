@@ -1,0 +1,5 @@
+Hello,
+
+the e-mail account sender=<%s> was compromised.
+
+Postmaster

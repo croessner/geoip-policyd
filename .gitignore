@@ -1,4 +1,5 @@
 .idea
 GeoLite2-City.mmdb
 ldap.secret
+mail.secret
 *.pem

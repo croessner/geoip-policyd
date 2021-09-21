@@ -32,11 +32,14 @@ const rejectText = "REJECT Your account seems to be compromised. Please contact 
 type RemoteClient struct {
 	Ips       []string `redis:"ips"`       // All known IP addresses
 	Countries []string `redis:"countries"` // All known country codes
+	Actions   []string `redis:"actions"`   // All actions that may have run
 }
 
-func (r *RemoteClient) AddCountryCode(countryCode string) {
+func (r *RemoteClient) AddCountryCode(countryCode string) bool {
+	var updated = false
 	if len(r.Countries) == 0 {
 		r.Countries = append(r.Countries, countryCode)
+		updated = true
 	} else {
 		var haveCC = false
 		for _, value := range r.Countries {
@@ -46,13 +49,17 @@ func (r *RemoteClient) AddCountryCode(countryCode string) {
 		}
 		if !haveCC {
 			r.Countries = append(r.Countries, countryCode)
+			updated = true
 		}
 	}
+	return updated
 }
 
-func (r *RemoteClient) AddIPAddress(ip string) {
+func (r *RemoteClient) AddIPAddress(ip string) bool {
+	var updated = false
 	if len(r.Ips) == 0 {
 		r.Ips = append(r.Ips, ip)
+		updated = true
 	} else {
 		var haveIP = false
 		for _, value := range r.Ips {
@@ -62,8 +69,10 @@ func (r *RemoteClient) AddIPAddress(ip string) {
 		}
 		if !haveIP {
 			r.Ips = append(r.Ips, ip)
+			updated = true
 		}
 	}
+	return updated
 }
 
 func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) string {
@@ -150,7 +159,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							}
 						}
 
-						remote.AddIPAddress(clientIP)
+						newCC := false
+						newIP := remote.AddIPAddress(clientIP)
 
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
@@ -159,13 +169,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 								log.Println("Debug: No country code present for", clientIP)
 							}
 						} else {
-							remote.AddCountryCode(countryCode)
-							redisValue, _ := json.Marshal(remote)
-							if _, err := redisConnW.Do("SET",
-								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
-								log.Println("Error:", err)
-								return fmt.Sprintf("action=%s", deferText)
-							}
+							newCC = remote.AddCountryCode(countryCode)
 						}
 
 						if len(wl.Data) > 0 {
@@ -183,18 +187,58 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						}
 
 						persist := false
+						runActions := false
+
+						// Flag indicates, if the operator action was successful
+						ranOperator := false
 
 						if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
 							}
+							runActions = true
 						}
 
 						if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
+							}
+							runActions = true
+						}
+
+						if cfg.RunActions && runActions {
+							var a Action
+							runOperator := true
+							for _, action := range remote.Actions {
+								if action == "operator" {
+									runOperator = false
+									break
+								}
+							}
+
+							if cfg.RunActionOperator && runOperator {
+								a = &EmailOperator{}
+								if err := a.Call(sender, cfg); err != nil {
+									log.Println("Error:", err)
+								} else {
+									if cfg.Verbose == logLevelDebug {
+										log.Println("Debug: Action operator finished successfully")
+									}
+									remote.Actions = append(remote.Actions, "operator")
+									ranOperator = true
+								}
+							}
+						}
+
+						// Only change client information, if there was a new IP, a new country code or an action was taken.
+						if newIP || newCC || ranOperator {
+							redisValue, _ := json.Marshal(remote)
+							if _, err := redisConnW.Do("SET",
+								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
+								log.Println("Error:", err)
+								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
 

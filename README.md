@@ -38,8 +38,6 @@ docker build -t geoip-policyd:latest .
 You need to change the docker-compose.yml file as well. If you prefer, you can add a Redis
 service and run the *geoip-policyd* container in bridged mode.
 
-As this is my first Go project. Feel free to help me to make it better ;-)
-
 The service is configured in Postfix like this:
 
 ## Postfix integration
@@ -101,6 +99,18 @@ Arguments:
       --ldap-tls-client-key           File containing a TLS client key. Default:
       --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
       --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
+      --run-actions                   Run actions, if a sender is over limits. Default: false
+      --run-action-operator           Run the operator action. Default: false
+      --operator-to                   E-Mail To-header for the operator action. Default: 
+      --operator-from                 E-Mail From-header for the operator action. Default: 
+      --operator-subject              E-Mail Subject-header for the operator action. Default: [geoip-policyd] An e-mail account was compromised
+      --operator-message-ct           E-Mail Content-Type-header for the operator action. Default: text/plain
+      --operator-message-path         Full path to the e-mail message file for the operator action. Default: 
+      --mail-server                   E-Mail server address for notifications. Default: 
+      --mail-port                     E-Mail server port number. Default: 587
+      --mail-username                 E-Mail server username. Default: 
+      --mail-password-path            Full path to the e-mail password file. Default:
+      --mail-ssl                      Use TLS on connect for the e-mail server. Default: false
   -v  --verbose                       Verbose mode. Repeat this for an increased log level
       --version                       Current version
 ```
@@ -187,6 +197,18 @@ LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
 LDAP_TLS_CLIENT_KEY | File containing a TLS client key
 LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
 LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
+RUN_ACTIONS | Run actions, if a sender is over limits; default(false)
+RUN_ACTION_OPERATOR | Run the operator action; default(false)
+OPERATOR_TO | E-Mail To-header for the operator action
+OPERATOR_FROM | E-Mail From-header for the operator action
+OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised)
+OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
+OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
+MAIL_SERVER | E-Mail server address for notifications
+MAIL_PORT | E-Mail server port number; default(587)
+MAIL_USERNAME | E-Mail server username
+MAIL_PASSWORD_PATH | Full path to the e-mail password file
+MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
 ### Reload
@@ -202,6 +224,30 @@ Variable | Description
 ---|---
 HTTP_URI | http://127.0.0.1:8080
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
+
+## Actions
+
+You can activate actions that will be taken, if a sender was declared compromised. At the moment you can send a
+notification to an e-mail operator. To do this, you must activate actions in general as well as the operator action.
+You need also to define all the required operator parameters as To, From, Subject, CT and of course an e-mail server (
+including all required settings) to get things done.
+
+If you need to authenticate to the e-mail server, please put the password in a file with appropriate permissions.
+
+Example:
+```shell
+geoip-policyd ...other-options... \
+  --run-actions \
+  --run-action-operator \
+  --operator-to "<operator@example.com>" \
+  --operator-from "<no-reply@submission.example.com>" \
+  --operator-message-ct "text/plain" \
+  --operator-message-path ./mailtemplate.txt \
+  --mail-server submission.example.com \
+  --mail-port 587 \
+  --mail-username "some_username" \
+  --mail-password ./mail.secret
+```
 
 ## LDAP
 
