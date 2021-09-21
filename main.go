@@ -108,37 +108,11 @@ func httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					return
 				}
 
-				var (
-					redisConn = newRedisPool(
-						cfg.RedisAddress,
-						cfg.RedisPort,
-						cfg.RedisDB,
-						cfg.RedisUsername,
-						cfg.RedisPassword,
-					).Get()
-					redisConnW redis.Conn
-				)
+				var redisHelper = &Redis{}
+				redisConnW := redisHelper.WriteConn()
 
-				if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
-					redisConnW = newRedisPool(
-						cfg.RedisAddressW,
-						cfg.RedisPortW,
-						cfg.RedisDBW,
-						cfg.RedisUsernameW,
-						cfg.RedisPasswordW,
-					).Get()
-					if cfg.Verbose == logLevelDebug {
-						log.Printf("Debug: Redis read server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
-						log.Printf("Debug: Redis write server: %s:%d\n", cfg.RedisAddressW, cfg.RedisPortW)
-					}
-					//goland:noinspection GoUnhandledErrorResult
-					defer redisConnW.Close()
-				} else {
-					redisConnW = redisConn
-					if cfg.Verbose == logLevelDebug {
-						log.Printf("Debug: Redis read and write server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
-					}
-				}
+				//goland:noinspection GoUnhandledErrorResult
+				defer redisConnW.Close()
 
 				if cfg.UseLDAP {
 					var err error

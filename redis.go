@@ -24,6 +24,36 @@ import (
 	"log"
 )
 
+type Redis struct{}
+
+func (r *Redis) ReadConn() redis.Conn {
+	var (
+		redisConn = newRedisPool(
+			cfg.RedisAddress,
+			cfg.RedisPort,
+			cfg.RedisDB,
+			cfg.RedisUsername,
+			cfg.RedisPassword,
+		).Get()
+	)
+	return redisConn
+}
+
+func (r *Redis) WriteConn() redis.Conn {
+	var redisConnW redis.Conn
+	if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
+		redisConnW = newRedisPool(
+			cfg.RedisAddressW,
+			cfg.RedisPortW,
+			cfg.RedisDBW,
+			cfg.RedisUsernameW,
+			cfg.RedisPasswordW,
+		).Get()
+		return redisConnW
+	}
+	return r.ReadConn()
+}
+
 func newRedisPool(
 	redisAddress string, redisPort int, redisDB int, redisUsername string, redisPassword string) *redis.Pool {
 	return &redis.Pool{

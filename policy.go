@@ -77,47 +77,22 @@ func (r *RemoteClient) AddIPAddress(ip string) bool {
 
 func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) string {
 	var (
-		ok         bool
-		request    string
-		sender     string
-		clientIP   string
-		ldapResult string
-		err        error
-		remote     RemoteClient
-		redisConn  = newRedisPool(
-			cfg.RedisAddress,
-			cfg.RedisPort,
-			cfg.RedisDB,
-			cfg.RedisUsername,
-			cfg.RedisPassword,
-		).Get()
-		redisConnW       redis.Conn
+		ok               bool
+		request          string
+		sender           string
+		clientIP         string
+		ldapResult       string
+		err              error
+		remote           RemoteClient
+		redisHelper      = &Redis{}
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
 		actionText       = "DUNNO"
 		ldapServer       = &cfg.LDAP
 	)
 
-	if !(cfg.RedisAddress == cfg.RedisAddressW && cfg.RedisPort == cfg.RedisPortW) {
-		redisConnW = newRedisPool(
-			cfg.RedisAddressW,
-			cfg.RedisPortW,
-			cfg.RedisDBW,
-			cfg.RedisUsernameW,
-			cfg.RedisPasswordW,
-		).Get()
-		if cfg.Verbose == logLevelDebug {
-			log.Printf("Debug: Redis read server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
-			log.Printf("Debug: Redis write server: %s:%d\n", cfg.RedisAddressW, cfg.RedisPortW)
-		}
-		//goland:noinspection GoUnhandledErrorResult
-		defer redisConnW.Close()
-	} else {
-		redisConnW = redisConn
-		if cfg.Verbose == logLevelDebug {
-			log.Printf("Debug: Redis read and write server: %s:%d\n", cfg.RedisAddress, cfg.RedisPort)
-		}
-	}
+	redisConn := redisHelper.ReadConn()
+	redisConnW := redisHelper.WriteConn()
 
 	//goland:noinspection GoUnhandledErrorResult
 	defer redisConn.Close()
