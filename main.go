@@ -20,7 +20,7 @@ package main
 
 import (
 	"encoding/json"
-	fmt "fmt"
+	"fmt"
 	"github.com/oschwald/maxminddb-golang"
 	"io"
 	"io/ioutil"
@@ -79,6 +79,8 @@ func httpRootPage(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "%+v\n", string(jsonValue))
 			}
 		}
+	} else if r.Method == "DELETE" {
+
 	}
 }
 
