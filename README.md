@@ -107,6 +107,7 @@ Arguments:
       --operator-message-ct           E-Mail Content-Type-header for the operator action. Default: text/plain
       --operator-message-path         Full path to the e-mail message file for the operator action. Default: 
       --mail-server                   E-Mail server address for notifications. Default: 
+      --mail-helo                     E-Mail server HELO/EHLO hostname. Default: localhost
       --mail-port                     E-Mail server port number. Default: 587
       --mail-username                 E-Mail server username. Default: 
       --mail-password-path            Full path to the e-mail password file. Default:
@@ -205,6 +206,7 @@ OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip
 OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
 OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
 MAIL_SERVER | E-Mail server address for notifications
+MAIL_HELO | E-Mail server HELO/EHLO hostname; default(localhost)
 MAIL_PORT | E-Mail server port number; default(587)
 MAIL_USERNAME | E-Mail server username
 MAIL_PASSWORD_PATH | Full path to the e-mail password file
