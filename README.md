@@ -155,6 +155,27 @@ Arguments:
   -v  --verbose          Verbose mode
       --version          Current version
 ```
+
+## Remove options
+
+```shell
+geoip-policyd remove --help
+```
+
+produces the following output:
+
+```
+...
+
+Arguments:
+
+  -h  --help      Print help information
+      --sender    Unlock an e-mail account by specifying the sender e-mail address
+      --http-uri  HTTP URI to the REST server. Default: http://127.0.0.1:8080
+  -v  --verbose   Verbose mode. Repeat this for an increased log level
+      --version   Current version
+```
+
 ## Environment variables
 
 The following environment variables can be used to configure the policy service. This is especially useful, if you plan
@@ -211,20 +232,6 @@ MAIL_PORT | E-Mail server port number; default(587)
 MAIL_USERNAME | E-Mail server username
 MAIL_PASSWORD_PATH | Full path to the e-mail password file
 MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
-VERBOSE | Log level. One of 'none', 'info' or 'debug'
-
-### Reload
-
-Variable | Description
----|---
-HTTP_URI | http://127.0.0.1:8080
-VERBOSE | Log level. One of 'none', 'info' or 'debug'
-
-### Stats
-
-Variable | Description
----|---
-HTTP_URI | http://127.0.0.1:8080
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
 ## Actions
