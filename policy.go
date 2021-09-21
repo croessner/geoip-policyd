@@ -126,18 +126,20 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		if request == "smtpd_access_policy" {
 			if sender, ok = policyRequest["sender"]; ok {
 				if len(sender) > 0 {
-					if ldapResult, err = ldapServer.Search(sender); err != nil {
-						log.Println("Info:", err)
-						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-							if ldapServer.LDAPConn == nil {
-								ldapServer.Connect()
-								ldapServer.Bind()
-								ldapResult, _ = ldapServer.Search(sender)
+					if cfg.UseLDAP {
+						if ldapResult, err = ldapServer.Search(sender); err != nil {
+							log.Println("Info:", err)
+							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
+								if ldapServer.LDAPConn == nil {
+									ldapServer.Connect()
+									ldapServer.Bind()
+									ldapResult, _ = ldapServer.Search(sender)
+								}
 							}
 						}
-					}
-					if ldapResult != "" {
-						sender = ldapResult
+						if ldapResult != "" {
+							sender = ldapResult
+						}
 					}
 					if clientIP, ok = policyRequest["client_address"]; ok {
 						key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
