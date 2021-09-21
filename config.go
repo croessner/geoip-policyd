@@ -101,10 +101,12 @@ type CmdLineConfig struct {
 	CommandReload bool
 	CommandStats  bool
 	CommandStatsOption
+	CommandRemove bool
 
 	UseLDAP bool
 	LDAP
 
+	RemoveSender  string
 	WhiteListPath string
 
 	// Global flag that indicates if any action should be taken
@@ -149,7 +151,8 @@ func (c *CmdLineConfig) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "UseLDAP", "LDAP", "MailPasswordPath", "Verbose":
+		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "CommandRemove", "RemoveSender",
+			"UseLDAP", "LDAP", "MailPasswordPath", "Verbose":
 			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
@@ -680,6 +683,24 @@ func (c *CmdLineConfig) Init(args []string) {
 		},
 	)
 
+	commandRemove := parser.NewCommand("remove", "Unlock a sender account")
+
+	argRemoveSender := commandRemove.String(
+		"", "sender", &argparse.Options{
+			Required: true,
+			Default:  "",
+			Help:     "Unlock an e-mail account by specifying the sender e-mail address",
+		},
+	)
+
+	argRemoveHttpURI := commandRemove.String(
+		"", "http-uri", &argparse.Options{
+			Required: false,
+			Default:  httpURI,
+			Help:     "HTTP URI to the REST server",
+		},
+	)
+
 	err := parser.Parse(args)
 	if err != nil {
 		log.Fatalln(parser.Usage(err))
@@ -715,6 +736,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	c.CommandServer = commandServer.Happened()
 	c.CommandReload = commandReload.Happened()
 	c.CommandStats = commandStats.Happened()
+	c.CommandRemove = commandRemove.Happened()
 
 	if commandServer.Happened() {
 		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
@@ -1085,6 +1107,23 @@ func (c *CmdLineConfig) Init(args []string) {
 
 		if *argStatsPrintWhitelist {
 			c.CommandStatsOption.printWhitelist = true
+		}
+	}
+
+	if commandRemove.Happened() {
+		if val := os.Getenv("HTTP_URI"); val != "" {
+			c.HttpURI = val
+		} else {
+			c.HttpURI = *argRemoveHttpURI
+		}
+		if strings.HasSuffix(c.HttpURI, "/") {
+			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
+		}
+
+		if val := os.Getenv("SENDER"); val != "" {
+			c.RemoveSender = val
+		} else {
+			c.RemoveSender = *argRemoveSender
 		}
 	}
 }

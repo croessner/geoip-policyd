@@ -141,6 +141,11 @@ func httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					redis.Args{}.Add(key)...); err != nil {
 					log.Println("Error:", err)
 				}
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintf(rw, "Sender '%s' unlocked", sender)
+			} else {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintln(rw, "[]")
 			}
 		}
 
@@ -243,7 +248,9 @@ func main() {
 			fmt.Println("Error", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Reload-status: %s\n", resp.Status)
+		if cfg.Verbose >= logLevelInfo {
+			fmt.Printf("Reload-status: %s\n", resp.Status)
+		}
 	}
 
 	if cfg.CommandStats {
@@ -253,8 +260,44 @@ func main() {
 				fmt.Println("Error", err)
 				os.Exit(1)
 			}
-			//goland:noinspection GoUnhandledErrorResult
-			io.Copy(os.Stdout, resp.Body)
+			if cfg.Verbose >= logLevelInfo {
+				//goland:noinspection GoUnhandledErrorResult
+				io.Copy(os.Stdout, resp.Body)
+			}
+		}
+	}
+
+	if cfg.CommandRemove {
+		var (
+			req      *http.Request
+			resp     *http.Response
+			respBody []byte
+			err      error
+		)
+		client := &http.Client{}
+
+		req, err = http.NewRequest("DELETE", fmt.Sprintf("%s/remove?sender=%s", cfg.HttpURI, cfg.RemoveSender), nil)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		resp, err = client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		//goland:noinspection GoUnhandledErrorResult
+		defer resp.Body.Close()
+
+		respBody, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		if cfg.Verbose >= logLevelInfo {
+			fmt.Println(string(respBody))
 		}
 	}
 }
