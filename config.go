@@ -47,6 +47,7 @@ const (
 	maxRetries    = 9
 	mailPort      = 587
 	mailSubject   = "[geoip-policyd] An e-mail account was compromised"
+	mailHelo      = "localhost"
 )
 
 const (
@@ -121,6 +122,7 @@ type CmdLineConfig struct {
 
 	// Global mail server configuration parameters
 	MailServer       string
+	MailHelo         string
 	MailPort         int
 	MailUsername     string
 	MailPasswordPath string
@@ -600,6 +602,13 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help: "E-Mail server address for notifications",
 		},
 	)
+	argServerMailHelo := commandServer.String(
+		"", "mail-helo", &argparse.Options{
+			Required: false,
+			Default:  mailHelo,
+			Help:     "E-Mail server HELO/EHLO hostname",
+		},
+	)
 	argServerMailPort := commandServer.Int(
 		"", "mail-port", &argparse.Options{
 			Required: false,
@@ -1016,6 +1025,11 @@ func (c *CmdLineConfig) Init(args []string) {
 				c.MailServer = val
 			} else {
 				c.MailServer = *argServerMailServer
+			}
+			if val := os.Getenv("MAIL_HELO"); val != "" {
+				c.MailHelo = val
+			} else {
+				c.MailHelo = *argServerMailHelo
 			}
 			if val := os.Getenv("MAIL_PORT"); val != "" {
 				p, err := strconv.Atoi(val)

@@ -80,6 +80,9 @@ func (a *EmailOperator) Call(sender string, c interface{}) error {
 		}
 		d.Password = string(password)
 	}
+	if cfg.MailHelo != "" {
+		d.LocalName = cfg.MailHelo
+	}
 	d.TLSConfig = &tls.Config{ServerName: cfg.MailServer, InsecureSkipVerify: false}
 
 	if err := d.DialAndSend(m); err != nil {
