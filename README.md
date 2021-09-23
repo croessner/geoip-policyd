@@ -67,36 +67,42 @@ Arguments:
   -h  --help                          Print help information
   -a  --server-address                IPv4 or IPv6 address for the policy service. Default: 127.0.0.1
   -p  --server-port                   Port for the policy service. Default: 4646
-      --http-address                  HTTP address for incoming requests. Default: :8080
+      --http-address                  HTTP address for incoming requests. Default: 127.0.0.1:8080
   -A  --redis-address                 IPv4 or IPv6 address for the Redis service. Default: 127.0.0.1
   -P  --redis-port                    Port for the Redis service. Default: 6379
       --redis-database-number         Redis database number. Default: 0
-      --redis-username                Redis username. Default:
-      --redis-password                Redis password. Default:
+      --redis-username                Redis username. Default: 
+      --redis-password                Redis password. Default: 
       --redis-writer-address          IPv4 or IPv6 address for a Redis service (writer). Default: 127.0.0.1
       --redis-writer-port             Port for a Redis service (writer). Default: 6379
       --redis-writer-database-number  Redis database number (writer). Default: 0
-      --redis-writer-username         Redis username (writer). Default:
-      --redis-writer-password         Redis password (writer). Default:
+      --redis-writer-username         Redis username (writer). Default: 
+      --redis-writer-password         Redis password (writer). Default: 
       --redis-prefix                  Redis prefix. Default: geopol_
       --redis-ttl                     Redis TTL in seconds. Default: 3600
   -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
-      --blocked-no-expire             Do not expire senders from Redis, if they were blocked in the past: Default false
-  -w  --whitelist-path                Whitelist with different IP and country limits. Default:
+      --blocked-no-expire             Do not expire senders from Redis, if they were blocked in the past. Default: false
+  -w  --whitelist-path                Whitelist with different IP and country limits. Default: 
+      --http-use-basic-auth           Enable basic HTTP auth. Default: false
+      --http-use-ssl                  Enable HTTPS. Default: false
+      --http-basic-auth-username      HTTP basic auth username. Default: 
+      --http-basic-auth-password      Whitelist with different IP and country limits. Default: 
+      --http-tls-cert                 HTTP TLS server certificate (full chain). Default: /localhost.pem
+      --http-tls-key                  HTTP TLS server key. Default: /localhost-key.pem
       --use-ldap                      Enable LDAP support. Default: false
       --ldap-server-uri               Server URI. Specify multiple times, if you need more than one server. Default: [ldap://127.0.0.1:389/]
-      --ldap-basedn                   Base DN. Default:
-      --ldap-binddn                   Bind DN. Default:
-      --ldap-bindpw-path              File containing the LDAP users password. Default:
+      --ldap-basedn                   Base DN. Default: 
+      --ldap-binddn                   Bind DN. Default: 
+      --ldap-bindpw                   Bind password. Default: 
       --ldap-filter                   Filter with %s placeholder. Default: (&(objectClass=*)(mailAlias=%s))
       --ldap-result-attribute         Result attribute for the requested mail sender. Default: mailAccount
       --ldap-starttls                 If this option is given, use StartTLS. Default: false
       --ldap-skip-tls-verify          Skip TLS server name verification. Default: false
-      --ldap-tls-cafile               File containing TLS CA certificate(s). Default:
-      --ldap-tls-client-cert          File containing a TLS client certificate. Default:
-      --ldap-tls-client-key           File containing a TLS client key. Default:
+      --ldap-tls-cafile               File containing TLS CA certificate(s). Default: 
+      --ldap-tls-client-cert          File containing a TLS client certificate. Default: 
+      --ldap-tls-client-key           File containing a TLS client key. Default: 
       --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
       --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
       --run-actions                   Run actions, if a sender is over limits. Default: false
@@ -106,11 +112,11 @@ Arguments:
       --operator-subject              E-Mail Subject-header for the operator action. Default: [geoip-policyd] An e-mail account was compromised
       --operator-message-ct           E-Mail Content-Type-header for the operator action. Default: text/plain
       --operator-message-path         Full path to the e-mail message file for the operator action. Default: 
-      --mail-server                   E-Mail server address for notifications. Default: 
-      --mail-helo                     E-Mail server HELO/EHLO hostname. Default: localhost
-      --mail-port                     E-Mail server port number. Default: 587
-      --mail-username                 E-Mail server username. Default: 
-      --mail-password-path            Full path to the e-mail password file. Default:
+      --mail-server                   E-mail server address for notifications. Default: 
+      --mail-helo                     E-mail server HELO/EHLO hostname. Default: localhost
+      --mail-port                     E-mail server port number. Default: 587
+      --mail-username                 E-mail server username. Default: 
+      --mail-password                 E-mail server password. Default: 
       --mail-ssl                      Use TLS on connect for the e-mail server. Default: false
   -v  --verbose                       Verbose mode. Repeat this for an increased log level
       --version                       Current version
@@ -118,62 +124,48 @@ Arguments:
 
 ## Reload options
 
+Example:
+
 ```shell
-geoip-policyd reload --help
-```
+# Plain http without basic auth
+curl "http://localhost:8080/reload"
 
-produces the following output:
+# Plain with basic auth
+curl "http://localhost:8080/reload" -u testuser:testsecret
 
-```
-...
-
-Arguments:
-
-  -h  --help      Print help information
-      --http-uri  HTTP URI to the REST server; default(http://127.0.0.1:8080)
-  -v  --verbose   Verbose mode
-      --version   Current version
-
+# Secured with basic auth
+curl -k "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
 ## Stats options
 
+Example:
+
 ```shell
-geoip-policyd stats --help
-```
+# Plain http without basic auth
+curl "http://localhost:8080/whitelist" | jq
 
-produces the following output:
+# Plain with basic auth
+curl "http://localhost:8080/whitelist" -u testuser:testsecret | jq
 
-```
-...
+# Secured with basic auth
+curl -k "https://localhost:8443/whitelist" -u testuser:testsecret | jq
 
-Arguments:
-
-  -h  --help             Print help information
-      --print-whitelist  Print out the currently loaded whitelist (JSON-format)
-      --http-uri         HTTP URI to the REST server; default(http://127.0.0.1:8080)
-  -v  --verbose          Verbose mode
-      --version          Current version
 ```
 
 ## Remove options
 
+Example:
+
 ```shell
-geoip-policyd remove --help
-```
+# Plain http without basic auth
+curl -d "sender=user@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "http://localhost:8080/remove"
 
-produces the following output:
+# Plain with basic auth
+curl -d "sender=user@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "http://localhost:8080/remove" -u testuser:testsecret
 
-```
-...
-
-Arguments:
-
-  -h  --help      Print help information
-      --sender    Unlock an e-mail account by specifying the sender e-mail address
-      --http-uri  HTTP URI to the REST server. Default: http://127.0.0.1:8080
-  -v  --verbose   Verbose mode. Repeat this for an increased log level
-      --version   Current version
+# Secured with basic auth
+curl -k -d "sender=test@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
 ## Environment variables
@@ -187,7 +179,7 @@ Variable | Description
 ---|---
 SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
 SERVER_PORT | Port for the policy service; default(4646)
-SERVER_HTTP_ADDRESS | HTTP address for incoming requests; default(:8080)
+HTTP_ADDRESS | HTTP address for incoming requests; default(127.0.0.1:8080)
 REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
 REDIS_PORT | Port for the Redis service; default(6379)
 REDIS_DATABASE_NUMBER | Redis database number
@@ -205,11 +197,16 @@ MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
 MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
 BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
 WHITELIST_PATH | Whitelist with different IP and country limits
+HTTP_USE_BASIC_AUTH | Enable basic HTTP auth; default(false)
+HTTP_USE_SSL | Enable HTTPS; default(false)
+HTTP_BASIC_AUTH_USERNAME | HTTP basic auth username
+HTTP_BASIC_AUTH_PASSWORD | HTTP basic auth password
+HTTP_TLS_CERT | HTTP TLS server certificate (full chain); default(/localhost.pem)
+HTTP_TLS_KEY | HTTP TLS server key; default(/localhost-key.pem)
 USE_LDAP | Enable LDAP support; default(false)
 LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
 LDAP_BASEDN | Base DN
-LDAP_BINDDN | Bind DN 
-LDAP_BINDPW_PATH | File containing the LDAP users password
+LDAP_BINDPW | Bind PW 
 LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
 LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
 LDAP_STARTTLS | If this option is given, use StartTLS
@@ -226,11 +223,11 @@ OPERATOR_FROM | E-Mail From-header for the operator action
 OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised)
 OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
 OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
-MAIL_SERVER | E-Mail server address for notifications
-MAIL_HELO | E-Mail server HELO/EHLO hostname; default(localhost)
-MAIL_PORT | E-Mail server port number; default(587)
-MAIL_USERNAME | E-Mail server username
-MAIL_PASSWORD_PATH | Full path to the e-mail password file
+MAIL_SERVER | E-mail server address for notifications
+MAIL_HELO | E-mail server HELO/EHLO hostname; default(localhost)
+MAIL_PORT | E-mail server port number; default(587)
+MAIL_USERNAME | E-mail server username
+MAIL_PASSWORD | E-mail server password
 MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
@@ -255,7 +252,7 @@ geoip-policyd ...other-options... \
   --mail-server submission.example.com \
   --mail-port 587 \
   --mail-username "some_username" \
-  --mail-password ./mail.secret
+  --mail-password some-secret
 ```
 
 ## LDAP
