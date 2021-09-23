@@ -75,16 +75,14 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			log.Println("Reloaded GeoLite2-City database file")
 
 			if cs != nil {
-				cs.Mu.Lock()
 				cs = initCustomSettings(cfg)
-				cs.Mu.Unlock()
-				log.Println("Reloaded whitelist file")
+				log.Println("Reloaded custom settings file")
 			}
 
 			//goland:noinspection GoUnhandledErrorResult
 			fmt.Fprintf(rw, "OK reload")
 
-		case "/whitelist":
+		case "/custom-settings":
 			if cs == nil {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "[]")

@@ -28,7 +28,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // Defaults
@@ -128,7 +127,6 @@ type CmdLineConfig struct {
 }
 
 type CustomSettings struct {
-	Mu   sync.Mutex
 	Data []Account `json:"data"`
 }
 

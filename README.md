@@ -143,13 +143,13 @@ Example:
 
 ```shell
 # Plain http without basic auth
-curl "http://localhost:8080/whitelist" | jq
+curl "http://localhost:8080/custom-settings" | jq
 
 # Plain with basic auth
-curl "http://localhost:8080/whitelist" -u testuser:testsecret | jq
+curl "http://localhost:8080/custom-settings" -u testuser:testsecret | jq
 
 # Secured with basic auth
-curl -k "https://localhost:8443/whitelist" -u testuser:testsecret | jq
+curl -k "https://localhost:8443/custom-settings" -u testuser:testsecret | jq
 
 ```
 
