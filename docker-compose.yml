@@ -13,7 +13,7 @@ services:
       - TZ=Europe/Berlin
       - SERVER_ADDRESS=127.0.0.1
       - SERVER_PORT=4646
-      - SERVER_HTTP_ADDRESS=127.0.0.1:8080
+      - HTTP_ADDRESS=127.0.0.1:8080
       - REDIS_ADDRESS=127.0.0.1
       - REDIS_PORT=6379
       - REDIS_DATABASE_NUMBER=0
