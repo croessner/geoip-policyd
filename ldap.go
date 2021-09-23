@@ -35,7 +35,7 @@ type LDAP struct {
 	ServerURIs    []string
 	BaseDN        string
 	BindDN        string
-	BindPWPATH    string
+	BindPW        string
 	Filter        string
 	ResultAttr    []string
 	StartTLS      bool
@@ -152,10 +152,7 @@ func (l *LDAP) Connect() {
 }
 
 func (l *LDAP) Bind() {
-	var (
-		password []byte
-		err      error
-	)
+	var err error
 
 	if l.SASLExternal {
 		if cfg.Verbose == logLevelDebug {
@@ -169,12 +166,8 @@ func (l *LDAP) Bind() {
 		if cfg.Verbose == logLevelDebug {
 			log.Println("Debug: LDAP: simple bind")
 		}
-		password, err = ioutil.ReadFile(l.BindPWPATH)
-		if err != nil {
-			log.Fatalln("Error:", err)
-		}
 
-		err = l.LDAPConn.Bind(l.BindDN, string(password))
+		err = l.LDAPConn.Bind(l.BindDN, l.BindPW)
 		if err != nil {
 			log.Println("Error:", err)
 		}

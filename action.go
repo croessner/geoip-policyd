@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"gopkg.in/gomail.v2"
 	"io/ioutil"
-	"log"
 	"strings"
 )
 
@@ -72,13 +71,8 @@ func (a *EmailOperator) Call(sender string, c interface{}) error {
 	if cfg.MailUsername != "" {
 		d.Username = cfg.MailUsername
 	}
-	if cfg.MailPasswordPath != "" {
-		password, err := ioutil.ReadFile(cfg.MailPasswordPath)
-		if err != nil {
-			log.Println("Error:", err)
-			return err
-		}
-		d.Password = string(password)
+	if cfg.MailPassword != "" {
+		d.Password = cfg.MailPassword
 	}
 	if cfg.MailHelo != "" {
 		d.LocalName = cfg.MailHelo

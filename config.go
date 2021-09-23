@@ -42,8 +42,9 @@ const (
 	redisTTL      = 3600
 	maxCountries  = 3
 	maxIps        = 10
-	httpAddress   = ":8080"
-	httpURI       = "http://127.0.0.1:8080"
+	httpAddress   = "127.0.0.1:8080"
+	httpX509Cert  = "/localhost.pem"
+	httpX509Key   = "/localhost-key.pem"
 	maxRetries    = 9
 	mailPort      = 587
 	mailSubject   = "[geoip-policyd] An e-mail account was compromised"
@@ -56,9 +57,11 @@ const (
 	logLevelDebug = iota
 )
 
-type CommandStatsOption struct {
-	printWhitelist bool
-}
+const (
+	BASE = "base"
+	ONE  = "one"
+	SUB  = "sub"
+)
 
 type CmdLineConfig struct {
 	// Listen address for the policy service
@@ -69,9 +72,7 @@ type CmdLineConfig struct {
 
 	// REST interface of the policy service
 	HttpAddress string
-
-	// URI to the REST service, if called with any other command than server
-	HttpURI string
+	HttpApp
 
 	// Redis settings for a raed and/or write server pool
 	RedisAddress  string
@@ -98,15 +99,10 @@ type CmdLineConfig struct {
 
 	// Flag that indicates which command was called
 	CommandServer bool
-	CommandReload bool
-	CommandStats  bool
-	CommandStatsOption
-	CommandRemove bool
 
 	UseLDAP bool
 	LDAP
 
-	RemoveSender  string
 	WhiteListPath string
 
 	// Global flag that indicates if any action should be taken
@@ -123,12 +119,12 @@ type CmdLineConfig struct {
 	EmailOperatorMessagePath string
 
 	// Global mail server configuration parameters
-	MailServer       string
-	MailHelo         string
-	MailPort         int
-	MailUsername     string
-	MailPasswordPath string
-	MailSSL          bool
+	MailServer   string
+	MailHelo     string
+	MailPort     int
+	MailUsername string
+	MailPassword string
+	MailSSL      bool
 }
 
 type WhiteList struct {
@@ -151,8 +147,7 @@ func (c *CmdLineConfig) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "CommandServer", "CommandReload", "CommandStats", "CommandStatsOption", "CommandRemove", "RemoveSender",
-			"UseLDAP", "LDAP", "MailPasswordPath", "Verbose":
+		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HttpApp", "Verbose":
 			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
@@ -416,6 +411,48 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help:     "Whitelist with different IP and country limits",
 		},
 	)
+	argServerHttpUseBasicAuth := commandServer.Flag(
+		"", "http-use-basic-auth", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Enable basic HTTP auth",
+		},
+	)
+	argServerHttpUseSSL := commandServer.Flag(
+		"", "http-use-ssl", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Enable HTTPS",
+		},
+	)
+	argServerHttpBasicAuthUsername := commandServer.String(
+		"", "http-basic-auth-username", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "HTTP basic auth username",
+		},
+	)
+	argServerHttpBasicAuthPassword := commandServer.String(
+		"", "http-basic-auth-password", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "HTTP basic auth password",
+		},
+	)
+	argServerHttpTLSCert := commandServer.String(
+		"", "http-tls-cert", &argparse.Options{
+			Required: false,
+			Default:  httpX509Cert,
+			Help:     "HTTP TLS server certificate (full chain)",
+		},
+	)
+	argServerHttpTLSKey := commandServer.String(
+		"", "http-tls-key", &argparse.Options{
+			Required: false,
+			Default:  httpX509Key,
+			Help:     "HTTP TLS server key",
+		},
+	)
 	argServerUseLDAP := commandServer.Flag(
 		"", "use-ldap", &argparse.Options{
 			Required: false,
@@ -445,10 +482,10 @@ func (c *CmdLineConfig) Init(args []string) {
 		},
 	)
 	argServerLDAPBindPWPATH := commandServer.String(
-		"", "ldap-bindpw-path", &argparse.Options{
+		"", "ldap-bindpw", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "File containing the LDAP users password",
+			Help:     "Bind password",
 		},
 	)
 	argServerLDAPFilter := commandServer.String(
@@ -513,7 +550,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "sub",
 			Validate: func(opt []string) error {
 				switch opt[0] {
-				case "base", "one", "sub":
+				case BASE, ONE, SUB:
 					return nil
 				default:
 					return fmt.Errorf("value '%s' must be one of: 'one', 'base' or 'sub'", opt[0])
@@ -602,14 +639,14 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "E-Mail server address for notifications",
+			Help: "E-mail server address for notifications",
 		},
 	)
 	argServerMailHelo := commandServer.String(
 		"", "mail-helo", &argparse.Options{
 			Required: false,
 			Default:  mailHelo,
-			Help:     "E-Mail server HELO/EHLO hostname",
+			Help:     "E-mail server HELO/EHLO hostname",
 		},
 	)
 	argServerMailPort := commandServer.Int(
@@ -626,27 +663,21 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 				return nil
 			},
-			Help: "E-Mail server port number",
+			Help: "E-mail server port number",
 		},
 	)
 	argServerMailUsername := commandServer.String(
 		"", "mail-username", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "E-Mail server username",
+			Help:     "E-mail server username",
 		},
 	)
 	argServerMailPasswordPath := commandServer.String(
-		"", "mail-password-path", &argparse.Options{
+		"", "mail-password", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Validate: func(opt []string) error {
-				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return fmt.Errorf("%s: %s", opt[0], err)
-				}
-				return nil
-			},
-			Help: "Full path to the e-mail password file",
+			Help:     "E-mail server password",
 		},
 	)
 	argServerMailSSL := commandServer.Flag(
@@ -654,50 +685,6 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  false,
 			Help:     "Use TLS on connect for the e-mail server",
-		},
-	)
-
-	commandReload := parser.NewCommand("reload", "Reload the geoip-policyd server")
-
-	argReloadHttpURI := commandReload.String(
-		"", "http-uri", &argparse.Options{
-			Required: false,
-			Default:  httpURI,
-			Help:     "HTTP URI to the REST server",
-		},
-	)
-
-	commandStats := parser.NewCommand("stats", "Get statistics from geoip-policyd server")
-
-	argStatsPrintWhitelist := commandStats.Flag(
-		"", "print-whitelist", &argparse.Options{
-			Required: false,
-			Help:     "Print out the currently loaded whitelist (JSON-format)",
-		},
-	)
-	argStatsHttpURI := commandStats.String(
-		"", "http-uri", &argparse.Options{
-			Required: false,
-			Default:  httpURI,
-			Help:     "HTTP URI to the REST server",
-		},
-	)
-
-	commandRemove := parser.NewCommand("remove", "Unlock a sender account")
-
-	argRemoveSender := commandRemove.String(
-		"", "sender", &argparse.Options{
-			Required: true,
-			Default:  "",
-			Help:     "Unlock an e-mail account by specifying the sender e-mail address",
-		},
-	)
-
-	argRemoveHttpURI := commandRemove.String(
-		"", "http-uri", &argparse.Options{
-			Required: false,
-			Default:  httpURI,
-			Help:     "HTTP URI to the REST server",
 		},
 	)
 
@@ -734,9 +721,6 @@ func (c *CmdLineConfig) Init(args []string) {
 	}
 
 	c.CommandServer = commandServer.Happened()
-	c.CommandReload = commandReload.Happened()
-	c.CommandStats = commandStats.Happened()
-	c.CommandRemove = commandRemove.Happened()
 
 	if commandServer.Happened() {
 		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
@@ -753,7 +737,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		} else {
 			c.ServerPort = *argServerPort
 		}
-		if val := os.Getenv("SERVER_HTTP_ADDRESS"); val != "" {
+		if val := os.Getenv("HTTP_ADDRESS"); val != "" {
 			c.HttpAddress = val
 		} else {
 			c.HttpAddress = *argServerHttpAddress
@@ -882,6 +866,46 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.WhiteListPath = *argServerWhiteListPath
 		}
 
+		if val := os.Getenv("HTTP_USE_BASIC_AUTH"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Println("Error:", err)
+			}
+			c.HttpApp.UseBasicAuth = p
+			if un := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); un != "" {
+				c.HttpApp.Auth.Username = un
+			} else {
+				c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
+			}
+			if pw := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); pw != "" {
+				c.HttpApp.Auth.Password = pw
+			} else {
+				c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
+			}
+		} else {
+			c.HttpApp.UseBasicAuth = *argServerHttpUseBasicAuth
+		}
+
+		if val := os.Getenv("HTTP_USE_SSL"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Println("Error:", err)
+			}
+			c.HttpApp.UseSSL = p
+			if crt := os.Getenv("HTTP_TLS_CERT"); crt != "" {
+				c.HttpApp.X509.Cert = crt
+			} else {
+				c.HttpApp.X509.Cert = *argServerHttpTLSCert
+			}
+			if key := os.Getenv("HTTP_TLS_KEY"); key != "" {
+				c.HttpApp.X509.Key = key
+			} else {
+				c.HttpApp.X509.Key = *argServerHttpTLSKey
+			}
+		} else {
+			c.HttpApp.UseSSL = *argServerHttpUseSSL
+		}
+
 		if val := os.Getenv("USE_LDAP"); val != "" {
 			p, err := strconv.ParseBool(val)
 			if err != nil {
@@ -912,10 +936,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			} else {
 				c.LDAP.BindDN = *argServerLDAPBindDN
 			}
-			if val := os.Getenv("LDAP_BINDPW_PATH"); val != "" {
-				c.LDAP.BindPWPATH = val
+			if val := os.Getenv("LDAP_BINDPW"); val != "" {
+				c.LDAP.BindPW = val
 			} else {
-				c.LDAP.BindPWPATH = *argServerLDAPBindPWPATH
+				c.LDAP.BindPW = *argServerLDAPBindPWPATH
 			}
 			if val := os.Getenv("LDAP_FILTER"); val != "" {
 				c.LDAP.Filter = val
@@ -971,22 +995,22 @@ func (c *CmdLineConfig) Init(args []string) {
 			}
 			if val := os.Getenv("LDAP_SCOPE"); val != "" {
 				switch val {
-				case "base":
+				case BASE:
 					c.LDAP.Scope = ldap.ScopeBaseObject
-				case "one":
+				case ONE:
 					c.LDAP.Scope = ldap.ScopeSingleLevel
-				case "sub":
+				case SUB:
 					c.LDAP.Scope = ldap.ScopeWholeSubtree
 				default:
 					log.Fatalln(parser.Usage(fmt.Sprintf("value '%s' must be one of: one, base or sub", val)))
 				}
 			} else {
 				switch *argServerLDAPScope {
-				case "base":
+				case BASE:
 					c.LDAP.Scope = ldap.ScopeBaseObject
-				case "one":
+				case ONE:
 					c.LDAP.Scope = ldap.ScopeSingleLevel
-				case "sub":
+				case SUB:
 					c.LDAP.Scope = ldap.ScopeWholeSubtree
 				}
 			}
@@ -1067,10 +1091,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			} else {
 				c.MailUsername = *argServerMailUsername
 			}
-			if val := os.Getenv("MAIL_PASSWORD_PATH"); val != "" {
-				c.MailPasswordPath = val
+			if val := os.Getenv("MAIL_PASSWORD"); val != "" {
+				c.MailPassword = val
 			} else {
-				c.MailPasswordPath = *argServerMailPasswordPath
+				c.MailPassword = *argServerMailPasswordPath
 			}
 			if val := os.Getenv("MAIL_SSL"); val != "" {
 				p, err := strconv.ParseBool(val)
@@ -1082,38 +1106,5 @@ func (c *CmdLineConfig) Init(args []string) {
 				c.MailSSL = *argServerMailSSL
 			}
 		}
-	}
-
-	if commandReload.Happened() {
-		if *argReloadHttpURI != "" {
-			c.HttpURI = *argReloadHttpURI
-		}
-		if strings.HasSuffix(c.HttpURI, "/") {
-			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
-		}
-	}
-
-	if commandStats.Happened() {
-		if *argStatsHttpURI != "" {
-			c.HttpURI = *argStatsHttpURI
-		}
-		if strings.HasSuffix(c.HttpURI, "/") {
-			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
-		}
-
-		if *argStatsPrintWhitelist {
-			c.CommandStatsOption.printWhitelist = true
-		}
-	}
-
-	if commandRemove.Happened() {
-		if *argRemoveHttpURI != "" {
-			c.HttpURI = *argRemoveHttpURI
-		}
-		if strings.HasSuffix(c.HttpURI, "/") {
-			c.HttpURI = c.HttpURI[:len(c.HttpURI)-1]
-		}
-
-		c.RemoveSender = *argRemoveSender
 	}
 }

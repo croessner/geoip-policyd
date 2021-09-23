@@ -20,18 +20,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/gomodule/redigo/redis"
 	"github.com/oschwald/maxminddb-golang"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 )
 
@@ -42,118 +37,6 @@ var (
 	wl    *WhiteList
 	geoip *GeoIP
 )
-
-const (
-	GET    = "GET"
-	DELETE = "DELETE"
-)
-
-func httpRootPage(rw http.ResponseWriter, request *http.Request) {
-	if err := request.ParseForm(); err != nil {
-		log.Println("Error:", err)
-		return
-	}
-
-	method := request.Method
-	values := request.Form
-	uri := request.URL
-
-	switch method {
-	case GET:
-		switch uri.Path {
-		case "/reload":
-			var err error
-
-			//goland:noinspection GoUnhandledErrorResult
-			geoip.Reader.Close()
-			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
-			if err != nil {
-				log.Fatal("Error: Can not open GeoLite2-City database file", err)
-			}
-			log.Println("Reloaded GeoLite2-City database file")
-
-			if wl != nil {
-				wl.Mu.Lock()
-				wl = initWhitelist(cfg)
-				wl.Mu.Unlock()
-				log.Println("Reloaded whitelist file")
-			}
-
-			//goland:noinspection GoUnhandledErrorResult
-			fmt.Fprintf(rw, "OK reload")
-
-		case "/whitelist":
-			if wl == nil {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
-				return
-			}
-			if jsonValue, err := json.Marshal(wl.Data); err != nil {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
-			} else {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(rw, "%+v\n", string(jsonValue))
-			}
-		}
-
-	case DELETE:
-		switch uri.Path {
-		case "/remove":
-			if val, ok := values["sender"]; ok {
-				sender := val[0]
-				if sender == "" {
-					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "[]")
-					return
-				}
-
-				var redisHelper = &Redis{}
-				redisConnW := redisHelper.WriteConn()
-
-				//goland:noinspection GoUnhandledErrorResult
-				defer redisConnW.Close()
-
-				if cfg.UseLDAP {
-					var err error
-					var ldapResult string
-
-					ldapServer := &cfg.LDAP
-
-					if ldapResult, err = ldapServer.Search(sender); err != nil {
-						log.Println("Info:", err)
-						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-							if ldapServer.LDAPConn == nil {
-								ldapServer.Connect()
-								ldapServer.Bind()
-								ldapResult, _ = ldapServer.Search(sender)
-							}
-						}
-					}
-					if ldapResult != "" {
-						sender = ldapResult
-					}
-
-				}
-
-				key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
-				if _, err := redisConnW.Do("DEL",
-					redis.Args{}.Add(key)...); err != nil {
-					log.Println("Error:", err)
-				}
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(rw, "Sender '%s' unlocked", sender)
-			} else {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
-			}
-		}
-
-	default:
-		rw.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-}
 
 func initWhitelist(cfg *CmdLineConfig) *WhiteList {
 	w := new(WhiteList)
@@ -201,7 +84,6 @@ func main() {
 		wl = initWhitelist(cfg)
 
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
-		log.Printf("Starting geoip-policyd HTTP service with address: '%s'", cfg.HttpAddress)
 
 		if cfg.Verbose == logLevelDebug {
 			log.Println("Debug:", cfg)
@@ -227,10 +109,8 @@ func main() {
 		//goland:noinspection GoUnhandledErrorResult
 		defer geoip.Reader.Close()
 
-		go func() {
-			http.HandleFunc("/", httpRootPage)
-			log.Fatal(http.ListenAndServe(cfg.HttpAddress, nil))
-		}()
+		// REST interface
+		go httpApp()
 
 		server, err = net.Listen("tcp", cfg.ServerAddress+":"+strconv.Itoa(cfg.ServerPort))
 		if server == nil {
@@ -239,65 +119,6 @@ func main() {
 		clientChannel := clientConnections(server)
 		for {
 			go handleConnection(<-clientChannel, cfg)
-		}
-	}
-
-	if cfg.CommandReload {
-		resp, err := http.Get(fmt.Sprintf("%s%s", cfg.HttpURI, "/reload"))
-		if err != nil {
-			fmt.Println("Error", err)
-			os.Exit(1)
-		}
-		if cfg.Verbose >= logLevelInfo {
-			fmt.Printf("Reload-status: %s\n", resp.Status)
-		}
-	}
-
-	if cfg.CommandStats {
-		if cfg.CommandStatsOption.printWhitelist {
-			resp, err := http.Get(fmt.Sprintf("%s%s", cfg.HttpURI, "/whitelist"))
-			if err != nil {
-				fmt.Println("Error", err)
-				os.Exit(1)
-			}
-			if cfg.Verbose >= logLevelInfo {
-				//goland:noinspection GoUnhandledErrorResult
-				io.Copy(os.Stdout, resp.Body)
-			}
-		}
-	}
-
-	if cfg.CommandRemove {
-		var (
-			req      *http.Request
-			resp     *http.Response
-			respBody []byte
-			err      error
-		)
-		client := &http.Client{}
-
-		req, err = http.NewRequest("DELETE", fmt.Sprintf("%s/remove?sender=%s", cfg.HttpURI, cfg.RemoveSender), nil)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		resp, err = client.Do(req)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		//goland:noinspection GoUnhandledErrorResult
-		defer resp.Body.Close()
-
-		respBody, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		if cfg.Verbose >= logLevelInfo {
-			fmt.Println(string(respBody))
 		}
 	}
 }
