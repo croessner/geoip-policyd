@@ -149,8 +149,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							newCC = remote.AddCountryCode(countryCode)
 						}
 
-						if len(wl.Data) > 0 {
-							for _, record := range wl.Data {
+						if len(cs.Data) > 0 {
+							for _, record := range cs.Data {
 								if record.Sender == sender {
 									if record.Ips > 0 {
 										usedMaxIps = record.Ips

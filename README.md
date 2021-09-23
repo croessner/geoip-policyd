@@ -298,7 +298,7 @@ services:
       REDIS_PORT: 6379
       REDIS_DATABASE_NUMBER: 0
       GEOIP_PATH: "/GeoLite2-City.mmdb"
-      WHITELIST_PATH: "/whitelist.json"
+      CUSTOM_SETTINGS_PATH: "/custom.json"
       USE_LDAP: "true"
       LDAP_STARTTLS: "true"
       LDAP_SASL_EXTERNAL: "true"
@@ -311,7 +311,7 @@ services:
       LDAP_RESULT_ATTRIBUTE: "uid"
     volumes:
       - /usr/share/GeoIP/GeoLite2-City.mmdb:/GeoLite2-City.mmdb:ro,Z
-      - ./whitelist.json:/whitelist.json:ro,Z
+      - ./custom.json:/custom.json:ro,Z
       - /etc/pki/tls/certs/cacert.pem:/cacert.pem:ro,Z
       - /etc/ssl/certs/cert.pem:/cert.pem:ro,Z
       - /etc/ssl/private/key.pem:/key.pem:ro,Z

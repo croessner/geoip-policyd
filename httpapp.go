@@ -74,10 +74,10 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			}
 			log.Println("Reloaded GeoLite2-City database file")
 
-			if wl != nil {
-				wl.Mu.Lock()
-				wl = initWhitelist(cfg)
-				wl.Mu.Unlock()
+			if cs != nil {
+				cs.Mu.Lock()
+				cs = initCustomSettings(cfg)
+				cs.Mu.Unlock()
 				log.Println("Reloaded whitelist file")
 			}
 
@@ -85,12 +85,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			fmt.Fprintf(rw, "OK reload")
 
 		case "/whitelist":
-			if wl == nil {
+			if cs == nil {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "[]")
 				return
 			}
-			if jsonValue, err := json.Marshal(wl.Data); err != nil {
+			if jsonValue, err := json.Marshal(cs.Data); err != nil {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "[]")
 			} else {

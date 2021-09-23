@@ -34,14 +34,14 @@ const version = "@@gittag@@-@@gitcommit@@"
 
 var (
 	cfg   *CmdLineConfig
-	wl    *WhiteList
+	cs    *CustomSettings
 	geoip *GeoIP
 )
 
-func initWhitelist(cfg *CmdLineConfig) *WhiteList {
-	w := new(WhiteList)
-	if cfg.WhiteListPath != "" {
-		jsonFile, err := os.Open(cfg.WhiteListPath)
+func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
+	customSettings := new(CustomSettings)
+	if cfg.CustomSettingsPath != "" {
+		jsonFile, err := os.Open(cfg.CustomSettingsPath)
 		if err != nil {
 			log.Fatalln("Error:", err)
 		}
@@ -52,12 +52,12 @@ func initWhitelist(cfg *CmdLineConfig) *WhiteList {
 		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
 			log.Fatalln("Error:", err)
 		} else {
-			if err := json.Unmarshal(byteValue, w); err != nil {
+			if err := json.Unmarshal(byteValue, customSettings); err != nil {
 				log.Fatalln("Error:", err)
 			}
 		}
 	}
-	return w
+	return customSettings
 }
 
 func main() {
@@ -81,7 +81,7 @@ func main() {
 	}()
 
 	if cfg.CommandServer {
-		wl = initWhitelist(cfg)
+		cs = initCustomSettings(cfg)
 
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 

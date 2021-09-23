@@ -18,7 +18,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_DATABASE_NUMBER=0
       - GEOIP_PATH=/GeoLite2-City.mmdb
-      - WHITELIST_PATH=/whitelist.json
+      - CUSTOM_SETTINGS_PATH=/custom.json
     volumes:
       - /usr/share/GeoIP/GeoLite2-City.mmdb:/GeoLite2-City.mmdb:ro,Z
-      - ./whitelist.json:/whitelist.json:ro,Z
+      - ./custom.json:/custom.json:ro,Z

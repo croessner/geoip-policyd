@@ -103,7 +103,7 @@ type CmdLineConfig struct {
 	UseLDAP bool
 	LDAP
 
-	WhiteListPath string
+	CustomSettingsPath string
 
 	// Global flag that indicates if any action should be taken
 	RunActions bool
@@ -127,7 +127,7 @@ type CmdLineConfig struct {
 	MailSSL      bool
 }
 
-type WhiteList struct {
+type CustomSettings struct {
 	Mu   sync.Mutex
 	Data []Account `json:"data"`
 }
@@ -404,11 +404,11 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help:     "Do not expire senders from Redis, if they were blocked in the past",
 		},
 	)
-	argServerWhiteListPath := commandServer.String(
-		"w", "whitelist-path", &argparse.Options{
+	argServerCustomSettingsPath := commandServer.String(
+		"c", "custom-settings-path", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Whitelist with different IP and country limits",
+			Help:     "Custom settings with different IP and country limits",
 		},
 	)
 	argServerHttpUseBasicAuth := commandServer.Flag(
@@ -860,10 +860,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.BlockedNoExpire = *argServerBlockedNoExpire
 		}
 
-		if val := os.Getenv("WHITELIST_PATH"); val != "" {
-			c.WhiteListPath = val
+		if val := os.Getenv("CUSTOM_SETTINGS_PATH"); val != "" {
+			c.CustomSettingsPath = val
 		} else {
-			c.WhiteListPath = *argServerWhiteListPath
+			c.CustomSettingsPath = *argServerCustomSettingsPath
 		}
 
 		if val := os.Getenv("HTTP_USE_BASIC_AUTH"); val != "" {
