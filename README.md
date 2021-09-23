@@ -84,7 +84,7 @@ Arguments:
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
       --blocked-no-expire             Do not expire senders from Redis, if they were blocked in the past. Default: false
-  -w  --whitelist-path                Whitelist with different IP and country limits. Default: 
+  -c  --custom-settings-path          Custom settings with different IP and country limits. Default: 
       --http-use-basic-auth           Enable basic HTTP auth. Default: false
       --http-use-ssl                  Enable HTTPS. Default: false
       --http-basic-auth-username      HTTP basic auth username. Default: 
@@ -196,7 +196,7 @@ GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoL
 MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
 MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
 BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
-WHITELIST_PATH | Whitelist with different IP and country limits
+CUSTOM_SETTINGS_PATH | Custom settings with different IP and country limits
 HTTP_USE_BASIC_AUTH | Enable basic HTTP auth; default(false)
 HTTP_USE_SSL | Enable HTTPS; default(false)
 HTTP_BASIC_AUTH_USERNAME | HTTP basic auth username
