@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -34,7 +35,7 @@ const version = "@@gittag@@-@@gitcommit@@"
 
 var (
 	cfg   *CmdLineConfig
-	cs    *CustomSettings
+	cs    atomic.Value
 	geoip *GeoIP
 )
 
@@ -81,7 +82,7 @@ func main() {
 	}()
 
 	if cfg.CommandServer {
-		cs = initCustomSettings(cfg)
+		cs.Store(initCustomSettings(cfg))
 
 		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 

@@ -74,21 +74,15 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			}
 			log.Println("Reloaded GeoLite2-City database file")
 
-			if cs != nil {
-				cs = initCustomSettings(cfg)
-				log.Println("Reloaded custom settings file")
-			}
+			cs.Store(initCustomSettings(cfg))
+			log.Println("Reloaded custom settings file")
 
 			//goland:noinspection GoUnhandledErrorResult
 			fmt.Fprintf(rw, "OK reload")
 
 		case "/custom-settings":
-			if cs == nil {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
-				return
-			}
-			if jsonValue, err := json.Marshal(cs.Data); err != nil {
+			customSettings := cs.Load().(*CustomSettings)
+			if jsonValue, err := json.Marshal(customSettings.Data); err != nil {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "[]")
 			} else {
