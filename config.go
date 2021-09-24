@@ -870,18 +870,18 @@ func (c *CmdLineConfig) Init(args []string) {
 				log.Println("Error:", err)
 			}
 			c.HttpApp.UseBasicAuth = p
-			if un := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); un != "" {
-				c.HttpApp.Auth.Username = un
-			} else {
-				c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
-			}
-			if pw := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); pw != "" {
-				c.HttpApp.Auth.Password = pw
-			} else {
-				c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
-			}
 		} else {
 			c.HttpApp.UseBasicAuth = *argServerHttpUseBasicAuth
+		}
+		if val := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); val != "" {
+			c.HttpApp.Auth.Username = val
+		} else {
+			c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
+		}
+		if val := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); val != "" {
+			c.HttpApp.Auth.Password = val
+		} else {
+			c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
 		}
 
 		if val := os.Getenv("HTTP_USE_SSL"); val != "" {
@@ -890,18 +890,18 @@ func (c *CmdLineConfig) Init(args []string) {
 				log.Println("Error:", err)
 			}
 			c.HttpApp.UseSSL = p
-			if crt := os.Getenv("HTTP_TLS_CERT"); crt != "" {
-				c.HttpApp.X509.Cert = crt
-			} else {
-				c.HttpApp.X509.Cert = *argServerHttpTLSCert
-			}
-			if key := os.Getenv("HTTP_TLS_KEY"); key != "" {
-				c.HttpApp.X509.Key = key
-			} else {
-				c.HttpApp.X509.Key = *argServerHttpTLSKey
-			}
 		} else {
 			c.HttpApp.UseSSL = *argServerHttpUseSSL
+		}
+		if val := os.Getenv("HTTP_TLS_CERT"); val != "" {
+			c.HttpApp.X509.Cert = val
+		} else {
+			c.HttpApp.X509.Cert = *argServerHttpTLSCert
+		}
+		if val := os.Getenv("HTTP_TLS_KEY"); val != "" {
+			c.HttpApp.X509.Key = val
+		} else {
+			c.HttpApp.X509.Key = *argServerHttpTLSKey
 		}
 
 		if val := os.Getenv("USE_LDAP"); val != "" {
