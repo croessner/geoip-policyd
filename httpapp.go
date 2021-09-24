@@ -78,13 +78,13 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			log.Println("Reloaded custom settings file")
 
 			//goland:noinspection GoUnhandledErrorResult
-			fmt.Fprintf(rw, "OK reload")
+			fmt.Fprintf(rw, "OK reload\n")
 
 		case "/custom-settings":
 			customSettings := cs.Load().(*CustomSettings)
 			if jsonValue, err := json.Marshal(customSettings.Data); err != nil {
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
+				fmt.Fprintln(rw, "Unable to handle request")
 			} else {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintf(rw, "%+v\n", string(jsonValue))
@@ -99,7 +99,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				sender := val[0]
 				if sender == "" {
 					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "[]")
+					fmt.Fprintln(rw, "Unable to handle request")
 					return
 				}
 
@@ -137,10 +137,10 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					log.Println("Error:", err)
 				}
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(rw, "Sender '%s' unlocked", sender)
+				fmt.Fprintf(rw, "Sender '%s' unlocked\n", sender)
 			} else {
 				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
+				fmt.Fprintln(rw, "Unable to handle request")
 			}
 		}
 
