@@ -22,11 +22,9 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 	"log"
 	"net"
-	"sync"
 )
 
 type GeoIP struct {
-	Mu     sync.Mutex
 	Reader *maxminddb.Reader
 }
 
@@ -38,6 +36,7 @@ func getCountryCode(s string) string {
 		} `maxminddb:"country"`
 	}
 	var err error
+	geoip := gi.Load().(*GeoIP)
 
 	ip := net.ParseIP(s)
 	if ip != nil {

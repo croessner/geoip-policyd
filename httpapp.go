@@ -66,12 +66,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 		case "/reload":
 			var err error
 
-			//goland:noinspection GoUnhandledErrorResult
-			geoip.Reader.Close()
+			geoip := new(GeoIP)
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 			if err != nil {
 				log.Fatal("Error: Can not open GeoLite2-City database file", err)
 			}
+			gi.Store(geoip)
 			log.Println("Reloaded GeoLite2-City database file")
 
 			cs.Store(initCustomSettings(cfg))

@@ -34,9 +34,11 @@ import (
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	cfg   *CmdLineConfig
-	cs    atomic.Value
-	geoip *GeoIP
+	cfg *CmdLineConfig
+
+	// Reloadable data
+	cs atomic.Value
+	gi atomic.Value
 )
 
 func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
@@ -99,16 +101,12 @@ func main() {
 			ldapServer.Bind()
 		}
 
-		geoip = new(GeoIP)
-		geoip.Mu.Lock()
+		geoip := new(GeoIP)
 		geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
-		geoip.Mu.Unlock()
 		if err != nil {
 			log.Fatal("Error: Can not open GeoLite2-City database file", err)
 		}
-
-		//goland:noinspection GoUnhandledErrorResult
-		defer geoip.Reader.Close()
+		gi.Store(geoip)
 
 		// REST interface
 		go httpApp()
