@@ -34,7 +34,9 @@ func clientConnections(listener net.Listener) chan net.Conn {
 				log.Println("Error: Couldn't accept connection:", err)
 				continue
 			}
-			log.Printf("Connection %v established\n", client.RemoteAddr())
+			if cfg.Verbose >= logLevelInfo {
+				log.Printf("Connection %v established\n", client.RemoteAddr())
+			}
 			ch <- client
 		}
 	}()
@@ -49,7 +51,9 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
-			log.Printf("Connection %v disconnected\n", client.RemoteAddr())
+			if cfg.Verbose == logLevelDebug {
+				log.Printf("Connection %v disconnected\n", client.RemoteAddr())
+			}
 			client.Close()
 			break
 		}
@@ -59,7 +63,7 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			if cfg.Verbose == logLevelDebug {
+			if cfg.Verbose >= logLevelInfo {
 				log.Println("Debug:", policyRequest)
 			}
 
