@@ -67,7 +67,7 @@ func newRedisPool(
 				redis.DialPassword(redisPassword),
 			)
 			if err != nil {
-				log.Panic("Panic: Can't create Redis pool", err)
+				log.Println("Error: Can't create Redis pool", err)
 			}
 
 			return c, err
