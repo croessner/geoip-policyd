@@ -65,6 +65,8 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 		switch uri.Path {
 		case "/reload":
 			var err error
+			var customSettings *CustomSettings
+			var newCustomSettings *CustomSettings
 
 			geoip := new(GeoIP)
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
@@ -74,8 +76,13 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			gi.Store(geoip)
 			log.Println("Reloaded GeoLite2-City database file")
 
-			cs.Store(initCustomSettings(cfg))
-			log.Println("Reloaded custom settings file")
+			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
+				newCustomSettings = initCustomSettings(cfg)
+				if newCustomSettings != nil {
+					cs.Store(newCustomSettings)
+					log.Println("Reloaded custom settings file")
+				}
+			}
 
 			//goland:noinspection GoUnhandledErrorResult
 			fmt.Fprintf(rw, "OK reload\n")

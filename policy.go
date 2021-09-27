@@ -152,16 +152,18 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 						if val := os.Getenv("GO_TESTING"); val == "" {
 							customSettings := cs.Load().(*CustomSettings)
-							if len(customSettings.Data) > 0 {
-								for _, record := range customSettings.Data {
-									if record.Sender == sender {
-										if record.Ips > 0 {
-											usedMaxIps = record.Ips
+							if customSettings != nil {
+								if len(customSettings.Data) > 0 {
+									for _, record := range customSettings.Data {
+										if record.Sender == sender {
+											if record.Ips > 0 {
+												usedMaxIps = record.Ips
+											}
+											if record.Countries > 0 {
+												usedMaxCountries = record.Countries
+											}
+											break // First match wins!
 										}
-										if record.Countries > 0 {
-											usedMaxCountries = record.Countries
-										}
-										break // First match wins!
 									}
 								}
 							}

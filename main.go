@@ -59,8 +59,9 @@ func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
 				log.Fatalln("Error:", err)
 			}
 		}
+		return customSettings
 	}
-	return customSettings
+	return nil
 }
 
 func main() {
