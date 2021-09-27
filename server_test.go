@@ -23,6 +23,8 @@ func TestServerSimple(t *testing.T) {
 	if server == nil {
 		t.Errorf("Unable to start server: %s", err)
 	}
+	//goland:noinspection GoUnhandledErrorResult
+	defer server.Close()
 	clientChannel := clientConnections(server)
 
 	tcpAddress, err = net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort))
@@ -34,6 +36,8 @@ func TestServerSimple(t *testing.T) {
 	if err != nil {
 		t.Errorf("Dial failed: %s", err)
 	}
+	//goland:noinspection GoUnhandledErrorResult
+	defer clientConn.Close()
 
 	go handleConnection(<-clientChannel, cfg)
 
