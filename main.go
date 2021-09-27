@@ -20,13 +20,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/oschwald/maxminddb-golang"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync/atomic"
 	"syscall"
 )
@@ -111,7 +111,7 @@ func main() {
 		// REST interface
 		go httpApp()
 
-		server, err = net.Listen("tcp", cfg.ServerAddress+":"+strconv.Itoa(cfg.ServerPort))
+		server, err = net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort))
 		if server == nil {
 			log.Panic("Error: Unable to start server:", err)
 		}
