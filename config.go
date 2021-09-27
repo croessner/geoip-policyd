@@ -632,7 +632,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
 					}
 				}
 				return nil
@@ -873,15 +873,17 @@ func (c *CmdLineConfig) Init(args []string) {
 		} else {
 			c.HttpApp.UseBasicAuth = *argServerHttpUseBasicAuth
 		}
-		if val := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); val != "" {
-			c.HttpApp.Auth.Username = val
-		} else {
-			c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
-		}
-		if val := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); val != "" {
-			c.HttpApp.Auth.Password = val
-		} else {
-			c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
+		if c.HttpApp.UseBasicAuth {
+			if val := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); val != "" {
+				c.HttpApp.Auth.Username = val
+			} else {
+				c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
+			}
+			if val := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); val != "" {
+				c.HttpApp.Auth.Password = val
+			} else {
+				c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
+			}
 		}
 
 		if val := os.Getenv("HTTP_USE_SSL"); val != "" {
@@ -893,15 +895,17 @@ func (c *CmdLineConfig) Init(args []string) {
 		} else {
 			c.HttpApp.UseSSL = *argServerHttpUseSSL
 		}
-		if val := os.Getenv("HTTP_TLS_CERT"); val != "" {
-			c.HttpApp.X509.Cert = val
-		} else {
-			c.HttpApp.X509.Cert = *argServerHttpTLSCert
-		}
-		if val := os.Getenv("HTTP_TLS_KEY"); val != "" {
-			c.HttpApp.X509.Key = val
-		} else {
-			c.HttpApp.X509.Key = *argServerHttpTLSKey
+		if c.HttpApp.UseSSL {
+			if val := os.Getenv("HTTP_TLS_CERT"); val != "" {
+				c.HttpApp.X509.Cert = val
+			} else {
+				c.HttpApp.X509.Cert = *argServerHttpTLSCert
+			}
+			if val := os.Getenv("HTTP_TLS_KEY"); val != "" {
+				c.HttpApp.X509.Key = val
+			} else {
+				c.HttpApp.X509.Key = *argServerHttpTLSKey
+			}
 		}
 
 		if val := os.Getenv("USE_LDAP"); val != "" {
@@ -913,7 +917,6 @@ func (c *CmdLineConfig) Init(args []string) {
 		} else {
 			c.UseLDAP = *argServerUseLDAP
 		}
-
 		if c.UseLDAP {
 			if val := os.Getenv("LDAP_SERVER_URIS"); val != "" {
 				p := strings.Split(val, ",")
@@ -1012,20 +1015,22 @@ func (c *CmdLineConfig) Init(args []string) {
 					c.LDAP.Scope = ldap.ScopeWholeSubtree
 				}
 			}
+		}
 
-			/*
-			 * Actions
-			 */
+		/*
+		 * Actions
+		 */
 
-			if val := os.Getenv("RUN_ACTIONS"); val != "" {
-				p, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err)
-				}
-				c.RunActions = p
-			} else {
-				c.RunActions = *argServerRunActions
+		if val := os.Getenv("RUN_ACTIONS"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err)
 			}
+			c.RunActions = p
+		} else {
+			c.RunActions = *argServerRunActions
+		}
+		if c.RunActions {
 			if val := os.Getenv("RUN_ACTION_OPERATOR"); val != "" {
 				p, err := strconv.ParseBool(val)
 				if err != nil {
@@ -1035,74 +1040,76 @@ func (c *CmdLineConfig) Init(args []string) {
 			} else {
 				c.RunActionOperator = *argServerRunActionOperator
 			}
-			if val := os.Getenv("OPERATOR_TO"); val != "" {
-				c.EmailOperatorTo = val
-			} else {
-				c.EmailOperatorTo = *argServerOperatorTo
-			}
-			if val := os.Getenv("OPERATOR_FROM"); val != "" {
-				c.EmailOperatorFrom = val
-			} else {
-				c.EmailOperatorFrom = *argServerOperatorFrom
-			}
-			if val := os.Getenv("OPERATOR_SUBJECT"); val != "" {
-				c.EmailOperatorSubject = val
-			} else {
-				c.EmailOperatorSubject = *argServerOperatorSubject
-			}
-			if val := os.Getenv("OPERATOR_MESSAGE_CT"); val != "" {
-				c.EmailOperatorMessageCT = val
-			} else {
-				c.EmailOperatorMessageCT = *argServerOperatorMessageCT
-			}
-			if val := os.Getenv("OPERATOR_MESSAGE_PATH"); val != "" {
-				c.EmailOperatorMessagePath = val
-			} else {
-				c.EmailOperatorMessagePath = *argServerOperatorMessagePath
-			}
-
-			/*
-			 * Mail server settings
-			 */
-
-			if val := os.Getenv("MAIL_SERVER"); val != "" {
-				c.MailServer = val
-			} else {
-				c.MailServer = *argServerMailServer
-			}
-			if val := os.Getenv("MAIL_HELO"); val != "" {
-				c.MailHelo = val
-			} else {
-				c.MailHelo = *argServerMailHelo
-			}
-			if val := os.Getenv("MAIL_PORT"); val != "" {
-				p, err := strconv.Atoi(val)
-				if err != nil {
-					log.Fatalln("Error: MAIL_PORT can not be used:", parser.Usage(err))
+			if c.RunActionOperator {
+				if val := os.Getenv("OPERATOR_TO"); val != "" {
+					c.EmailOperatorTo = val
+				} else {
+					c.EmailOperatorTo = *argServerOperatorTo
 				}
-				c.MailPort = p
-			} else {
-				c.MailPort = *argServerMailPort
-			}
-			if val := os.Getenv("MAIL_USERNAME"); val != "" {
-				c.MailUsername = val
-			} else {
-				c.MailUsername = *argServerMailUsername
-			}
-			if val := os.Getenv("MAIL_PASSWORD"); val != "" {
-				c.MailPassword = val
-			} else {
-				c.MailPassword = *argServerMailPasswordPath
-			}
-			if val := os.Getenv("MAIL_SSL"); val != "" {
-				p, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err)
+				if val := os.Getenv("OPERATOR_FROM"); val != "" {
+					c.EmailOperatorFrom = val
+				} else {
+					c.EmailOperatorFrom = *argServerOperatorFrom
 				}
-				c.MailSSL = p
-			} else {
-				c.MailSSL = *argServerMailSSL
+				if val := os.Getenv("OPERATOR_SUBJECT"); val != "" {
+					c.EmailOperatorSubject = val
+				} else {
+					c.EmailOperatorSubject = *argServerOperatorSubject
+				}
+				if val := os.Getenv("OPERATOR_MESSAGE_CT"); val != "" {
+					c.EmailOperatorMessageCT = val
+				} else {
+					c.EmailOperatorMessageCT = *argServerOperatorMessageCT
+				}
+				if val := os.Getenv("OPERATOR_MESSAGE_PATH"); val != "" {
+					c.EmailOperatorMessagePath = val
+				} else {
+					c.EmailOperatorMessagePath = *argServerOperatorMessagePath
+				}
 			}
+		}
+
+		/*
+		 * Mail server settings
+		 */
+
+		if val := os.Getenv("MAIL_SERVER"); val != "" {
+			c.MailServer = val
+		} else {
+			c.MailServer = *argServerMailServer
+		}
+		if val := os.Getenv("MAIL_HELO"); val != "" {
+			c.MailHelo = val
+		} else {
+			c.MailHelo = *argServerMailHelo
+		}
+		if val := os.Getenv("MAIL_PORT"); val != "" {
+			p, err := strconv.Atoi(val)
+			if err != nil {
+				log.Fatalln("Error: MAIL_PORT can not be used:", parser.Usage(err))
+			}
+			c.MailPort = p
+		} else {
+			c.MailPort = *argServerMailPort
+		}
+		if val := os.Getenv("MAIL_USERNAME"); val != "" {
+			c.MailUsername = val
+		} else {
+			c.MailUsername = *argServerMailUsername
+		}
+		if val := os.Getenv("MAIL_PASSWORD"); val != "" {
+			c.MailPassword = val
+		} else {
+			c.MailPassword = *argServerMailPasswordPath
+		}
+		if val := os.Getenv("MAIL_SSL"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err)
+			}
+			c.MailSSL = p
+		} else {
+			c.MailSSL = *argServerMailSSL
 		}
 	}
 }
