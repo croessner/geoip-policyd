@@ -508,7 +508,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		},
 	)
 	argServerLDAPTLSVerify := commandServer.Flag(
-		"", "ldap-skip-tls-verify", &argparse.Options{
+		"", "ldap-tls-skip-verify", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Skip TLS server name verification",
@@ -961,7 +961,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			} else {
 				c.LDAP.StartTLS = *argServerLDAPStartTLS
 			}
-			if val := os.Getenv("LDAP_SKIP_TLS_VERIFY"); val != "" {
+			if val := os.Getenv("LDAP_TLS_SKIP_VERIFY"); val != "" {
 				p, err := strconv.ParseBool(val)
 				if err != nil {
 					log.Fatalln("Error:", err)
