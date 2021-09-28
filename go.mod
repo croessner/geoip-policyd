@@ -3,6 +3,7 @@ module geoip-policyd
 go 1.16
 
 require (
+	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c // indirect
 	github.com/akamensky/argparse v1.3.1
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/gomodule/redigo v1.8.5
