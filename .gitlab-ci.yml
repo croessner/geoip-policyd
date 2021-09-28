@@ -27,8 +27,10 @@ report:
   image: golang:1.16-alpine
   stage: test
   script:
-    - go get gotest.tools/gotestsum
-    - gotestsum --junitfile report.xml --format testname || exit 0
+    - apk add wget
+    - wget -Ogotestsum.tar.gz https://github.com/gotestyourself/gotestsum/releases/download/v1.7.0/gotestsum_1.7.0_linux_amd64.tar.gz
+    - tar xvzf gotestsum.tar.gz
+    - gotestsum_1.7.0_linux_amd64/gotestsum --junitfile report.xml --format testname || exit 0
   artifacts:
     when: always
     reports:
