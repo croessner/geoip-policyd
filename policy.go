@@ -106,11 +106,10 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						if ldapResult, err = ldapServer.Search(sender); err != nil {
 							log.Println("Info:", err)
 							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-								if ldapServer.LDAPConn == nil {
-									ldapServer.Connect()
-									ldapServer.Bind()
-									ldapResult, _ = ldapServer.Search(sender)
-								}
+								ldapServer.LDAPConn.Close()
+								ldapServer.Connect()
+								ldapServer.Bind()
+								ldapResult, _ = ldapServer.Search(sender)
 							}
 						}
 						if ldapResult != "" {

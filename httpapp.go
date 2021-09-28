@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"github.com/oschwald/maxminddb-golang"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -34,6 +35,7 @@ import (
 const (
 	GET  = "GET"
 	POST = "POST"
+	PUT  = "PUT"
 )
 
 // HttpApp Basic Auth for the HTTP service
@@ -74,13 +76,17 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				log.Fatal("Error: Can not open GeoLite2-City database file", err)
 			}
 			gi.Store(geoip)
-			log.Println("Reloaded GeoLite2-City database file")
+			if cfg.Verbose >= logLevelInfo {
+				log.Println("Info: Reloaded GeoLite2-City database file")
+			}
 
 			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
 				newCustomSettings = initCustomSettings(cfg)
 				if newCustomSettings != nil {
 					cs.Store(newCustomSettings)
-					log.Println("Reloaded custom settings file")
+					if cfg.Verbose >= logLevelInfo {
+						log.Println("Info: Reloaded custom settings file")
+					}
 				}
 			}
 
@@ -88,20 +94,20 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			fmt.Fprintf(rw, "OK reload\n")
 
 		case "/custom-settings":
-			customSettings := cs.Load().(*CustomSettings)
-			if jsonValue, err := json.Marshal(customSettings.Data); err != nil {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "Unable to handle request")
-			} else {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(rw, "%+v\n", string(jsonValue))
+			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
+				if jsonValue, err := json.Marshal(customSettings.Data); err != nil {
+					//goland:noinspection GoUnhandledErrorResult
+					fmt.Fprintln(rw, "Unable to handle request:", err)
+				} else {
+					//goland:noinspection GoUnhandledErrorResult
+					fmt.Fprintf(rw, "%+v\n", string(jsonValue))
+				}
 			}
 		}
 
 	case POST:
 		switch uri.Path {
 		case "/remove":
-			log.Println("sender:", request.FormValue("sender"))
 			if val, ok := values["sender"]; ok {
 				sender := val[0]
 				if sender == "" {
@@ -125,11 +131,10 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					if ldapResult, err = ldapServer.Search(sender); err != nil {
 						log.Println("Info:", err)
 						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-							if ldapServer.LDAPConn == nil {
-								ldapServer.Connect()
-								ldapServer.Bind()
-								ldapResult, _ = ldapServer.Search(sender)
-							}
+							ldapServer.LDAPConn.Close()
+							ldapServer.Connect()
+							ldapServer.Bind()
+							ldapResult, _ = ldapServer.Search(sender)
 						}
 					}
 					if ldapResult != "" {
@@ -148,6 +153,24 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			} else {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "Unable to handle request")
+			}
+		}
+
+	case PUT:
+		switch uri.Path {
+		case "/update":
+			body, err := ioutil.ReadAll(request.Body)
+			if err != nil {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintln(rw, "Unable to handle request:", err)
+			} else {
+				customSettings := new(CustomSettings)
+				if err := json.Unmarshal(body, customSettings); err != nil {
+					//goland:noinspection GoUnhandledErrorResult
+					fmt.Fprintln(rw, "Unable to handle request:", err)
+				} else {
+					cs.Store(customSettings)
+				}
 			}
 		}
 
