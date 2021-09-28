@@ -476,14 +476,14 @@ func (c *CmdLineConfig) Init(args []string) {
 		"", "ldap-binddn", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Bind DN",
+			Help:     "bind DN",
 		},
 	)
 	argServerLDAPBindPWPATH := commandServer.String(
 		"", "ldap-bindpw", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Bind password",
+			Help:     "bind password",
 		},
 	)
 	argServerLDAPFilter := commandServer.String(
@@ -869,20 +869,20 @@ func (c *CmdLineConfig) Init(args []string) {
 			if err != nil {
 				log.Println("Error:", err)
 			}
-			c.HttpApp.UseBasicAuth = p
+			c.HttpApp.useBasicAuth = p
 		} else {
-			c.HttpApp.UseBasicAuth = *argServerHttpUseBasicAuth
+			c.HttpApp.useBasicAuth = *argServerHttpUseBasicAuth
 		}
-		if c.HttpApp.UseBasicAuth {
+		if c.HttpApp.useBasicAuth {
 			if val := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); val != "" {
-				c.HttpApp.Auth.Username = val
+				c.HttpApp.auth.username = val
 			} else {
-				c.HttpApp.Auth.Username = *argServerHttpBasicAuthUsername
+				c.HttpApp.auth.username = *argServerHttpBasicAuthUsername
 			}
 			if val := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); val != "" {
-				c.HttpApp.Auth.Password = val
+				c.HttpApp.auth.password = val
 			} else {
-				c.HttpApp.Auth.Password = *argServerHttpBasicAuthPassword
+				c.HttpApp.auth.password = *argServerHttpBasicAuthPassword
 			}
 		}
 
@@ -891,20 +891,20 @@ func (c *CmdLineConfig) Init(args []string) {
 			if err != nil {
 				log.Println("Error:", err)
 			}
-			c.HttpApp.UseSSL = p
+			c.HttpApp.useSSL = p
 		} else {
-			c.HttpApp.UseSSL = *argServerHttpUseSSL
+			c.HttpApp.useSSL = *argServerHttpUseSSL
 		}
-		if c.HttpApp.UseSSL {
+		if c.HttpApp.useSSL {
 			if val := os.Getenv("HTTP_TLS_CERT"); val != "" {
-				c.HttpApp.X509.Cert = val
+				c.HttpApp.x509.cert = val
 			} else {
-				c.HttpApp.X509.Cert = *argServerHttpTLSCert
+				c.HttpApp.x509.cert = *argServerHttpTLSCert
 			}
 			if val := os.Getenv("HTTP_TLS_KEY"); val != "" {
-				c.HttpApp.X509.Key = val
+				c.HttpApp.x509.key = val
 			} else {
-				c.HttpApp.X509.Key = *argServerHttpTLSKey
+				c.HttpApp.x509.key = *argServerHttpTLSKey
 			}
 		}
 

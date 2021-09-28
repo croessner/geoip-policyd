@@ -38,18 +38,18 @@ const (
 	PUT  = "PUT"
 )
 
-// HttpApp Basic Auth for the HTTP service
+// HttpApp Basic auth for the HTTP service
 type HttpApp struct {
-	Auth struct {
-		Username string
-		Password string
+	auth struct {
+		username string
+		password string
 	}
-	X509 struct {
-		Cert string
-		Key  string
+	x509 struct {
+		cert string
+		key  string
 	}
-	UseBasicAuth bool
-	UseSSL       bool
+	useBasicAuth bool
+	useSSL       bool
 }
 
 func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
@@ -77,7 +77,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			}
 			gi.Store(geoip)
 			if cfg.Verbose >= logLevelInfo {
-				log.Println("Info: Reloaded GeoLite2-City database file")
+				log.Printf("Info: request='%s'; path='%s'; result='GeoLite2-City reloaded'", method, uri.Path)
 			}
 
 			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
@@ -85,22 +85,31 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if newCustomSettings != nil {
 					cs.Store(newCustomSettings)
 					if cfg.Verbose >= logLevelInfo {
-						log.Println("Info: Reloaded custom settings file")
+						log.Printf("Info: request='%s'; path='%s'; result='%s reloaded'", method, uri.Path, cfg.CustomSettingsPath)
 					}
 				}
 			}
 
-			//goland:noinspection GoUnhandledErrorResult
-			fmt.Fprintf(rw, "OK reload\n")
-
 		case "/custom-settings":
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusCreated)
 			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
-				if jsonValue, err := json.Marshal(customSettings.Data); err != nil {
+				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
 					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "Unable to handle request:", err)
+					fmt.Fprintln(rw, "[]")
+					if cfg.Verbose >= logLevelInfo {
+						log.Printf("Info: request='%s'; path='%s'; result='failed'", method, uri.Path)
+					}
 				} else {
-					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintf(rw, "%+v\n", string(jsonValue))
+					if cfg.Verbose >= logLevelInfo {
+						log.Printf("Info: request='%s'; path='%s'; result='success'", method, uri.Path)
+					}
+				}
+			} else {
+				//goland:noinspection GoUnhandledErrorResult
+				fmt.Fprintln(rw, "[]")
+				if cfg.Verbose >= logLevelInfo {
+					log.Printf("Info: request='%s'; path='%s'; result='success'", method, uri.Path)
 				}
 			}
 		}
@@ -128,13 +137,13 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 					ldapServer := &cfg.LDAP
 
-					if ldapResult, err = ldapServer.Search(sender); err != nil {
+					if ldapResult, err = ldapServer.search(sender); err != nil {
 						log.Println("Info:", err)
 						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
 							ldapServer.LDAPConn.Close()
-							ldapServer.Connect()
-							ldapServer.Bind()
-							ldapResult, _ = ldapServer.Search(sender)
+							ldapServer.connect()
+							ldapServer.bind()
+							ldapResult, _ = ldapServer.search(sender)
 						}
 					}
 					if ldapResult != "" {
@@ -186,8 +195,8 @@ func (a *HttpApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 		if ok {
 			usernameHash := sha256.Sum256([]byte(username))
 			passwordHash := sha256.Sum256([]byte(password))
-			expectedUsernameHash := sha256.Sum256([]byte(a.Auth.Username))
-			expectedPasswordHash := sha256.Sum256([]byte(a.Auth.Password))
+			expectedUsernameHash := sha256.Sum256([]byte(a.auth.username))
+			expectedPasswordHash := sha256.Sum256([]byte(a.auth.password))
 
 			usernameMatch := subtle.ConstantTimeCompare(usernameHash[:], expectedUsernameHash[:]) == 1
 			passwordMatch := subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1
@@ -208,7 +217,7 @@ func httpApp() {
 	app := &cfg.HttpApp
 
 	mux := http.NewServeMux()
-	if app.UseBasicAuth {
+	if app.useBasicAuth {
 		mux.HandleFunc("/", app.basicAuth(app.httpRootPage))
 	} else {
 		mux.HandleFunc("/", app.httpRootPage)
@@ -223,8 +232,8 @@ func httpApp() {
 	}
 
 	log.Printf("Starting geoip-policyd HTTP service with address: '%s'", www.Addr)
-	if app.UseSSL {
-		err = www.ListenAndServeTLS(app.X509.Cert, app.X509.Key)
+	if app.useSSL {
+		err = www.ListenAndServeTLS(app.x509.cert, app.x509.key)
 	} else {
 		err = www.ListenAndServe()
 	}

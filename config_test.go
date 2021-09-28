@@ -492,8 +492,8 @@ func TestConfigEnvCustomSettings(t *testing.T) {
 func TestConfigHttpUseBasicAuth(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-basic-auth"})
-	if cfg.HttpApp.UseBasicAuth != true {
-		t.Errorf("Expected --http-use-basic-auth, got value=%v", cfg.HttpApp.UseBasicAuth)
+	if cfg.HttpApp.useBasicAuth != true {
+		t.Errorf("Expected --http-use-basic-auth, got value=%v", cfg.HttpApp.useBasicAuth)
 	}
 }
 
@@ -504,16 +504,16 @@ func TestConfigEnvHttpUseBasicAuth(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.UseBasicAuth != true {
-		t.Errorf("Expected --http-use-basic-auth, got value=%v", cfg.HttpApp.UseBasicAuth)
+	if cfg.HttpApp.useBasicAuth != true {
+		t.Errorf("Expected --http-use-basic-auth, got value=%v", cfg.HttpApp.useBasicAuth)
 	}
 }
 
 func TestConfigHttpBasicAuthUsername(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-basic-auth", "--http-basic-auth-username", "username"})
-	if cfg.HttpApp.Auth.Username != "username" {
-		t.Errorf("Expected --http-basic-auth-username=username, got value=%v", cfg.HttpApp.Auth.Username)
+	if cfg.HttpApp.auth.username != "username" {
+		t.Errorf("Expected --http-basic-auth-username=username, got value=%v", cfg.HttpApp.auth.username)
 	}
 }
 
@@ -525,16 +525,16 @@ func TestConfigEnvHttpBasicAuthUsername(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.Auth.Username != "username" {
-		t.Errorf("Expected --http-basic-auth-username=username, got value=%v", cfg.HttpApp.Auth.Username)
+	if cfg.HttpApp.auth.username != "username" {
+		t.Errorf("Expected --http-basic-auth-username=username, got value=%v", cfg.HttpApp.auth.username)
 	}
 }
 
 func TestConfigHttpBasicAuthPassword(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-basic-auth", "--http-basic-auth-password", "password"})
-	if cfg.HttpApp.Auth.Password != "password" {
-		t.Errorf("Expected --http-basic-auth-password=password, got value=%v", cfg.HttpApp.Auth.Password)
+	if cfg.HttpApp.auth.password != "password" {
+		t.Errorf("Expected --http-basic-auth-password=password, got value=%v", cfg.HttpApp.auth.password)
 	}
 }
 
@@ -546,16 +546,16 @@ func TestConfigEnvHttpBasicAuthPassword(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.Auth.Password != "password" {
-		t.Errorf("Expected --http-basic-auth-password=password, got value=%v", cfg.HttpApp.Auth.Password)
+	if cfg.HttpApp.auth.password != "password" {
+		t.Errorf("Expected --http-basic-auth-password=password, got value=%v", cfg.HttpApp.auth.password)
 	}
 }
 
 func TestConfigHttpUseSSL(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-ssl"})
-	if cfg.HttpApp.UseSSL != true {
-		t.Errorf("Expected --http-use-ssl, got value=%v", cfg.HttpApp.UseSSL)
+	if cfg.HttpApp.useSSL != true {
+		t.Errorf("Expected --http-use-ssl, got value=%v", cfg.HttpApp.useSSL)
 	}
 }
 
@@ -566,16 +566,16 @@ func TestConfigEnvHttpUseSSL(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.UseSSL != true {
-		t.Errorf("Expected --http-use-ssl, got value=%v", cfg.HttpApp.UseSSL)
+	if cfg.HttpApp.useSSL != true {
+		t.Errorf("Expected --http-use-ssl, got value=%v", cfg.HttpApp.useSSL)
 	}
 }
 
 func TestConfigHttpTLSCert(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-ssl", "--http-tls-cert", "/tmp"})
-	if cfg.HttpApp.X509.Cert != "/tmp" {
-		t.Errorf("Expected --http-tls-cert=/tmp, got value=%v", cfg.HttpApp.X509.Cert)
+	if cfg.HttpApp.x509.cert != "/tmp" {
+		t.Errorf("Expected --http-tls-cert=/tmp, got value=%v", cfg.HttpApp.x509.cert)
 	}
 }
 
@@ -587,16 +587,16 @@ func TestConfigEnvHttpTLSCert(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.X509.Cert != "/tmp" {
-		t.Errorf("Expected --http-tls-cert=/tmp, got value=%v", cfg.HttpApp.X509.Cert)
+	if cfg.HttpApp.x509.cert != "/tmp" {
+		t.Errorf("Expected --http-tls-cert=/tmp, got value=%v", cfg.HttpApp.x509.cert)
 	}
 }
 
 func TestConfigHttpTLSKey(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-use-ssl", "--http-tls-key", "/tmp"})
-	if cfg.HttpApp.X509.Key != "/tmp" {
-		t.Errorf("Expected --http-tls-key=/tmp, got value=%v", cfg.HttpApp.X509.Key)
+	if cfg.HttpApp.x509.key != "/tmp" {
+		t.Errorf("Expected --http-tls-key=/tmp, got value=%v", cfg.HttpApp.x509.key)
 	}
 }
 
@@ -608,8 +608,8 @@ func TestConfigEnvHttpTLSKey(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.HttpApp.X509.Key != "/tmp" {
-		t.Errorf("Expected --http-tls-key=/tmp, got value=%v", cfg.HttpApp.X509.Key)
+	if cfg.HttpApp.x509.key != "/tmp" {
+		t.Errorf("Expected --http-tls-key=/tmp, got value=%v", cfg.HttpApp.x509.key)
 	}
 }
 

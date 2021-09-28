@@ -76,7 +76,7 @@ func (l *LDAP) String() string {
 	return result[1:]
 }
 
-func (l *LDAP) Connect() {
+func (l *LDAP) connect() {
 	var (
 		retryLimit   = 0
 		ldapCounter  = 0
@@ -151,7 +151,7 @@ func (l *LDAP) Connect() {
 	}
 }
 
-func (l *LDAP) Bind() {
+func (l *LDAP) bind() {
 	var err error
 
 	if l.SASLExternal {
@@ -174,7 +174,7 @@ func (l *LDAP) Bind() {
 	}
 }
 
-func (l *LDAP) Search(sender string) (string, error) {
+func (l *LDAP) search(sender string) (string, error) {
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
 		if cfg.Verbose == logLevelDebug {
