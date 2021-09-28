@@ -23,6 +23,17 @@ format:
     - go vet $(go list ./... | grep -v /vendor/)
     - go test -race $(go list ./... | grep -v /vendor/)
 
+golang:
+  image: golang:1.16-alpine
+  stage: test
+  script:
+    - go get gotest.tools/gotestsum
+    - gotestsum --junitfile report.xml --format testname
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
 compile:
   image: golang:1.16-alpine
   stage: build
