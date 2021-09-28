@@ -31,7 +31,7 @@ report:
     - wget -Ogotestsum.tar.gz https://github.com/gotestyourself/gotestsum/releases/download/v1.7.0/gotestsum_1.7.0_linux_amd64.tar.gz
     - mkdir gotestsum
     - cd gotestsum
-    - tar xvzf gotestsum.tar.gz
+    - tar xvzf ../gotestsum.tar.gz
     - gotestsum/gotestsum --junitfile report.xml --format testname || exit 0
   artifacts:
     when: always
