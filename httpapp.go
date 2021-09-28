@@ -53,6 +53,11 @@ type HttpApp struct {
 	useSSL       bool
 }
 
+type Body struct {
+	Key   string      `json:"key"`
+	Value interface{} `json:"value"`
+}
+
 func HasContentType(request *http.Request, mimetype string) bool {
 	contentType := request.Header.Get("Content-type")
 	for _, v := range strings.Split(contentType, ",") {
@@ -68,13 +73,14 @@ func HasContentType(request *http.Request, mimetype string) bool {
 }
 
 func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
-	if err := request.ParseForm(); err != nil {
-		log.Println("Error:", err)
-		return
-	}
+	/*
+		if err := request.ParseForm(); err != nil {
+			log.Println("Error:", err)
+			return
+		}
+	*/
 
 	method := request.Method
-	values := request.Form
 	uri := request.URL
 	client := request.RemoteAddr
 
@@ -109,6 +115,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 		case "/custom-settings":
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusCreated)
+
 			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
 				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
 					//goland:noinspection GoUnhandledErrorResult
@@ -131,14 +138,34 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 	case POST:
 		switch uri.Path {
 		case "/remove":
-			if val, ok := values["sender"]; ok {
-				sender := val[0]
-				if sender == "" {
-					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "Unable to handle request")
+			var requestData *Body
+
+			if !HasContentType(request, "application/json") {
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				return
+			}
+
+			body, err := ioutil.ReadAll(request.Body)
+			if err != nil {
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+			} else {
+				requestData = new(Body)
+				if err := json.Unmarshal(body, requestData); err != nil {
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				}
+			}
 
+			if requestData.Key == "sender" {
+				sender, ok := requestData.Value.(string)
+				if !ok {
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					return
+				}
+				if sender == "" {
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					return
+				}
 				var redisHelper = &Redis{}
 				redisConnW := redisHelper.WriteConn()
 
@@ -171,11 +198,11 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					redis.Args{}.Add(key)...); err != nil {
 					log.Println("Error:", err)
 				}
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintf(rw, "Sender '%s' unlocked\n", sender)
+				if cfg.Verbose >= logLevelInfo {
+					log.Printf("Info: client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
+				}
 			} else {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "Unable to handle request")
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='unknown key'", client, method, uri.Path)
 			}
 		}
 
@@ -186,6 +213,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
+
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
