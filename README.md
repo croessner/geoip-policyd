@@ -43,9 +43,9 @@ The service is configured in Postfix like this:
 ## Postfix integration
 
 ```
-smtpd_recipient_restrictions =
+smtpd_sender_restrictions =
     ...
-    check_policy_service inet:127.0.0.1:46464
+    check_policy_service inet:127.0.0.1:4646
     ...
 ```
 
@@ -122,7 +122,10 @@ Arguments:
       --version                       Current version
 ```
 
-## Reload options
+## GET request /reload
+
+Request: reload     
+Response: No results
 
 Example:
 
@@ -137,7 +140,10 @@ curl "http://localhost:8080/reload" -u testuser:testsecret
 curl -k "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
-## Stats options
+## GET request /custom-settings
+
+Request: get current custom settings in JSON format     
+Response: JSON output of the currently loaded custom settings
 
 Example:
 
@@ -150,23 +156,84 @@ curl "http://localhost:8080/custom-settings" -u testuser:testsecret | jq
 
 # Secured with basic auth
 curl -k "https://localhost:8443/custom-settings" -u testuser:testsecret | jq
-
 ```
 
-## Remove options
+Example result from default custom.json:
+
+```json
+[
+  {
+    "comment": "Allow only two countries and a maximum of 5 IP addresses",
+    "sender": "christian@roessner.email",
+    "ips": 5,
+    "countries": 2
+  },
+  {
+    "comment": "Allow at least 4 countries and go with the default IP address limit",
+    "sender": "test1@example.com",
+    "ips": 0,
+    "countries": 4
+  },
+  {
+    "comment": "Go with the default country limit, but allow up to 30 IP addresses",
+    "sender": "test2@example.com",
+    "ips": 30,
+    "countries": 0
+  }
+]
+```
+
+## POST request /remove
+
+Request: Submit an email account that should be unlocked        
+Response: No results
 
 Example:
 
 ```shell
 # Plain http without basic auth
-curl -d "sender=user@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "http://localhost:8080/remove"
+curl -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove"
 
 # Plain with basic auth
-curl -d "sender=user@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d "sender=test@example.com" -H "Content-Type: application/x-www-form-urlencoded" -X POST "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "https://localhost:8443/remove" -u testuser:testsecret
 ```
+
+## PUT request /update
+
+Request: Set custom settings. This will overwrite a custom settings file or initiates settings, if there have
+not been any settings before (no config file given).       
+Response: No results
+
+---
+***Note***
+
+If you use a custom settings file and send new data with a PUT request, the settings are updated in memory. But if you
+do a GET request afterwards and reloading data, the settings from the file will be loaded again!
+
+---
+
+Example:
+
+```shell
+# Plain http without basic auth
+curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/remove"
+
+# Plain with basic auth
+curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/remove" -u testuser:testsecret
+
+# Secured with basic auth
+curl -k -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "https://localhost:8443/remove" -u testuser:testsecret
+```
+
+---
+***Note***
+
+It is currently not possible to update a single record. This might be implemented somewhere in the future by a PATCH request.
+
+---
 
 ## Environment variables
 
