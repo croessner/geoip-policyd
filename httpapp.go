@@ -27,6 +27,7 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -52,6 +53,20 @@ type HttpApp struct {
 	useSSL       bool
 }
 
+func HasContentType(request *http.Request, mimetype string) bool {
+	contentType := request.Header.Get("Content-type")
+	for _, v := range strings.Split(contentType, ",") {
+		t, _, err := mime.ParseMediaType(v)
+		if err != nil {
+			break
+		}
+		if t == mimetype {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 	if err := request.ParseForm(); err != nil {
 		log.Println("Error:", err)
@@ -61,6 +76,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 	method := request.Method
 	values := request.Form
 	uri := request.URL
+	client := request.RemoteAddr
 
 	switch method {
 	case GET:
@@ -73,11 +89,11 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			geoip := new(GeoIP)
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 			if err != nil {
-				log.Fatal("Error: Can not open GeoLite2-City database file", err)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			}
 			gi.Store(geoip)
 			if cfg.Verbose >= logLevelInfo {
-				log.Printf("Info: request='%s'; path='%s'; result='GeoLite2-City reloaded'", method, uri.Path)
+				log.Printf("Info: client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.GeoipPath)
 			}
 
 			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
@@ -97,19 +113,17 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
 					//goland:noinspection GoUnhandledErrorResult
 					fmt.Fprintln(rw, "[]")
-					if cfg.Verbose >= logLevelInfo {
-						log.Printf("Info: request='%s'; path='%s'; result='failed'", method, uri.Path)
-					}
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				} else {
 					if cfg.Verbose >= logLevelInfo {
-						log.Printf("Info: request='%s'; path='%s'; result='success'", method, uri.Path)
+						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			} else {
 				//goland:noinspection GoUnhandledErrorResult
 				fmt.Fprintln(rw, "[]")
 				if cfg.Verbose >= logLevelInfo {
-					log.Printf("Info: request='%s'; path='%s'; result='success'", method, uri.Path)
+					log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 				}
 			}
 		}
@@ -168,17 +182,22 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 	case PUT:
 		switch uri.Path {
 		case "/update":
+			if !HasContentType(request, "application/json") {
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				return
+			}
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "Unable to handle request:", err)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			} else {
 				customSettings := new(CustomSettings)
 				if err := json.Unmarshal(body, customSettings); err != nil {
-					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "Unable to handle request:", err)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				} else {
 					cs.Store(customSettings)
+					if cfg.Verbose >= logLevelInfo {
+						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+					}
 				}
 			}
 		}
