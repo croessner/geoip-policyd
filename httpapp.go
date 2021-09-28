@@ -95,7 +95,9 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			geoip := new(GeoIP)
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				return
 			}
 			gi.Store(geoip)
 			if cfg.Verbose >= logLevelInfo {
@@ -111,28 +113,29 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					}
 				}
 			}
+			rw.WriteHeader(http.StatusAccepted)
 
 		case "/custom-settings":
 			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusCreated)
 
 			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
 				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
-					//goland:noinspection GoUnhandledErrorResult
-					fmt.Fprintln(rw, "[]")
 					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					return
 				} else {
 					if cfg.Verbose >= logLevelInfo {
 						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			} else {
-				//goland:noinspection GoUnhandledErrorResult
-				fmt.Fprintln(rw, "[]")
+				rw.WriteHeader(http.StatusNoContent)
 				if cfg.Verbose >= logLevelInfo {
 					log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 				}
 			}
+
+		default:
+			rw.WriteHeader(http.StatusNotFound)
 		}
 
 	case POST:
@@ -141,16 +144,20 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			var requestData *Body
 
 			if !HasContentType(request, "application/json") {
+				rw.WriteHeader(http.StatusBadRequest)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				return
 			} else {
 				requestData = new(Body)
 				if err := json.Unmarshal(body, requestData); err != nil {
+					rw.WriteHeader(http.StatusBadRequest)
 					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				}
@@ -159,10 +166,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			if requestData.Key == "sender" {
 				sender, ok := requestData.Value.(string)
 				if !ok {
+					rw.WriteHeader(http.StatusBadRequest)
 					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
 					return
 				}
 				if sender == "" {
+					rw.WriteHeader(http.StatusBadRequest)
 					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
 					return
 				}
@@ -201,33 +210,45 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if cfg.Verbose >= logLevelInfo {
 					log.Printf("Info: client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
 				}
+				rw.WriteHeader(http.StatusAccepted)
 			} else {
+				rw.WriteHeader(http.StatusBadRequest)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='unknown key'", client, method, uri.Path)
 			}
+
+		default:
+			rw.WriteHeader(http.StatusNotFound)
 		}
 
 	case PUT:
 		switch uri.Path {
 		case "/update":
 			if !HasContentType(request, "application/json") {
+				rw.WriteHeader(http.StatusBadRequest)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
 				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			} else {
 				customSettings := new(CustomSettings)
 				if err := json.Unmarshal(body, customSettings); err != nil {
+					rw.WriteHeader(http.StatusBadRequest)
 					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				} else {
+					rw.WriteHeader(http.StatusAccepted)
 					cs.Store(customSettings)
 					if cfg.Verbose >= logLevelInfo {
 						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			}
+
+		default:
+			rw.WriteHeader(http.StatusNotFound)
 		}
 
 	default:
