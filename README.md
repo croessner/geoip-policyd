@@ -5,9 +5,9 @@
 Postfix-Submission policy server that checks sender IPs and blocks senders, if they come from too many countries or if 
 they come from too many IP addresses.
 
-## Whitelist
+## Custom settings
 
-You can specify a whitelist, which must be valid JSON. The format is:
+You can specify custom settings, which must be written in valid JSON. The format is:
 
 ```json
 {
@@ -88,7 +88,7 @@ Arguments:
       --http-use-basic-auth           Enable basic HTTP auth. Default: false
       --http-use-ssl                  Enable HTTPS. Default: false
       --http-basic-auth-username      HTTP basic auth username. Default: 
-      --http-basic-auth-password      Whitelist with different IP and country limits. Default: 
+      --http-basic-auth-password      HTTP basic auth password. Default: 
       --http-tls-cert                 HTTP TLS server certificate (full chain). Default: /localhost.pem
       --http-tls-key                  HTTP TLS server key. Default: /localhost-key.pem
       --use-ldap                      Enable LDAP support. Default: false
@@ -400,7 +400,7 @@ Redis-result:
 
 This way you get some pseudo anonymization.
 
-If you do so, you also have to modify your whitelist.json file, if you use one:
+If you do so, you also have to modify your custom.json file, if you use one:
 
 ```json
 {
