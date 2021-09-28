@@ -32,6 +32,7 @@ report:
     - mkdir gotestsum
     - cd gotestsum
     - tar xvzf ../gotestsum.tar.gz
+    - cd ..
     - gotestsum/gotestsum --junitfile report.xml --format testname || exit 0
   artifacts:
     when: always
