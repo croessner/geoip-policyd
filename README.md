@@ -18,6 +18,7 @@ they come from too many IP addresses.
 1. [Install](#install)
    * [Postfix integration](#postfix-integration)
    * [Custom settings](#custom-settings)
+   * [Preparing a docker image](#preparing-a-docker-image)
    * [Server options](#server-options)
 2. [Environment variables](#environment-variables)
    * [Server](#server)
@@ -48,6 +49,8 @@ smtpd_sender_restrictions =
 
 ... if you use the docker-compose.yml file as provided.
 
+Back to [table of contents](#table-of-contents)
+
 ## Custom settings
 
 You can specify custom settings, which must be written in valid JSON. The format is:
@@ -70,6 +73,10 @@ It is possible to only specify *ips* or *countries*. The missing parameter will 
 data structure is read one by one and the rules are evaluated as first match wins. By redefining a sender more than
 once, only the first will be used.
 
+Back to [table of contents](#table-of-contents)
+
+## Preparing a docker image
+
 The simplest way to use the program is by using a docker image. You can build your own, as the default repository is not
 public for other people.
 
@@ -82,6 +89,8 @@ You need to change the docker-compose.yml file as well. If you prefer, you can a
 service and run the *geoip-policyd* container in bridged mode.
 
 For a complete example see [here](docker-compose.yml)
+
+Back to [table of contents](#table-of-contents)
 
 ## Server options
 
@@ -154,6 +163,8 @@ Arguments:
       --version                       Current version
 ```
 
+Back to [table of contents](#table-of-contents)
+
 # Environment variables
 
 The following environment variables can be used to configure the policy service. This is especially useful, if you plan
@@ -217,6 +228,8 @@ MAIL_PASSWORD | E-mail server password
 MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
 VERBOSE | Log level. One of 'none', 'info' or 'debug'
 
+Back to [table of contents](#table-of-contents)
+
 # REST interface
 
 ## GET request /reload
@@ -236,6 +249,8 @@ curl "http://localhost:8080/reload" -u testuser:testsecret
 # Secured with basic auth
 curl -k "https://localhost:8443/remove" -u testuser:testsecret
 ```
+
+Back to [table of contents](#table-of-contents)
 
 ## GET request /custom-settings
 
@@ -280,6 +295,8 @@ Example result from default [custom.json](custom.json):
 ]
 ```
 
+Back to [table of contents](#table-of-contents)
+
 ## POST request /remove
 
 Request: Submit an email account that should be unlocked        
@@ -297,6 +314,8 @@ curl -d '{"key":"sender","value":"user@example.com"}' -H "Content-Type: applicat
 # Secured with basic auth
 curl -k -d '{"key":"sender","value":"user@example.com}"' -H "Content-Type: application/json" -X POST "https://localhost:8443/remove" -u testuser:testsecret
 ```
+
+Back to [table of contents](#table-of-contents)
 
 ## PUT request /update
 
@@ -325,6 +344,8 @@ curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{
 curl -k -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
+Back to [table of contents](#table-of-contents)
+
 ## PATCH request /update
 
 Request: Send changed settings for a given sender       
@@ -342,6 +363,8 @@ curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.
 # Secured with basic auth
 curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X PATCH "https://localhost:8443/remove" -u testuser:testsecret
 ````
+
+Back to [table of contents](#table-of-contents)
 
 # Actions
 
@@ -367,6 +390,8 @@ geoip-policyd ...other-options... \
   --mail-username "some_username" \
   --mail-password some-secret
 ```
+
+Back to [table of contents](#table-of-contents)
 
 # LDAP
 
@@ -475,5 +500,6 @@ If you do so, you also have to modify your custom.json file, if you use one:
   ]
 }
 ```
+Back to [table of contents](#table-of-contents)
 
 Hope you enjoy :-)
