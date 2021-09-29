@@ -5,6 +5,49 @@
 Postfix-Submission policy server that checks sender IPs and blocks senders, if they come from too many countries or if 
 they come from too many IP addresses.
 
+## Features
+
+* GeoIP policy service for Postfix
+* Custom settings to define different limits for IPs and countries per sender
+* LDAP support (optional)
+* REST interface to interact with the service on the fly
+* Actions
+
+# Table of contents
+
+1. [Install](#install)
+   * [Postfix integration](#postfix-integration)
+   * [Custom settings](#custom-settings)
+   * [Server options](#server-options)
+2. [Environment variables](#environment-variables)
+   * [Server](#server)
+3. [REST interface](#rest-interface)
+   * [GET request /reload](#get-request-reload)
+   * [GET request /custom-settings](#get-request-custom-settings)
+   * [POST request /remove](#post-request-remove)
+   * [PUT request /update](#put-request-update)
+   * [PATCH request /update](#patch-request-update)
+4. [Actions](#actions)
+   * [Operator action](#operator-action)
+5. [LDAP](#ldap)
+   * [docker-compose.yml](#docker-composeyml)
+   * [custom.json](#customjson)
+
+# Install
+
+## Postfix integration
+
+The service is configured in Postfix like this...
+
+```
+smtpd_sender_restrictions =
+    ...
+    check_policy_service inet:127.0.0.1:4646
+    ...
+```
+
+... if you use the docker-compose.yml file as provided.
+
 ## Custom settings
 
 You can specify custom settings, which must be written in valid JSON. The format is:
@@ -38,18 +81,7 @@ docker build -t geoip-policyd:latest .
 You need to change the docker-compose.yml file as well. If you prefer, you can add a Redis
 service and run the *geoip-policyd* container in bridged mode.
 
-The service is configured in Postfix like this:
-
-## Postfix integration
-
-```
-smtpd_sender_restrictions =
-    ...
-    check_policy_service inet:127.0.0.1:4646
-    ...
-```
-
-if you use the docker-compose.yml file as provided.
+For a complete example see [here](docker-compose.yml)
 
 ## Server options
 
@@ -122,6 +154,71 @@ Arguments:
       --version                       Current version
 ```
 
+# Environment variables
+
+The following environment variables can be used to configure the policy service. This is especially useful, if you plan
+on running the service as a docker service.
+
+## Server
+
+Variable | Description
+---|---
+SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
+SERVER_PORT | Port for the policy service; default(4646)
+HTTP_ADDRESS | HTTP address for incoming requests; default(127.0.0.1:8080)
+REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
+REDIS_PORT | Port for the Redis service; default(6379)
+REDIS_DATABASE_NUMBER | Redis database number
+REDIS_USERNAME | Redis username
+REDIS_PASSWORD | Redis password
+REDIS_WRITER_ADDRESS | IPv4 or IPv6 address for a Redis service (writer)
+REDIS_WRITER_PORT | Port for a Redis service (writer)
+REDIS_WRITER_DATABASE_NUMBER | Redis database number (writer)
+REDIS_WRITER_USERNAME | Redis username (writer)
+REDIS_WRITER_PASSWORD | Redis password (writer)
+REDIS_PREFIX | Redis prefix; default(geopol_)
+REDIS_TTL | Redis TTL; default(3600)
+GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)
+MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
+MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
+BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
+CUSTOM_SETTINGS_PATH | Custom settings with different IP and country limits
+HTTP_USE_BASIC_AUTH | Enable basic HTTP auth; default(false)
+HTTP_USE_SSL | Enable HTTPS; default(false)
+HTTP_BASIC_AUTH_USERNAME | HTTP basic auth username
+HTTP_BASIC_AUTH_PASSWORD | HTTP basic auth password
+HTTP_TLS_CERT | HTTP TLS server certificate (full chain); default(/localhost.pem)
+HTTP_TLS_KEY | HTTP TLS server key; default(/localhost-key.pem)
+USE_LDAP | Enable LDAP support; default(false)
+LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
+LDAP_BASEDN | Base DN
+LDAP_BINDPW | Bind PW
+LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
+LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
+LDAP_STARTTLS | If this option is given, use StartTLS
+LDAP_TLS_SKIP_VERIFY | Skip TLS server name verification
+LDAP_TLS_CAFILE | File containing TLS CA certificate(s)
+LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
+LDAP_TLS_CLIENT_KEY | File containing a TLS client key
+LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
+LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
+RUN_ACTIONS | Run actions, if a sender is over limits; default(false)
+RUN_ACTION_OPERATOR | Run the operator action; default(false)
+OPERATOR_TO | E-Mail To-header for the operator action
+OPERATOR_FROM | E-Mail From-header for the operator action
+OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised)
+OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
+OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
+MAIL_SERVER | E-mail server address for notifications
+MAIL_HELO | E-mail server HELO/EHLO hostname; default(localhost)
+MAIL_PORT | E-mail server port number; default(587)
+MAIL_USERNAME | E-mail server username
+MAIL_PASSWORD | E-mail server password
+MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
+VERBOSE | Log level. One of 'none', 'info' or 'debug'
+
+# REST interface
+
 ## GET request /reload
 
 Request: reload     
@@ -158,7 +255,7 @@ curl "http://localhost:8080/custom-settings" -u testuser:testsecret | jq
 curl -k "https://localhost:8443/custom-settings" -u testuser:testsecret | jq
 ```
 
-Example result from default custom.json:
+Example result from default [custom.json](custom.json):
 
 ```json
 [
@@ -192,13 +289,13 @@ Example:
 
 ```shell
 # Plain http without basic auth
-curl -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove"
+curl -d '{"key":"sender","value":"user@example.com"}' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove"
 
 # Plain with basic auth
-curl -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{"key":"sender","value":"user@example.com"}' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d '{"key":"sender","value":"user@example.com"' -H "Content-Type: application/json" -X POST "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{"key":"sender","value":"user@example.com}"' -H "Content-Type: application/json" -X POST "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
 ## PUT request /update
@@ -228,86 +325,35 @@ curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{
 curl -k -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "https://localhost:8443/remove" -u testuser:testsecret
 ```
 
----
-***Note***
+## PATCH request /update
 
-It is currently not possible to update a single record. This might be implemented somewhere in the future by a PATCH request.
+Request: Send changed settings for a given sender       
+Response: No results
 
----
+Example:
 
-## Environment variables
+````shell
+# Plain http without basic auth
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/remove"
 
-The following environment variables can be used to configure the policy service. This is especially useful, if you plan
-on running the service as a docker service.
+# Plain with basic auth
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/remove" -u testuser:testsecret
 
-### Server
+# Secured with basic auth
+curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X PATCH "https://localhost:8443/remove" -u testuser:testsecret
+````
 
-Variable | Description
----|---
-SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
-SERVER_PORT | Port for the policy service; default(4646)
-HTTP_ADDRESS | HTTP address for incoming requests; default(127.0.0.1:8080)
-REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
-REDIS_PORT | Port for the Redis service; default(6379)
-REDIS_DATABASE_NUMBER | Redis database number
-REDIS_USERNAME | Redis username
-REDIS_PASSWORD | Redis password
-REDIS_WRITER_ADDRESS | IPv4 or IPv6 address for a Redis service (writer)
-REDIS_WRITER_PORT | Port for a Redis service (writer)
-REDIS_WRITER_DATABASE_NUMBER | Redis database number (writer)
-REDIS_WRITER_USERNAME | Redis username (writer)
-REDIS_WRITER_PASSWORD | Redis password (writer)
-REDIS_PREFIX | Redis prefix; default(geopol_)
-REDIS_TTL | Redis TTL; default(3600)
-GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)
-MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
-MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
-BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
-CUSTOM_SETTINGS_PATH | Custom settings with different IP and country limits
-HTTP_USE_BASIC_AUTH | Enable basic HTTP auth; default(false)
-HTTP_USE_SSL | Enable HTTPS; default(false)
-HTTP_BASIC_AUTH_USERNAME | HTTP basic auth username
-HTTP_BASIC_AUTH_PASSWORD | HTTP basic auth password
-HTTP_TLS_CERT | HTTP TLS server certificate (full chain); default(/localhost.pem)
-HTTP_TLS_KEY | HTTP TLS server key; default(/localhost-key.pem)
-USE_LDAP | Enable LDAP support; default(false)
-LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
-LDAP_BASEDN | Base DN
-LDAP_BINDPW | Bind PW 
-LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
-LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
-LDAP_STARTTLS | If this option is given, use StartTLS
-LDAP_TLS_SKIP_VERIFY | Skip TLS server name verification
-LDAP_TLS_CAFILE | File containing TLS CA certificate(s)
-LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
-LDAP_TLS_CLIENT_KEY | File containing a TLS client key
-LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
-LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
-RUN_ACTIONS | Run actions, if a sender is over limits; default(false)
-RUN_ACTION_OPERATOR | Run the operator action; default(false)
-OPERATOR_TO | E-Mail To-header for the operator action
-OPERATOR_FROM | E-Mail From-header for the operator action
-OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised)
-OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
-OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
-MAIL_SERVER | E-mail server address for notifications
-MAIL_HELO | E-mail server HELO/EHLO hostname; default(localhost)
-MAIL_PORT | E-mail server port number; default(587)
-MAIL_USERNAME | E-mail server username
-MAIL_PASSWORD | E-mail server password
-MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
-VERBOSE | Log level. One of 'none', 'info' or 'debug'
+# Actions
 
-## Actions
+## Operator action
 
 You can activate actions that will be taken, if a sender was declared compromised. At the moment you can send a
 notification to an e-mail operator. To do this, you must activate actions in general as well as the operator action.
 You need also to define all the required operator parameters as To, From, Subject, CT and of course an e-mail server (
 including all required settings) to get things done.
 
-If you need to authenticate to the e-mail server, please put the password in a file with appropriate permissions.
-
 Example:
+
 ```shell
 geoip-policyd ...other-options... \
   --run-actions \
@@ -322,7 +368,7 @@ geoip-policyd ...other-options... \
   --mail-password some-secret
 ```
 
-## LDAP
+# LDAP
 
 You can use LDAP to send the sender attribute and to retrieve whatever that makes your request unique. If you have
 customers that use virtual aliases and that belong to exactly one account, this may help you to aggregate e-mail sender
@@ -342,6 +388,8 @@ It is also possible to not retrieve another unique mail account from LDAP. You c
 some other field like uid or uniqueIdentifier (LDAP overlay unique to enforce uniqueness!).
 
 Here is my personal example of a docker-compose.yml file that makes use of LDAP:
+
+### docker-compose.yml
 
 ```yaml
 version: "3.8"
@@ -401,6 +449,8 @@ Redis-result:
 This way you get some pseudo anonymization.
 
 If you do so, you also have to modify your custom.json file, if you use one:
+
+### custom.json
 
 ```json
 {
