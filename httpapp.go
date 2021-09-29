@@ -29,14 +29,16 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 const (
-	GET  = "GET"
-	POST = "POST"
-	PUT  = "PUT"
+	GET   = "GET"
+	POST  = "POST"
+	PUT   = "PUT"
+	PATCH = "PATCH"
 )
 
 // HttpApp Basic auth for the HTTP service
@@ -243,6 +245,122 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					cs.Store(customSettings)
 					if cfg.Verbose >= logLevelInfo {
 						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+					}
+				}
+			}
+
+		default:
+			rw.WriteHeader(http.StatusNotFound)
+		}
+
+	case PATCH:
+		switch uri.Path {
+		case "/update":
+			var requestData *Body
+
+			if !HasContentType(request, "application/json") {
+				rw.WriteHeader(http.StatusBadRequest)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				return
+			}
+
+			body, err := ioutil.ReadAll(request.Body)
+			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+			} else {
+				requestData = new(Body)
+				if err := json.Unmarshal(body, requestData); err != nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					return
+				}
+			}
+
+			if requestData.Key == "sender" {
+				account, ok := requestData.Value.(map[string]interface{})
+				if !ok {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be account'", client, method, uri.Path)
+					return
+				}
+
+				var (
+					comment   string
+					countries int
+					ips       int
+					sender    string
+					tempFloat float64
+				)
+
+				if val, ok := account["comment"]; ok {
+					if comment, ok = val.(string); !ok {
+						rw.WriteHeader(http.StatusBadRequest)
+						log.Printf("Error: client=%s; request='%s'; path='%s'; result='comment not string'", client, method, uri.Path)
+						return
+					}
+				}
+				if val, ok := account["countries"]; ok {
+					if tempFloat, ok = val.(float64); !ok {
+						log.Printf("%T: %v\n", account["countries"], account["countries"])
+						rw.WriteHeader(http.StatusBadRequest)
+						log.Printf("Error: client=%s; request='%s'; path='%s'; result='countries not float64'", client, method, uri.Path)
+						return
+					} else {
+						countries = int(tempFloat)
+					}
+				}
+				if val, ok := account["ips"]; ok {
+					if tempFloat, ok = val.(float64); !ok {
+						rw.WriteHeader(http.StatusBadRequest)
+						log.Printf("Error: client=%s; request='%s'; path='%s'; result='ips not float64'", client, method, uri.Path)
+						return
+					} else {
+						ips = int(tempFloat)
+					}
+				}
+				if val, ok := account["sender"]; ok {
+					if sender, ok = val.(string); !ok {
+						rw.WriteHeader(http.StatusBadRequest)
+						log.Printf("Error: client=%s; request='%s'; path='%s'; result='sender not string'", client, method, uri.Path)
+						return
+					}
+				}
+				if countries <= 0 {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='countries %d <= 0'", client, method, uri.Path, countries)
+					return
+				}
+				if ips <= 0 {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='ips %d <= 0'", client, method, uri.Path, ips)
+					return
+				}
+				if sender == "" {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='empty sender'", client, method, uri.Path)
+					return
+				}
+
+				if val := os.Getenv("GO_TESTING"); val == "" {
+					customSettings := cs.Load().(*CustomSettings)
+					if customSettings != nil {
+						if len(customSettings.Data) > 0 {
+							for i, record := range customSettings.Data {
+								if record.Sender == sender {
+									customSettings.Data[i].Ips = ips
+									customSettings.Data[i].Countries = countries
+									customSettings.Data[i].Comment = comment
+									cs.Store(customSettings)
+									rw.WriteHeader(http.StatusAccepted)
+									log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+									return
+								}
+							}
+							rw.WriteHeader(http.StatusBadRequest)
+							log.Printf("Error: client=%s; request='%s'; path='%s'; result='sender not found %s'", client, method, uri.Path, sender)
+							return
+						}
 					}
 				}
 			}
