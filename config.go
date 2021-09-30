@@ -867,7 +867,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		if val := os.Getenv("HTTP_USE_BASIC_AUTH"); val != "" {
 			p, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Println("Error:", err)
+				ErrorLogger.Println(err)
 			}
 			c.HttpApp.useBasicAuth = p
 		} else {
@@ -889,7 +889,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		if val := os.Getenv("HTTP_USE_SSL"); val != "" {
 			p, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Println("Error:", err)
+				ErrorLogger.Println(err)
 			}
 			c.HttpApp.useSSL = p
 		} else {

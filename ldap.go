@@ -93,7 +93,7 @@ func (l *LDAP) connect() {
 			ldapCounter = 0
 		}
 		if cfg.Verbose == logLevelDebug {
-			log.Printf("Debug: Trying %d/%d to connect to LDAP: %s\n",
+			DebugLogger.Printf("Trying %d/%d to connect to LDAP: %s\n",
 				retryLimit+1, maxRetries+1, l.ServerURIs[ldapCounter])
 		}
 		l.LDAPConn, err = ldap.DialURL(l.ServerURIs[ldapCounter])
@@ -136,7 +136,7 @@ func (l *LDAP) connect() {
 
 			err = l.LDAPConn.StartTLS(tlsConfig)
 			if err != nil {
-				log.Println("Error:", err)
+				ErrorLogger.Println(err)
 				l.LDAPConn.Close()
 				ldapCounter += 1
 				retryLimit += 1
@@ -147,7 +147,7 @@ func (l *LDAP) connect() {
 	}
 
 	if cfg.Verbose == logLevelDebug {
-		log.Println("Debug: LDAP connection established")
+		DebugLogger.Println("LDAP connection established")
 	}
 }
 
@@ -156,20 +156,20 @@ func (l *LDAP) bind() {
 
 	if l.SASLExternal {
 		if cfg.Verbose == logLevelDebug {
-			log.Println("Debug: LDAP: SASL/EXTERNAL")
+			DebugLogger.Println("LDAP: SASL/EXTERNAL")
 		}
 		err = l.LDAPConn.ExternalBind()
 		if err != nil {
-			log.Println("Error:", err)
+			ErrorLogger.Println(err)
 		}
 	} else {
 		if cfg.Verbose == logLevelDebug {
-			log.Println("Debug: LDAP: simple bind")
+			DebugLogger.Println("LDAP: simple bind")
 		}
 
 		err = l.LDAPConn.Bind(l.BindDN, l.BindPW)
 		if err != nil {
-			log.Println("Error:", err)
+			ErrorLogger.Println(err)
 		}
 	}
 }
@@ -178,7 +178,7 @@ func (l *LDAP) search(sender string) (string, error) {
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
 		if cfg.Verbose == logLevelDebug {
-			log.Println("Debug: Using LDAP filter:", filter)
+			DebugLogger.Println("Using LDAP filter:", filter)
 		}
 		searchRequest := ldap.NewSearchRequest(
 			l.BaseDN, l.Scope, ldap.NeverDerefAliases, 0, 0, false, filter, l.ResultAttr,
@@ -193,12 +193,12 @@ func (l *LDAP) search(sender string) (string, error) {
 		for _, entry := range searchResult.Entries {
 			result := entry.GetAttributeValue(l.ResultAttr[0])
 			if cfg.Verbose == logLevelDebug {
-				log.Printf("Debug: sender=%s; %s: %s=%v\n", sender, entry.DN, l.ResultAttr[0], result)
+				DebugLogger.Printf("sender=%s; %s: %s=%v\n", sender, entry.DN, l.ResultAttr[0], result)
 			}
 			return result, nil
 		}
 	} else {
-		log.Printf("Warning: LDAP filter does not contain '%%s' macro!\n")
+		ErrorLogger.Printf("LDAP filter does not contain '%%s' macro!\n")
 	}
 
 	return "", nil

@@ -21,7 +21,6 @@ package main
 import (
 	"fmt"
 	"github.com/gomodule/redigo/redis"
-	"log"
 )
 
 type Redis struct{}
@@ -67,7 +66,7 @@ func newRedisPool(
 				redis.DialPassword(redisPassword),
 			)
 			if err != nil {
-				log.Println("Error: Can't create Redis pool", err)
+				ErrorLogger.Println("Can't create Redis pool", err)
 			}
 
 			return c, err

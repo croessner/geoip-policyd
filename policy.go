@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
-	"log"
 	"os"
 	"strings"
 )
@@ -104,7 +103,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 				if len(sender) > 0 {
 					if cfg.UseLDAP {
 						if ldapResult, err = ldapServer.search(sender); err != nil {
-							log.Println("Info:", err)
+							InfoLogger.Println(err)
 							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
 								ldapServer.LDAPConn.Close()
 								ldapServer.connect()
@@ -121,16 +120,16 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 						// Check Redis for the current sender
 						if reply, err := redisConn.Do("GET", key); err != nil {
-							log.Println("Error:", err)
+							ErrorLogger.Println(err)
 							return fmt.Sprintf("action=%s", deferText)
 						} else {
 							if reply != nil {
 								if redisValue, err := redis.Bytes(reply, err); err != nil {
-									log.Println("Error:", err)
+									ErrorLogger.Println(err)
 									return fmt.Sprintf("action=%s", deferText)
 								} else {
 									if err := json.Unmarshal(redisValue, &remote); err != nil {
-										log.Println("Error:", err)
+										ErrorLogger.Println(err)
 									}
 								}
 							}
@@ -143,7 +142,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						countryCode := getCountryCode(clientIP)
 						if len(countryCode) == 0 {
 							if cfg.Verbose == logLevelDebug {
-								log.Println("Debug: No country code present for", clientIP)
+								DebugLogger.Println("No country code present for", clientIP)
 							}
 						} else {
 							newCC = remote.AddCountryCode(countryCode)
@@ -203,10 +202,10 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							if cfg.RunActionOperator && runOperator {
 								a = &EmailOperator{}
 								if err := a.Call(sender, cfg); err != nil {
-									log.Println("Error:", err)
+									ErrorLogger.Println(err)
 								} else {
 									if cfg.Verbose == logLevelDebug {
-										log.Println("Debug: Action operator finished successfully")
+										DebugLogger.Println("Action operator finished successfully")
 									}
 									remote.Actions = append(remote.Actions, "operator")
 									ranOperator = true
@@ -219,7 +218,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							redisValue, _ := json.Marshal(remote)
 							if _, err := redisConnW.Do("SET",
 								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
-								log.Println("Error:", err)
+								ErrorLogger.Println(err)
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
@@ -228,13 +227,13 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						if persist {
 							if _, err := redisConnW.Do("PERSIST",
 								redis.Args{}.Add(key)...); err != nil {
-								log.Println("Error:", err)
+								ErrorLogger.Println(err)
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						} else {
 							if _, err := redisConnW.Do("EXPIRE",
 								redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
-								log.Println("Error:", err)
+								ErrorLogger.Println(err)
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
@@ -245,7 +244,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 	}
 
 	if cfg.Verbose >= logLevelInfo {
-		log.Printf("Info: sender=<%s>; countries=%s; ip_addresses=%s; "+
+		InfoLogger.Printf("sender=<%s>; countries=%s; ip_addresses=%s; "+
 			"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
 			sender, remote.Countries, remote.Ips,
 			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)

@@ -39,21 +39,31 @@ var (
 	// Reloadable data
 	cs atomic.Value
 	gi atomic.Value
+
+	DebugLogger *log.Logger
+	InfoLogger  *log.Logger
+	ErrorLogger *log.Logger
 )
+
+func init() {
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
+	DebugLogger = log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
+	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
+}
 
 func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
 	customSettings := new(CustomSettings)
 	if cfg.CustomSettingsPath != "" {
 		jsonFile, err := os.Open(cfg.CustomSettingsPath)
 		if err != nil {
-			log.Fatalln("Error:", err)
+			ErrorLogger.Fatalln(err)
 		}
 
 		//goland:noinspection GoUnhandledErrorResult
 		defer jsonFile.Close()
 
 		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
-			log.Fatalln("Error:", err)
+			ErrorLogger.Fatalln(err)
 		} else {
 			if err := json.Unmarshal(byteValue, customSettings); err != nil {
 				log.Fatalln("Error:", err)
@@ -87,16 +97,18 @@ func main() {
 	if cfg.CommandServer {
 		cs.Store(initCustomSettings(cfg))
 
-		log.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
+		if cfg.Verbose >= logLevelInfo {
+			InfoLogger.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
+		}
 
 		if cfg.Verbose == logLevelDebug {
-			log.Println("Debug:", cfg)
+			DebugLogger.Println(cfg)
 		}
 
 		if cfg.UseLDAP {
 			ldapServer = &cfg.LDAP
 			if cfg.Verbose == logLevelDebug {
-				log.Println("Debug: LDAP:", ldapServer)
+				DebugLogger.Println("LDAP:", ldapServer)
 			}
 			ldapServer.connect()
 			ldapServer.bind()

@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/akamensky/argparse v1.3.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/gomodule/redigo v1.8.5
 	github.com/oschwald/maxminddb-golang v1.8.0

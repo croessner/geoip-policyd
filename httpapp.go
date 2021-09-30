@@ -78,7 +78,7 @@ func HasContentType(request *http.Request, mimetype string) bool {
 func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 	/*
 		if err := request.ParseForm(); err != nil {
-			log.Println("Error:", err)
+			ErrorLogger.Println(err)
 			return
 		}
 	*/
@@ -99,12 +99,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				return
 			}
 			gi.Store(geoip)
 			if cfg.Verbose >= logLevelInfo {
-				log.Printf("Info: client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.GeoipPath)
+				InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.GeoipPath)
 			}
 
 			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
@@ -112,7 +112,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if newCustomSettings != nil {
 					cs.Store(newCustomSettings)
 					if cfg.Verbose >= logLevelInfo {
-						log.Printf("Info: request='%s'; path='%s'; result='%s reloaded'", method, uri.Path, cfg.CustomSettingsPath)
+						InfoLogger.Printf("request='%s'; path='%s'; result='%s reloaded'", method, uri.Path, cfg.CustomSettingsPath)
 					}
 				}
 			}
@@ -123,17 +123,17 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
 				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				} else {
 					if cfg.Verbose >= logLevelInfo {
-						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			} else {
 				rw.WriteHeader(http.StatusNoContent)
 				if cfg.Verbose >= logLevelInfo {
-					log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 				}
 			}
 
@@ -148,20 +148,20 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 			if !HasContentType(request, "application/json") {
 				rw.WriteHeader(http.StatusBadRequest)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				return
 			} else {
 				requestData = new(Body)
 				if err := json.Unmarshal(body, requestData); err != nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				}
 			}
@@ -170,12 +170,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				sender, ok := requestData.Value.(string)
 				if !ok {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
 					return
 				}
 				if sender == "" {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
 					return
 				}
 				var redisHelper = &Redis{}
@@ -191,7 +191,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					ldapServer := &cfg.LDAP
 
 					if ldapResult, err = ldapServer.search(sender); err != nil {
-						log.Println("Info:", err)
+						InfoLogger.Println(err)
 						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
 							ldapServer.LDAPConn.Close()
 							ldapServer.connect()
@@ -208,15 +208,15 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
 				if _, err := redisConnW.Do("DEL",
 					redis.Args{}.Add(key)...); err != nil {
-					log.Println("Error:", err)
+					ErrorLogger.Println(err)
 				}
 				if cfg.Verbose >= logLevelInfo {
-					log.Printf("Info: client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
+					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
 				}
 				rw.WriteHeader(http.StatusAccepted)
 			} else {
 				rw.WriteHeader(http.StatusBadRequest)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='unknown key'", client, method, uri.Path)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='unknown key'", client, method, uri.Path)
 			}
 
 		default:
@@ -228,24 +228,24 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 		case "/update":
 			if !HasContentType(request, "application/json") {
 				rw.WriteHeader(http.StatusBadRequest)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			} else {
 				customSettings := new(CustomSettings)
 				if err := json.Unmarshal(body, customSettings); err != nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 				} else {
 					rw.WriteHeader(http.StatusAccepted)
 					cs.Store(customSettings)
 					if cfg.Verbose >= logLevelInfo {
-						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			}
@@ -261,19 +261,19 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 			if !HasContentType(request, "application/json") {
 				rw.WriteHeader(http.StatusBadRequest)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			} else {
 				requestData = new(Body)
 				if err := json.Unmarshal(body, requestData); err != nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				}
 			}
@@ -282,7 +282,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				account, ok := requestData.Value.(map[string]interface{})
 				if !ok {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be account'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be account'", client, method, uri.Path)
 					return
 				}
 
@@ -297,7 +297,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if val, ok := account["comment"]; ok {
 					if comment, ok = val.(string); !ok {
 						rw.WriteHeader(http.StatusBadRequest)
-						log.Printf("Error: client=%s; request='%s'; path='%s'; result='comment not string'", client, method, uri.Path)
+						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='comment not string'", client, method, uri.Path)
 						return
 					}
 				}
@@ -305,7 +305,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					if tempFloat, ok = val.(float64); !ok {
 						log.Printf("%T: %v\n", account["countries"], account["countries"])
 						rw.WriteHeader(http.StatusBadRequest)
-						log.Printf("Error: client=%s; request='%s'; path='%s'; result='countries not float64'", client, method, uri.Path)
+						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='countries not float64'", client, method, uri.Path)
 						return
 					} else {
 						countries = int(tempFloat)
@@ -314,7 +314,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if val, ok := account["ips"]; ok {
 					if tempFloat, ok = val.(float64); !ok {
 						rw.WriteHeader(http.StatusBadRequest)
-						log.Printf("Error: client=%s; request='%s'; path='%s'; result='ips not float64'", client, method, uri.Path)
+						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='ips not float64'", client, method, uri.Path)
 						return
 					} else {
 						ips = int(tempFloat)
@@ -323,23 +323,23 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if val, ok := account["sender"]; ok {
 					if sender, ok = val.(string); !ok {
 						rw.WriteHeader(http.StatusBadRequest)
-						log.Printf("Error: client=%s; request='%s'; path='%s'; result='sender not string'", client, method, uri.Path)
+						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='sender not string'", client, method, uri.Path)
 						return
 					}
 				}
 				if countries <= 0 {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='countries %d <= 0'", client, method, uri.Path, countries)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='countries %d <= 0'", client, method, uri.Path, countries)
 					return
 				}
 				if ips <= 0 {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='ips %d <= 0'", client, method, uri.Path, ips)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='ips %d <= 0'", client, method, uri.Path, ips)
 					return
 				}
 				if sender == "" {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='empty sender'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='empty sender'", client, method, uri.Path)
 					return
 				}
 
@@ -354,7 +354,9 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 								customSettings.Data[i].Comment = comment
 								cs.Store(customSettings)
 								rw.WriteHeader(http.StatusAccepted)
-								log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+								if cfg.Verbose >= logLevelInfo {
+									InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+								}
 								return
 							}
 						}
@@ -363,13 +365,17 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 						customSettings.Data = append(customSettings.Data, account)
 						cs.Store(customSettings)
 						rw.WriteHeader(http.StatusAccepted)
-						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						if cfg.Verbose >= logLevelInfo {
+							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						}
 					} else {
 						account := Account{Comment: comment, Sender: sender, Ips: ips, Countries: countries}
 						customSettings = &CustomSettings{Data: []Account{account}}
 						cs.Store(customSettings)
 						rw.WriteHeader(http.StatusAccepted)
-						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						if cfg.Verbose >= logLevelInfo {
+							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+						}
 					}
 				}
 			}
@@ -385,19 +391,19 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 			if !HasContentType(request, "application/json") {
 				rw.WriteHeader(http.StatusBadRequest)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
 				return
 			}
 
 			body, err := ioutil.ReadAll(request.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 			} else {
 				requestData = new(Body)
 				if err := json.Unmarshal(body, requestData); err != nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				}
 			}
@@ -406,12 +412,12 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				sender, ok := requestData.Value.(string)
 				if !ok {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
 					return
 				}
 				if sender == "" {
 					rw.WriteHeader(http.StatusBadRequest)
-					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
 					return
 				}
 
@@ -427,12 +433,14 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 									}(customSettings.Data, i)
 									cs.Store(customSettings)
 									rw.WriteHeader(http.StatusAccepted)
-									log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+									if cfg.Verbose >= logLevelInfo {
+										InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+									}
 									return
 								}
 							}
 							rw.WriteHeader(http.StatusBadRequest)
-							log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s not found'", client, method, uri.Path, sender)
+							ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s not found'", client, method, uri.Path, sender)
 						}
 					}
 				}
@@ -490,11 +498,13 @@ func httpApp() {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	log.Printf("Starting geoip-policyd HTTP service with address: '%s'", www.Addr)
+	if cfg.Verbose >= logLevelInfo {
+		InfoLogger.Printf("Starting geoip-policyd HTTP service with address: '%s'", www.Addr)
+	}
 	if app.useSSL {
 		err = www.ListenAndServeTLS(app.x509.cert, app.x509.key)
 	} else {
 		err = www.ListenAndServe()
 	}
-	log.Fatalln("Error:", err)
+	ErrorLogger.Fatalln(err)
 }
