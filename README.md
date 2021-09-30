@@ -27,7 +27,8 @@ they come from too many IP addresses.
    * [GET request /custom-settings](#get-request-custom-settings)
    * [POST request /remove](#post-request-remove)
    * [PUT request /update](#put-request-update)
-   * [PATCH request /update](#patch-request-update)
+   * [PATCH request /modify](#patch-request-modify)
+   * [DELETE request /remove](#delete-request-remove)
 4. [Actions](#actions)
    * [Operator action](#operator-action)
 5. [LDAP](#ldap)
@@ -335,33 +336,53 @@ Example:
 
 ```shell
 # Plain http without basic auth
-curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/remove"
+curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/update"
 
 # Plain with basic auth
-curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "http://localhost:8080/update" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{"data":[{ "sender":"christian@roessner.email","ips":3,"countries":1},{"sender":"test1@example.com","countries":1},{"sender":"test2@example.com","ips":20}]}' -H "Content-Type: application/json" -X PUT "https://localhost:8443/update" -u testuser:testsecret
 ```
 
 Back to [table of contents](#table-of-contents)
 
-## PATCH request /update
+## PATCH request /modify
 
-Request: Send changed settings for a given sender       
+Request: Send changed settings for a given sender. If the sender does not exist, add a new record to the custom settings.       
 Response: No results
 
 Example:
 
 ````shell
 # Plain http without basic auth
-curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/remove"
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/modify"
 
 # Plain with basic auth
-curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X PATCH "http://localhost:8080/modify" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X PATCH "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X PATCH "https://localhost:8443/modify" -u testuser:testsecret
+````
+
+Back to [table of contents](#table-of-contents)
+
+## DELETE request /remove
+
+Request: Remove an entry from the custom settings by using the sender as the key.        
+Response: No results
+
+Example:
+
+````shell
+# Plain http without basic auth
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove"
+
+# Plain with basic auth
+curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove" -u testuser:testsecret
+
+# Secured with basic auth
+curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X DELETE "https://localhost:8443/remove" -u testuser:testsecret
 ````
 
 Back to [table of contents](#table-of-contents)
