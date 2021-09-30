@@ -35,10 +35,11 @@ import (
 )
 
 const (
-	GET   = "GET"
-	POST  = "POST"
-	PUT   = "PUT"
-	PATCH = "PATCH"
+	GET    = "GET"
+	POST   = "POST"
+	PUT    = "PUT"
+	PATCH  = "PATCH"
+	DELETE = "DELETE"
 )
 
 // HttpApp Basic auth for the HTTP service
@@ -255,7 +256,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 	case PATCH:
 		switch uri.Path {
-		case "/update":
+		case "/modify":
 			var requestData *Body
 
 			if !HasContentType(request, "application/json") {
@@ -345,12 +346,85 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if val := os.Getenv("GO_TESTING"); val == "" {
 					customSettings := cs.Load().(*CustomSettings)
 					if customSettings != nil {
+						for i, record := range customSettings.Data {
+							if record.Sender == sender {
+								// Update record
+								customSettings.Data[i].Ips = ips
+								customSettings.Data[i].Countries = countries
+								customSettings.Data[i].Comment = comment
+								cs.Store(customSettings)
+								rw.WriteHeader(http.StatusAccepted)
+								log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+								return
+							}
+						}
+						// Add record
+						account := Account{Comment: comment, Sender: sender, Ips: ips, Countries: countries}
+						customSettings.Data = append(customSettings.Data, account)
+						cs.Store(customSettings)
+						rw.WriteHeader(http.StatusAccepted)
+						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+					} else {
+						account := Account{Comment: comment, Sender: sender, Ips: ips, Countries: countries}
+						customSettings = &CustomSettings{Data: []Account{account}}
+						cs.Store(customSettings)
+						rw.WriteHeader(http.StatusAccepted)
+						log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
+					}
+				}
+			}
+
+		default:
+			rw.WriteHeader(http.StatusNotFound)
+		}
+
+	case DELETE:
+		switch uri.Path {
+		case "/remove":
+			var requestData *Body
+
+			if !HasContentType(request, "application/json") {
+				rw.WriteHeader(http.StatusBadRequest)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				return
+			}
+
+			body, err := ioutil.ReadAll(request.Body)
+			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
+				log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+			} else {
+				requestData = new(Body)
+				if err := json.Unmarshal(body, requestData); err != nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					return
+				}
+			}
+
+			if requestData.Key == "sender" {
+				sender, ok := requestData.Value.(string)
+				if !ok {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					return
+				}
+				if sender == "" {
+					rw.WriteHeader(http.StatusBadRequest)
+					log.Printf("Error: client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					return
+				}
+
+				if val := os.Getenv("GO_TESTING"); val == "" {
+					customSettings := cs.Load().(*CustomSettings)
+					if customSettings != nil {
 						if len(customSettings.Data) > 0 {
 							for i, record := range customSettings.Data {
 								if record.Sender == sender {
-									customSettings.Data[i].Ips = ips
-									customSettings.Data[i].Countries = countries
-									customSettings.Data[i].Comment = comment
+									customSettings.Data = func(s []Account, i int) []Account {
+										s[i] = s[len(s)-1]
+										return s[:len(s)-1]
+									}(customSettings.Data, i)
 									cs.Store(customSettings)
 									rw.WriteHeader(http.StatusAccepted)
 									log.Printf("Info: client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
@@ -358,8 +432,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 								}
 							}
 							rw.WriteHeader(http.StatusBadRequest)
-							log.Printf("Error: client=%s; request='%s'; path='%s'; result='sender not found %s'", client, method, uri.Path, sender)
-							return
+							log.Printf("Error: client=%s; request='%s'; path='%s'; result='%s not found'", client, method, uri.Path, sender)
 						}
 					}
 				}
