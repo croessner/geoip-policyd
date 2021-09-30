@@ -10,12 +10,14 @@ RUN go mod download
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 RUN go build -v -ldflags="-s -w" -o geoip-policyd .
 
-FROM scratch
+FROM alpine
 
 LABEL org.opencontainers.image.authors="christian@roessner.email"
 LABEL com.roessner-network-solutions.vendor="Rößner-Network-Solutions"
 LABEL version="@@gittag@@-@@gitcommit@@"
 LABEL description="Postfix policy service that blocks clients, if they come from too many countires or IP addresses."
+
+RUN apk add --no-cache tzdata
 
 # Copy binary to destination image
 COPY --from=builder ["/build/geoip-policyd", "/"]
