@@ -112,7 +112,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				if newCustomSettings != nil {
 					cs.Store(newCustomSettings)
 					if cfg.Verbose >= logLevelInfo {
-						InfoLogger.Printf("request='%s'; path='%s'; result='%s reloaded'", method, uri.Path, cfg.CustomSettingsPath)
+						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.CustomSettingsPath)
 					}
 				}
 			}
