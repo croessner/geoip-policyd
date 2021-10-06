@@ -33,16 +33,22 @@ func main() {
 	sender := os.Args[2]
 	clientAddress := os.Args[3]
 	totalConnections, _ := strconv.Atoi(os.Args[4])
-	if totalConnections <= 0 {
+	if totalConnections < MaxConnections {
 		totalConnections = TotalConnections
 	}
 
 	var failed atomic.Value
 
+	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nclient_address=%s\n\n", sender, clientAddress)
+
+	/*
+	 * Test 1
+	 */
+
 	numberOfConnections := &SimultaneousConnections{current: 0}
 	failed.Store(0)
 
-	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nclient_address=%s\n\n", sender, clientAddress)
+	fmt.Printf("Testing 1 request per connection, %d parallel\n", MaxConnections)
 
 	start := time.Now()
 
@@ -85,6 +91,7 @@ func main() {
 			for {
 				reader := bufio.NewReader(conn)
 				tp := textproto.NewReader(reader)
+				// Read action= string
 				line, err = tp.ReadLine()
 				if err != nil {
 					failed.Store(failed.Load().(int) + 1)
@@ -98,6 +105,12 @@ func main() {
 						failed.Store(failed.Load().(int) + 1)
 						break
 					}
+				}
+				// Read blank line after action= string
+				line, err = tp.ReadLine()
+				if err != nil {
+					failed.Store(failed.Load().(int) + 1)
+					goto abort
 				}
 			}
 
@@ -126,4 +139,90 @@ func main() {
 
 	fmt.Printf("\nFailed number of requests: %d (%d%%), total time: %.0fs, connections per second: %d\n",
 		failed.Load().(int), 100*failed.Load().(int)/totalConnections, elapsed.Seconds(), connectionsPerSecond)
+
+	/*
+	 * Test 2
+	 */
+
+	requestsPerConnection := totalConnections / MaxConnections
+
+	fmt.Printf("Testing %d requests per connection, %d parallel\n", requestsPerConnection, MaxConnections)
+
+	failed.Store(0)
+	start = time.Now()
+
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < MaxConnections; i++ {
+		wg.Add(1)
+		go func() {
+			var (
+				conn   net.Conn
+				err    error
+				line   string
+				cycles int
+			)
+			timeoutDuration := time.Second * 30
+			r := 0 // Request counter
+
+			if conn, err = net.Dial("tcp", host); err != nil {
+				failed.Store(failed.Load().(int) + 1)
+				goto abort
+			}
+
+			//goland:noinspection GoUnhandledErrorResult
+			defer conn.Close()
+
+			err = conn.SetReadDeadline(time.Now().Add(timeoutDuration))
+			if err != nil {
+				failed.Store(failed.Load().(int) + 1)
+				goto abort
+			}
+
+			for ; r < requestsPerConnection; r++ {
+				_, err = conn.Write([]byte(msg))
+				if err != nil {
+					goto abort
+				}
+
+				cycles = 0
+				for {
+					reader := bufio.NewReader(conn)
+					tp := textproto.NewReader(reader)
+					// Read action= string
+					line, err = tp.ReadLine()
+					if err != nil {
+						goto abort
+					}
+					if strings.HasPrefix(line, "action=") {
+						break
+					} else {
+						time.Sleep(10 * time.Millisecond)
+						if cycles > 5000 {
+							break
+						}
+					}
+					// Read blank line after action= string
+					line, err = tp.ReadLine()
+					if err != nil {
+						goto abort
+					}
+				}
+			}
+
+		abort:
+			failed.Store(failed.Load().(int) + (requestsPerConnection - r))
+
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	elapsed = time.Since(start)
+	requestsPerSecond := int(float64(totalConnections) / elapsed.Seconds())
+
+	fmt.Printf("Failed number of requests: %d (%d%%), total time: %.0fs, requests per second: %d\n",
+		failed.Load().(int), 100*failed.Load().(int)/totalConnections, elapsed.Seconds(), requestsPerSecond)
+
 }
