@@ -46,9 +46,9 @@ var (
 )
 
 func init() {
-	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
-	DebugLogger = log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
-	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile|log.Lmsgprefix)
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Lshortfile)
+	DebugLogger = log.New(os.Stdout, "DEBUG: ", log.Lshortfile)
+	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Lshortfile)
 }
 
 func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
