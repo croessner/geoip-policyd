@@ -9,6 +9,7 @@ RUN go mod download
 # Set necessarry environment vairables and compile the app
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 RUN go build -v -ldflags="-s -w" -o geoip-policyd .
+RUN cd ./stresstest && go build -v -v -ldflags="-s -w" -o stresstest main.go
 
 FROM alpine
 
@@ -23,6 +24,7 @@ WORKDIR /usr/app
 
 # Copy binary to destination image
 COPY --from=builder ["/build/geoip-policyd", "./"]
+COPY --from=builder ["/build/stresstest/stresstest", "./"]
 
 EXPOSE 4646
 EXPOSE 8080
