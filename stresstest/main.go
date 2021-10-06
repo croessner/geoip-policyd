@@ -6,8 +6,10 @@ import (
 	"net"
 	"net/textproto"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,23 +22,33 @@ type SimultaneousConnections struct {
 }
 
 func main() {
-	if len(os.Args) != 4 {
-		fmt.Println("Required args: <host:port> <sender> <client_address>")
+	if len(os.Args) != 5 {
+		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests>")
 		os.Exit(1)
 	}
 
 	counter := make(chan int, MaxConnections)
+	exit := make(chan int)
 	host := os.Args[1]
 	sender := os.Args[2]
 	clientAddress := os.Args[3]
+	totalConnections, _ := strconv.Atoi(os.Args[4])
+	if totalConnections <= 0 {
+		totalConnections = TotalConnections
+	}
+
+	var failed atomic.Value
 
 	numberOfConnections := &SimultaneousConnections{current: 0}
+	failed.Store(0)
 
 	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nclient_address=%s\n\n", sender, clientAddress)
 
-	for i := 0; i < TotalConnections; i++ {
+	start := time.Now()
+
+	for i := 0; i < totalConnections; i++ {
 		counter <- i
-		go func(absolut int) {
+		go func() {
 			numberOfConnections.mu.Lock()
 			numberOfConnections.current += 1
 			numberOfConnections.mu.Unlock()
@@ -47,43 +59,71 @@ func main() {
 				line   string
 				cycles int
 			)
+			timeoutDuration := time.Second * 30
 
 			if conn, err = net.Dial("tcp", host); err != nil {
-				fmt.Println("Error:", err)
-				os.Exit(1)
+				failed.Store(failed.Load().(int) + 1)
+				goto abort
 			}
 
-			defer func() { _ = conn.Close() }()
+			//goland:noinspection GoUnhandledErrorResult
+			defer conn.Close()
+
+			err = conn.SetReadDeadline(time.Now().Add(timeoutDuration))
+			if err != nil {
+				failed.Store(failed.Load().(int) + 1)
+				goto abort
+			}
 
 			_, err = conn.Write([]byte(msg))
 			if err != nil {
-				fmt.Println("Error:", err)
-				os.Exit(1)
+				failed.Store(failed.Load().(int) + 1)
+				goto abort
 			}
 
 			cycles = 0
 			for {
 				reader := bufio.NewReader(conn)
 				tp := textproto.NewReader(reader)
-				line, _ = tp.ReadLine()
+				line, err = tp.ReadLine()
+				if err != nil {
+					failed.Store(failed.Load().(int) + 1)
+					goto abort
+				}
 				if strings.HasPrefix(line, "action=") {
 					break
 				} else {
 					time.Sleep(10 * time.Millisecond)
 					if cycles > 5000 {
+						failed.Store(failed.Load().(int) + 1)
 						break
 					}
 				}
 			}
-			_ = <-counter
+
+		abort:
 
 			numberOfConnections.mu.Lock()
 			number := numberOfConnections.current
 			numberOfConnections.current -= 1
 			numberOfConnections.mu.Unlock()
 
-			fmt.Printf("\rCurrent connections: %3d total: %d", number, absolut)
-		}(i)
+			absolut := <-counter
+			absolut += 1
+
+			fmt.Printf("\rCurrent connections: %3d total: %d%%", number, 100*absolut/totalConnections)
+
+			if absolut == totalConnections {
+				exit <- 0
+			}
+		}()
 	}
-	fmt.Println()
+
+	<-exit
+
+	elapsed := time.Since(start)
+	connectionsPerSecond := int(float64(totalConnections) / elapsed.Seconds())
+
+	fmt.Printf("\nFailed number of requests: %d (%d%%), total time: %.0fs, connections per second: %d\n",
+		failed.Load().(int), 100*failed.Load().(int)/totalConnections, elapsed.Seconds(), connectionsPerSecond)
 }
