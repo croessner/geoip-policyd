@@ -7,11 +7,17 @@ import (
 	"net/textproto"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 const MaxConnections = 100
 const TotalConnections = 100000
+
+type SimultaneousConnections struct {
+	mu      sync.Mutex
+	current int32
+}
 
 func main() {
 	if len(os.Args) != 4 {
@@ -24,11 +30,17 @@ func main() {
 	sender := os.Args[2]
 	clientAddress := os.Args[3]
 
+	numberOfConnections := &SimultaneousConnections{current: 0}
+
 	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nclient_address=%s\n\n", sender, clientAddress)
 
 	for i := 0; i < TotalConnections; i++ {
 		counter <- i
-		go func() {
+		go func(absolut int) {
+			numberOfConnections.mu.Lock()
+			numberOfConnections.current += 1
+			numberOfConnections.mu.Unlock()
+
 			var (
 				conn   net.Conn
 				err    error
@@ -59,13 +71,19 @@ func main() {
 				} else {
 					time.Sleep(10 * time.Millisecond)
 					if cycles > 5000 {
-						line = "Timeout"
 						break
 					}
 				}
 			}
+			_ = <-counter
 
-			fmt.Println(<-counter, line)
-		}()
+			numberOfConnections.mu.Lock()
+			number := numberOfConnections.current
+			numberOfConnections.current -= 1
+			numberOfConnections.mu.Unlock()
+
+			fmt.Printf("\rCurrent connections: %3d total: %d", number, absolut)
+		}(i)
 	}
+	fmt.Println()
 }
