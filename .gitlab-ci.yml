@@ -12,7 +12,7 @@ before_script:
 stages:
   - test
   - build
-  #- deploy
+  - deploy
 
 format:
   image: golang:1.16-alpine
@@ -52,7 +52,7 @@ compile:
 
 docker-build:
   image: docker:latest
-  stage: build
+  stage: deploy
   before_script:
     - docker info
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
