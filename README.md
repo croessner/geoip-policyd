@@ -110,6 +110,7 @@ Arguments:
   -a  --server-address                IPv4 or IPv6 address for the policy service. Default: 127.0.0.1
   -p  --server-port                   Port for the policy service. Default: 4646
       --http-address                  HTTP address for incoming requests. Default: 127.0.0.1:8080
+      --sasl-username                 Use 'sasl_username' instead of the 'sender' attribute. Default: false
   -A  --redis-address                 IPv4 or IPv6 address for the Redis service. Default: 127.0.0.1
   -P  --redis-port                    Port for the Redis service. Default: 6379
       --redis-database-number         Redis database number. Default: 0
@@ -178,6 +179,7 @@ Variable | Description
 SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
 SERVER_PORT | Port for the policy service; default(4646)
 HTTP_ADDRESS | HTTP address for incoming requests; default(127.0.0.1:8080)
+USE_SASL_USERNAME | Use 'sasl_username' instead of the 'sender' attribute; default(false)
 REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
 REDIS_PORT | Port for the Redis service; default(6379)
 REDIS_DATABASE_NUMBER | Redis database number

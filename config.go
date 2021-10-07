@@ -73,6 +73,9 @@ type CmdLineConfig struct {
 	HttpAddress string
 	HttpApp
 
+	// Use 'sender' or 'sasl_username' attribute?
+	UseSASLUsername bool
+
 	// Redis settings for a raed and/or write server pool
 	RedisAddress  string
 	RedisPort     int
@@ -200,6 +203,14 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  httpAddress,
 			Help:     "HTTP address for incoming requests",
+		},
+	)
+
+	argServerUseSASLUsername := commandServer.Flag(
+		"", "sasl-username", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Use 'sasl_username' instead of the 'sender' attribute",
 		},
 	)
 
@@ -739,6 +750,16 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.HttpAddress = val
 		} else {
 			c.HttpAddress = *argServerHttpAddress
+		}
+
+		if val := os.Getenv("USE_SASL_USERNAME"); val != "" {
+			p, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err)
+			}
+			c.UseSASLUsername = p
+		} else {
+			c.UseSASLUsername = *argServerUseSASLUsername
 		}
 
 		if val := os.Getenv("REDIS_ADDRESS"); val != "" {

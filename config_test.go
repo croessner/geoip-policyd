@@ -129,6 +129,26 @@ func TestConfigEnvServerPort(t *testing.T) {
 	}
 }
 
+func TestConfigUseSASLUsername(t *testing.T) {
+	cfg := new(CmdLineConfig)
+	cfg.Init([]string{"app", "server", "--sasl-username"})
+	if cfg.UseSASLUsername != true {
+		t.Errorf("Expected --sasl-username, got value=%v", cfg.UseSASLUsername)
+	}
+}
+
+func TestConfigEnvUseSASLUsername(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"USE_SASL_USERNAME": "true",
+	})
+	defer closer()
+	cfg := new(CmdLineConfig)
+	cfg.Init([]string{"app", "server"})
+	if cfg.UseSASLUsername != true {
+		t.Errorf("Expected --sasl-username, got value=%v", cfg.ServerPort)
+	}
+}
+
 func TestConfigHttpAddress(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--http-address", "192.168.0.1:80"})

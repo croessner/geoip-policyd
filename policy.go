@@ -99,7 +99,11 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 	if request, ok = policyRequest["request"]; ok {
 		if request == "smtpd_access_policy" {
-			if sender, ok = policyRequest["sender"]; ok {
+			userAttribute := "sender"
+			if cfg.UseSASLUsername {
+				userAttribute = "sasl_username"
+			}
+			if sender, ok = policyRequest[userAttribute]; ok {
 				if len(sender) > 0 {
 					if cfg.UseLDAP {
 						if ldapResult, err = ldapServer.search(sender); err != nil {
