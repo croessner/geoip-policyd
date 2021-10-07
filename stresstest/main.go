@@ -62,7 +62,8 @@ func main() {
 		failedWrite    atomic.Value
 	)
 
-	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nclient_address=%s\n\n", sender, clientAddress)
+	msg := fmt.Sprintf("request=smtpd_access_policy\nsender=%s\nsasl_username=%s\nclient_address=%s\n\n",
+		sender, sender, clientAddress)
 
 	/*
 	 * Test 1
