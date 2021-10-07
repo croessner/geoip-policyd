@@ -27,7 +27,7 @@ type SimultaneousConnections struct {
 
 func main() {
 	if len(os.Args) < 5 || len(os.Args) > 6 {
-		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests> [optional test number]")
+		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests> [optional test]")
 		os.Exit(1)
 	}
 
@@ -40,7 +40,7 @@ func main() {
 	if totalConnections < MaxConnections {
 		totalConnections = TotalConnections
 	}
-	test := "all"
+	var test string
 	if len(os.Args) == 6 {
 		switch os.Args[5] {
 		case TEST1:
@@ -50,6 +50,8 @@ func main() {
 		default:
 			test = ALL
 		}
+	} else {
+		test = ALL
 	}
 
 	var (
