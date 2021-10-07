@@ -90,7 +90,7 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		log.Println("Shutting down. Received signal:", sig)
+		InfoLogger.Println("Shutting down. Received signal:", sig)
 		os.Exit(0)
 	}()
 
