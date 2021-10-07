@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"net"
-	"net/textproto"
 	"os"
 	"strconv"
 	"strings"
@@ -119,16 +117,15 @@ func main() {
 
 				cycles = 0
 				for {
-					reader := bufio.NewReader(conn)
-					tp := textproto.NewReader(reader)
-
+					var buffer = make([]byte, 1024)
 					// Read action= string
-					line, err = tp.ReadLine()
+					_, err = conn.Read(buffer)
 					if err != nil {
 						failed.Store(failed.Load().(int) + 1)
 						failedRead.Store(failedRead.Load().(int) + 1)
 						goto abort
 					}
+					line = strings.TrimSpace(string(buffer))
 					if strings.HasPrefix(line, "action=") {
 						break
 					} else {
@@ -177,6 +174,7 @@ func main() {
 		requestsPerConnection := totalConnections / MaxConnections
 		fmt.Printf("Testing %d requests per connection, %d parallel\n", requestsPerConnection, MaxConnections)
 
+		numberOfConnections := &SimultaneousConnections{current: 0}
 		failed.Store(0)
 		failedConnect.Store(0)
 		failedDeadline.Store(0)
@@ -186,6 +184,20 @@ func main() {
 		start := time.Now()
 
 		wg := sync.WaitGroup{}
+
+		stats := make(chan int32)
+		statsEnd := make(chan int)
+
+		go func() {
+			for {
+				select {
+				case c := <-stats:
+					fmt.Printf("\rRequest: %d total: %d%%", c, 100*int(c)/totalConnections)
+				case <-statsEnd:
+					return
+				}
+			}
+		}()
 
 		for i := 0; i < MaxConnections; i++ {
 			wg.Add(1)
@@ -224,16 +236,16 @@ func main() {
 
 					cycles = 0
 					for {
-						reader := bufio.NewReader(conn)
-						tp := textproto.NewReader(reader)
+						var buffer = make([]byte, 1024)
 
 						// Read action= string
-						line, err = tp.ReadLine()
+						_, err = conn.Read(buffer)
 						if err != nil {
 							fmt.Println(err.Error())
 							failedRead.Store(failedRead.Load().(int) + 1)
 							goto abort
 						}
+						line = strings.TrimSpace(string(buffer))
 						if strings.HasPrefix(line, "action=") {
 							break
 						} else {
@@ -244,6 +256,13 @@ func main() {
 							}
 						}
 					}
+
+					numberOfConnections.mu.Lock()
+					numberOfConnections.current += 1
+					number := numberOfConnections.current
+					numberOfConnections.mu.Unlock()
+
+					stats <- number
 				}
 
 			abort:
@@ -254,11 +273,12 @@ func main() {
 		}
 
 		wg.Wait()
+		statsEnd <- 0
 
 		elapsed := time.Since(start)
 		requestsPerSecond := int(float64(totalConnections) / elapsed.Seconds())
 
-		fmt.Printf("Failed number of requests: %d (%d%%), total time: %.0fs, requests per second: %d\n",
+		fmt.Printf("\nFailed number of requests: %d (%d%%), total time: %.0fs, requests per second: %d\n",
 			failed.Load().(int), 100*failed.Load().(int)/totalConnections, elapsed.Seconds(), requestsPerSecond)
 		fmt.Printf("Absolute failures: connect: %d, deadline: %d, read: %d, write: %d\n",
 			failedConnect.Load().(int), failedDeadline.Load().(int), failedRead.Load().(int), failedWrite.Load().(int))
