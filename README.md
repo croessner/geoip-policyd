@@ -450,7 +450,6 @@ services:
         tag: geoip-policyd
     network_mode: host
     environment:
-      TZ: "Europe/Berlin"
       VERBOSE: "debug"
       SERVER_ADDRESS: "127.0.0.1"
       SERVER_PORT: 4646

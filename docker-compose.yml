@@ -10,7 +10,6 @@ services:
         tag: geoip-policyd
     network_mode: host
     environment:
-      - TZ=Europe/Berlin
       - SERVER_ADDRESS=127.0.0.1
       - SERVER_PORT=4646
       - HTTP_ADDRESS=127.0.0.1:8080
