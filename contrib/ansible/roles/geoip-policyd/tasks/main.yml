@@ -1,0 +1,82 @@
+---
+# file: tasks/main.yml
+
+- name: Vars
+  set_fact:
+    destination_host: "{{ ansible_ssh_host }}"
+
+- name: Install geoip-policyd
+  ansible.builtin.copy:
+    src: geoip-policyd
+    dest: /usr/local/sbin/geoip-policyd
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart and test
+
+- name: Install stresstest
+  ansible.builtin.copy:
+    src: stresstest
+    dest: /usr/local/sbin/stresstest
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create config file folder
+  ansible.builtin.file:
+    path: /etc/geoip-policyd
+    state: directory
+    mode: '0755'
+
+#- name: Install GeoLite2-City.mmdb
+#  ansible.builtin.copy:
+#    src: GeoLite2-City.mmdb
+#    dest: /etc/geoip-policyd/GeoLite2-City.mmdb
+#    owner: root
+#    group: root
+#    mode: '0644'
+#  register: service_file
+#  notify: Restart and test
+
+- name: Install geoip-policyd.service
+  ansible.builtin.copy:
+    src: geoip-policyd.service
+    dest: /etc/systemd/system/geoip-policyd.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: service_file
+  notify: Restart and test
+
+- name: Install geoip-policyd default config file
+  ansible.builtin.template:
+    src: geoip-policyd.j2
+    dest: /etc/default/geoip-policyd
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart and test
+
+- name: Systemd daemon-reload
+  when: service_file is defined and service_file.changed | bool == True
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Create group policyd
+  ansible.builtin.group:
+    name: policyd
+    state: present
+    system: True
+
+- name: Create user policyd
+  ansible.builtin.user:
+    name: policyd
+    group: policyd
+    state: present
+    system: True
+
+- name: Enable geoip-policyd
+  ansible.builtin.systemd:
+    name: geoip-policyd
+    enabled: yes
+

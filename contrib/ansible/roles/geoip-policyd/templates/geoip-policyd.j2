@@ -1,0 +1,51 @@
+{{ ansible_managed | comment }}
+
+# /etc/default/geoip-policyd
+
+VERBOSE="{{ geoippolicyd['verbose'] | default('info') }}"
+
+SERVER_ADDRESS="{{ geoippolicyd['address'] | default('127.0.0.1') }}"
+SERVER_PORT="{{ geoippolicyd['port'] }}"
+HTTP_ADDRESS="{{ geoippolicyd['http_address'] | default('127.0.0.1:8080') }}"
+
+REDIS_ADDRESS="{{ geoippolicyd['redis_address'] | default('127.0.0.1') }}"
+REDIS_PORT="{{ geoippolicyd['redis_port'] | default('6379') }}"
+REDIS_DATABASE_NUMBER="{{ geoippolicyd['redis_database_number'] | default('0') }}"
+
+GEOIP_PATH="{{ geoippolicyd['geoip_path'] | default('/usr/share/GeoIP/GeoLite2-City.mmdb') }}"
+
+BLOCKED_NO_EXPIRE="{{ geoippolicyd['blocked_no_expire'] | default('true') }}"
+
+##
+## LDAP
+##
+
+USE_LDAP="false"
+#LDAP_STARTTLS="true"
+#LDAP_TLS_SKIP_VERIFY="true"
+#LDAP_SASL_EXTERNAL="true"
+#LDAP_SERVER_URIS="ldap://ldap1.example.test:389/, ldap://ldap2.example.test:389/"
+#LDAP_BASEDN="dc=example,dc=test"
+#LDAP_TLS_CAFILE="/etc/geoip-policyd/cacert.pem"
+#LDAP_TLS_CLIENT_CERT="/etc/geoip-policyd/cert.pem"
+#LDAP_TLS_CLIENT_KEY="/etc/geoip-policyd/key.pem"
+#LDAP_FILTER="(&(objectClass=rnsMSDovecotAccount)(objectClass=rnsMSPostfixAccount)(rnsMSRecipientAddress=%s))"
+#LDAP_RESULT_ATTRIBUTE="rnsMSDovecotUser"
+
+##
+## Actions
+##
+
+RUN_ACTIONS="false"
+RUN_ACTION_OPERATOR="false"
+#OPERATOR_TO="<user@example.test>"
+#OPERATOR_FROM="GeoIP-Policyd <no-reply@example.test>"
+#OPERATOR_MESSAGE_PATH="/etc/geoip-policyd/mailtemplate.txt"
+
+##
+## MTA settings
+##
+
+MAIL_SERVER="127.0.0.1"
+MAIL_HELO="localhost.localdomain"
+MAIL_PORT=25
