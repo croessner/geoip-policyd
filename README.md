@@ -250,7 +250,7 @@ curl "http://localhost:8080/reload"
 curl "http://localhost:8080/reload" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k "https://localhost:8443/remove" -u testuser:testsecret
+curl -k "https://localhost:8443/reload" -u testuser:testsecret
 ```
 
 Back to [table of contents](#table-of-contents)
