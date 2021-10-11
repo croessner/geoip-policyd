@@ -119,7 +119,7 @@ func main() {
 		geoip := new(GeoIP)
 		geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 		if err != nil {
-			log.Fatal("Error: Can not open GeoLite2-City database file", err)
+			ErrorLogger.Fatal("Can not open GeoLite2-City database file", err)
 		}
 		gi.Store(geoip)
 
@@ -128,7 +128,7 @@ func main() {
 
 		server, err = net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort))
 		if server == nil {
-			log.Panic("Error: Unable to start server:", err)
+			ErrorLogger.Panic("Unable to start server:", err)
 		}
 		clientChannel := clientConnections(server)
 		for {
