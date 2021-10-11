@@ -90,7 +90,9 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		InfoLogger.Println("Shutting down. Received signal:", sig)
+		if cfg.Verbose >= logLevelInfo {
+			InfoLogger.Println("Shutting down. Received signal:", sig)
+		}
 		os.Exit(0)
 	}()
 
