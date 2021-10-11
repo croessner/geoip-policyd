@@ -173,7 +173,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
 					}
 				}
 				return nil
@@ -224,7 +224,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
 					}
 				}
 				return nil
@@ -281,7 +281,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%sis not a valid IP address or hostname", opt[0])
+						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
 					}
 				}
 				return nil
