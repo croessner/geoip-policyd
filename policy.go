@@ -247,9 +247,14 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		}
 	}
 
+	if cfg.UseSASLUsername {
+		sender = fmt.Sprintf("sasl_username=\"%s\"", sender)
+	} else {
+		sender = fmt.Sprintf("sender=\"<%s>\"", sender)
+	}
+
 	if cfg.Verbose >= logLevelInfo {
-		InfoLogger.Printf("sender=<%s>; countries=%s; ip_addresses=%s; "+
-			"#countries=%d/%d; #ip_addresses=%d/%d; action=%s\n",
+		InfoLogger.Printf("%s countries=%s ip_addresses=%s #countries=%d/%d #ip_addresses=%d/%d action=\"%s\"\n",
 			sender, remote.Countries, remote.Ips,
 			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
 	}

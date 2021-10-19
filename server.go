@@ -33,8 +33,8 @@ func clientConnections(listener net.Listener) chan net.Conn {
 				ErrorLogger.Println("Couldn't accept connection:", err)
 				continue
 			}
-			if cfg.Verbose >= logLevelInfo {
-				InfoLogger.Printf("Connection %v established\n", client.RemoteAddr())
+			if cfg.Verbose == logLevelDebug {
+				DebugLogger.Printf("Client %v connected\n", client.RemoteAddr())
 			}
 			ch <- client
 		}
@@ -50,8 +50,8 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
-			if cfg.Verbose >= logLevelInfo {
-				InfoLogger.Printf("Connection %v disconnected\n", client.RemoteAddr())
+			if cfg.Verbose == logLevelDebug {
+				DebugLogger.Printf("Client %v disconnected\n", client.RemoteAddr())
 			}
 			client.Close()
 			break
