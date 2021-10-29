@@ -82,6 +82,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		sender           string
 		clientIP         string
 		ldapResult       string
+		instance         string
 		err              error
 		remote           RemoteClient
 		redisHelper      = &Redis{}
@@ -96,6 +97,12 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 	//goland:noinspection GoUnhandledErrorResult
 	defer redisConn.Close()
+
+	if val, ok := policyRequest["instance"]; ok {
+		instance = val
+	} else {
+		instance = "-"
+	}
 
 	if request, ok = policyRequest["request"]; ok {
 		if request == "smtpd_access_policy" {
@@ -254,8 +261,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 	}
 
 	if cfg.Verbose >= logLevelInfo {
-		InfoLogger.Printf("%s countries=%s ip_addresses=%s #countries=%d/%d #ip_addresses=%d/%d action=\"%s\"\n",
-			sender, remote.Countries, remote.Ips,
+		InfoLogger.Printf("instance=\"%s\" %s countries=%s ip_addresses=%s #countries=%d/%d #ip_addresses=%d/%d action=\"%s\"\n",
+			instance, sender, remote.Countries, remote.Ips,
 			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
 	}
 
