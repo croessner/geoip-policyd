@@ -46,7 +46,7 @@ var (
 )
 
 func init() {
-	InfoLogger = log.New(os.Stdout, "INFO: ", log.Lshortfile)
+	InfoLogger = log.New(os.Stdout, "INFO: ", 0)
 	DebugLogger = log.New(os.Stdout, "DEBUG: ", log.Lshortfile)
 	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Lshortfile)
 }
