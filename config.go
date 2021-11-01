@@ -179,8 +179,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for the policy service",
-		},
-	)
+		})
 	argServerPort := commandServer.Int(
 		"p", "server-port", &argparse.Options{
 			Required: false,
@@ -196,23 +195,20 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Port for the policy service",
-		},
-	)
+		})
 	argServerHttpAddress := commandServer.String(
 		"", "http-address", &argparse.Options{
 			Required: false,
 			Default:  httpAddress,
 			Help:     "HTTP address for incoming requests",
-		},
-	)
+		})
 
 	argServerUseSASLUsername := commandServer.Flag(
 		"", "sasl-username", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Use 'sasl_username' instead of the 'sender' attribute",
-		},
-	)
+		})
 
 	/*
 	 * Redis options for read and/or write requests
@@ -230,8 +226,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for the Redis service",
-		},
-	)
+		})
 	argServerRedisPort := commandServer.Int(
 		"P", "redis-port", &argparse.Options{
 			Required: false,
@@ -247,29 +242,25 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Port for the Redis service",
-		},
-	)
+		})
 	argServerRedisDB := commandServer.Int(
 		"", "redis-database-number", &argparse.Options{
 			Required: false,
 			Default:  0,
 			Help:     "Redis database number",
-		},
-	)
+		})
 	argServerRedisUsername := commandServer.String(
 		"", "redis-username", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Redis username",
-		},
-	)
+		})
 	argServerRedisPassword := commandServer.String(
 		"", "redis-password", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Redis password",
-		},
-	)
+		})
 
 	/*
 	 * Redis options for write requests
@@ -287,8 +278,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for a Redis service (writer)",
-		},
-	)
+		})
 	argServerRedisPortW := commandServer.Int(
 		"", "redis-writer-port", &argparse.Options{
 			Required: false,
@@ -304,29 +294,25 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Port for a Redis service (writer)",
-		},
-	)
+		})
 	argServerRedisDBW := commandServer.Int(
 		"", "redis-writer-database-number", &argparse.Options{
 			Required: false,
 			Default:  0,
 			Help:     "Redis database number (writer)",
-		},
-	)
+		})
 	argServerRedisUsernameW := commandServer.String(
 		"", "redis-writer-username", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Redis username (writer)",
-		},
-	)
+		})
 	argServerRedisPasswordW := commandServer.String(
 		"", "redis-writer-password", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Redis password (writer)",
-		},
-	)
+		})
 
 	/*
 	 * Common Redis options
@@ -336,8 +322,7 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  redisPrefix,
 			Help:     "Redis prefix",
-		},
-	)
+		})
 	argServerRedisTTL := commandServer.Int(
 		"", "redis-ttl", &argparse.Options{
 			Required: false,
@@ -353,8 +338,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Redis TTL in seconds",
-		},
-	)
+		})
 
 	/*
 	 * Other config options
@@ -370,8 +354,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Full path to the GeoIP database file",
-		},
-	)
+		})
 	argServerMaxCountries := commandServer.Int(
 		"", "max-countries", &argparse.Options{
 			Required: false,
@@ -387,8 +370,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Maximum number of countries before rejecting e-mails",
-		},
-	)
+		})
 	argServerMaxIps := commandServer.Int(
 		"", "max-ips", &argparse.Options{
 			Required: false,
@@ -404,155 +386,133 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Maximum number of IP addresses before rejecting e-mails",
-		},
-	)
+		})
 	argServerBlockedNoExpire := commandServer.Flag(
 		"", "blocked-no-expire", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Do not expire senders from Redis, if they were blocked in the past",
-		},
-	)
+		})
 	argServerCustomSettingsPath := commandServer.String(
 		"c", "custom-settings-path", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Custom settings with different IP and country limits",
-		},
-	)
+		})
 	argServerHttpUseBasicAuth := commandServer.Flag(
 		"", "http-use-basic-auth", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Enable basic HTTP auth",
-		},
-	)
+		})
 	argServerHttpUseSSL := commandServer.Flag(
 		"", "http-use-ssl", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Enable HTTPS",
-		},
-	)
+		})
 	argServerHttpBasicAuthUsername := commandServer.String(
 		"", "http-basic-auth-username", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "HTTP basic auth username",
-		},
-	)
+		})
 	argServerHttpBasicAuthPassword := commandServer.String(
 		"", "http-basic-auth-password", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "HTTP basic auth password",
-		},
-	)
+		})
 	argServerHttpTLSCert := commandServer.String(
 		"", "http-tls-cert", &argparse.Options{
 			Required: false,
 			Default:  httpX509Cert,
 			Help:     "HTTP TLS server certificate (full chain)",
-		},
-	)
+		})
 	argServerHttpTLSKey := commandServer.String(
 		"", "http-tls-key", &argparse.Options{
 			Required: false,
 			Default:  httpX509Key,
 			Help:     "HTTP TLS server key",
-		},
-	)
+		})
 	argServerUseLDAP := commandServer.Flag(
 		"", "use-ldap", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Enable LDAP support",
-		},
-	)
+		})
 	argServerLDAPServerURIs := commandServer.StringList(
 		"", "ldap-server-uri", &argparse.Options{
 			Required: false,
 			Default:  []string{"ldap://127.0.0.1:389/"},
 			Help:     "Server URI. Specify multiple times, if you need more than one server",
-		},
-	)
+		})
 	argServerLDAPBaseDN := commandServer.String(
 		"", "ldap-basedn", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "Base DN",
-		},
-	)
+		})
 	argServerLDAPBindDN := commandServer.String(
 		"", "ldap-binddn", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "bind DN",
-		},
-	)
+		})
 	argServerLDAPBindPWPATH := commandServer.String(
 		"", "ldap-bindpw", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "bind password",
-		},
-	)
+		})
 	argServerLDAPFilter := commandServer.String(
 		"", "ldap-filter", &argparse.Options{
 			Required: false,
 			Default:  "(&(objectClass=*)(mailAlias=%s))",
 			Help:     "Filter with %s placeholder",
-		},
-	)
+		})
 	argServerLDAPResultAttr := commandServer.String(
 		"", "ldap-result-attribute", &argparse.Options{
 			Required: false,
 			Default:  "mailAccount",
 			Help:     "Result attribute for the requested mail sender",
-		},
-	)
+		})
 	argServerLDAPStartTLS := commandServer.Flag(
 		"", "ldap-starttls", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "If this option is given, use StartTLS",
-		},
-	)
+		})
 	argServerLDAPTLSVerify := commandServer.Flag(
 		"", "ldap-tls-skip-verify", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Skip TLS server name verification",
-		},
-	)
+		})
 	argServerLDAPTLSCAFile := commandServer.String(
 		"", "ldap-tls-cafile", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "File containing TLS CA certificate(s)",
-		},
-	)
+		})
 	argServerLDAPTLSClientCert := commandServer.String(
 		"", "ldap-tls-client-cert", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "File containing a TLS client certificate",
-		},
-	)
+		})
 	argServerLDAPTLSClientKey := commandServer.String(
 		"", "ldap-tls-client-key", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "File containing a TLS client key",
-		},
-	)
+		})
 	argServerLDAPSASLExternal := commandServer.Flag(
 		"", "ldap-sasl-external", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Use SASL/EXTERNAL instead of a simple bind",
-		},
-	)
+		})
 	argServerLDAPScope := commandServer.String(
 		"", "ldap-scope", &argparse.Options{
 			Required: false,
@@ -566,62 +526,53 @@ func (c *CmdLineConfig) Init(args []string) {
 				}
 			},
 			Help: "LDAP search scope [base, one, sub]",
-		},
-	)
+		})
 
 	argVerbose := parser.FlagCounter(
 		"v", "verbose", &argparse.Options{
 			Help: "Verbose mode. Repeat this for an increased log level",
-		},
-	)
+		})
 	argVersion := parser.Flag(
 		"", "version", &argparse.Options{
 			Help: "Current version",
-		},
-	)
+		})
 
 	argServerRunActions := commandServer.Flag(
 		"", "run-actions", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Run actions, if a sender is over limits",
-		},
-	)
+		})
 	argServerRunActionOperator := commandServer.Flag(
 		"", "run-action-operator", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Run the operator action",
-		},
-	)
+		})
 	argServerOperatorTo := commandServer.String(
 		"", "operator-to", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "E-Mail To-header for the operator action",
-		},
-	)
+		})
 	argServerOperatorFrom := commandServer.String(
 		"", "operator-from", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "E-Mail From-header for the operator action",
-		},
-	)
+		})
 	argServerOperatorSubject := commandServer.String(
 		"", "operator-subject", &argparse.Options{
 			Required: false,
 			Default:  mailSubject,
 			Help:     "E-Mail Subject-header for the operator action",
-		},
-	)
+		})
 	argServerOperatorMessageCT := commandServer.String(
 		"", "operator-message-ct", &argparse.Options{
 			Required: false,
 			Default:  "text/plain",
 			Help:     "E-Mail Content-Type-header for the operator action",
-		},
-	)
+		})
 	argServerOperatorMessagePath := commandServer.String(
 		"", "operator-message-path", &argparse.Options{
 			Required: false,
@@ -633,8 +584,7 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Full path to the e-mail message file for the operator action",
-		},
-	)
+		})
 
 	argServerMailServer := commandServer.String(
 		"", "mail-server", &argparse.Options{
@@ -649,15 +599,13 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "E-mail server address for notifications",
-		},
-	)
+		})
 	argServerMailHelo := commandServer.String(
 		"", "mail-helo", &argparse.Options{
 			Required: false,
 			Default:  mailHelo,
 			Help:     "E-mail server HELO/EHLO hostname",
-		},
-	)
+		})
 	argServerMailPort := commandServer.Int(
 		"", "mail-port", &argparse.Options{
 			Required: false,
@@ -673,29 +621,25 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "E-mail server port number",
-		},
-	)
+		})
 	argServerMailUsername := commandServer.String(
 		"", "mail-username", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "E-mail server username",
-		},
-	)
+		})
 	argServerMailPasswordPath := commandServer.String(
 		"", "mail-password", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "E-mail server password",
-		},
-	)
+		})
 	argServerMailSSL := commandServer.Flag(
 		"", "mail-ssl", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Use TLS on connect for the e-mail server",
-		},
-	)
+		})
 
 	err := parser.Parse(args)
 	if err != nil {
