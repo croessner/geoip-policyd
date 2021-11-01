@@ -201,7 +201,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 								}
 								if trustedCountry == countryCode {
 									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Println("instance=\"%s\" Match", instance)
+										DebugLogger.Printf("instance=\"%s\" Country matched\n", instance)
 									}
 									matchCountry = true
 									break
@@ -236,7 +236,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 								}
 								if network.Contains(ip) {
 									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Println("instance=\"%s\" Match", instance)
+										DebugLogger.Printf("instance=\"%s\" IP matched", instance)
 									}
 									matchIp = true
 									break

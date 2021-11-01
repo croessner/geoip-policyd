@@ -178,7 +178,7 @@ func (l *LDAP) search(sender string, instance string) (string, error) {
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
 		if cfg.VerboseLevel == logLevelDebug {
-			DebugLogger.Printf("instance=\"%s\" Using LDAP filter:", instance, filter)
+			DebugLogger.Printf("instance=\"%s\" Using LDAP filter: %s\n", instance, filter)
 		}
 		searchRequest := ldap.NewSearchRequest(
 			l.BaseDN, l.Scope, ldap.NeverDerefAliases, 0, 0, false, filter, l.ResultAttr,
