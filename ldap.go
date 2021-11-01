@@ -92,7 +92,7 @@ func (l *LDAP) connect(instance string) {
 		if ldapCounter > len(l.ServerURIs)-1 {
 			ldapCounter = 0
 		}
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Printf("instance=\"%s\" Trying %d/%d to connect to LDAP: %s\n",
 				instance, retryLimit+1, maxRetries+1, l.ServerURIs[ldapCounter])
 		}
@@ -146,7 +146,7 @@ func (l *LDAP) connect(instance string) {
 		break
 	}
 
-	if cfg.Verbose == logLevelDebug {
+	if cfg.VerboseLevel == logLevelDebug {
 		DebugLogger.Printf("instance=\"%s\" LDAP connection established\n", instance)
 	}
 }
@@ -155,7 +155,7 @@ func (l *LDAP) bind(instance string) {
 	var err error
 
 	if l.SASLExternal {
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Printf("instance=\"%s\" LDAP: SASL/EXTERNAL\n", instance)
 		}
 		err = l.LDAPConn.ExternalBind()
@@ -163,7 +163,7 @@ func (l *LDAP) bind(instance string) {
 			ErrorLogger.Println(err)
 		}
 	} else {
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Printf("Linstance=\"%s\" DAP: simple bind\n", instance)
 		}
 
@@ -177,7 +177,7 @@ func (l *LDAP) bind(instance string) {
 func (l *LDAP) search(sender string, instance string) (string, error) {
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Printf("instance=\"%s\" Using LDAP filter:", instance, filter)
 		}
 		searchRequest := ldap.NewSearchRequest(
@@ -192,7 +192,7 @@ func (l *LDAP) search(sender string, instance string) (string, error) {
 
 		for _, entry := range searchResult.Entries {
 			result := entry.GetAttributeValue(l.ResultAttr[0])
-			if cfg.Verbose == logLevelDebug {
+			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Printf("instance=\"%s\" sender=%s; %s: %s=%v\n", instance, sender, entry.DN, l.ResultAttr[0], result)
 			}
 			return result, nil

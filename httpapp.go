@@ -103,7 +103,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				return
 			}
 			gi.Store(geoip)
-			if cfg.Verbose >= logLevelInfo {
+			if cfg.VerboseLevel >= logLevelInfo {
 				InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.GeoipPath)
 			}
 
@@ -111,7 +111,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				newCustomSettings = initCustomSettings(cfg)
 				if newCustomSettings != nil {
 					cs.Store(newCustomSettings)
-					if cfg.Verbose >= logLevelInfo {
+					if cfg.VerboseLevel >= logLevelInfo {
 						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.CustomSettingsPath)
 					}
 				}
@@ -126,13 +126,13 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
 					return
 				} else {
-					if cfg.Verbose >= logLevelInfo {
+					if cfg.VerboseLevel >= logLevelInfo {
 						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
 			} else {
 				rw.WriteHeader(http.StatusNoContent)
-				if cfg.Verbose >= logLevelInfo {
+				if cfg.VerboseLevel >= logLevelInfo {
 					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 				}
 			}
@@ -190,19 +190,18 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 					ldapServer := &cfg.LDAP
 
-					if ldapResult, err = ldapServer.search(sender); err != nil {
+					if ldapResult, err = ldapServer.search(sender, "-"); err != nil {
 						InfoLogger.Println(err)
 						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
 							ldapServer.LDAPConn.Close()
-							ldapServer.connect()
-							ldapServer.bind()
-							ldapResult, _ = ldapServer.search(sender)
+							ldapServer.connect("-")
+							ldapServer.bind("-")
+							ldapResult, _ = ldapServer.search(sender, "-")
 						}
 					}
 					if ldapResult != "" {
 						sender = ldapResult
 					}
-
 				}
 
 				key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
@@ -210,7 +209,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 					redis.Args{}.Add(key)...); err != nil {
 					ErrorLogger.Println(err)
 				}
-				if cfg.Verbose >= logLevelInfo {
+				if cfg.VerboseLevel >= logLevelInfo {
 					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
 				}
 				rw.WriteHeader(http.StatusAccepted)
@@ -244,7 +243,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 				} else {
 					rw.WriteHeader(http.StatusAccepted)
 					cs.Store(customSettings)
-					if cfg.Verbose >= logLevelInfo {
+					if cfg.VerboseLevel >= logLevelInfo {
 						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 					}
 				}
@@ -354,7 +353,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 								customSettings.Data[i].Comment = comment
 								cs.Store(customSettings)
 								rw.WriteHeader(http.StatusAccepted)
-								if cfg.Verbose >= logLevelInfo {
+								if cfg.VerboseLevel >= logLevelInfo {
 									InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 								}
 								return
@@ -365,7 +364,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 						customSettings.Data = append(customSettings.Data, account)
 						cs.Store(customSettings)
 						rw.WriteHeader(http.StatusAccepted)
-						if cfg.Verbose >= logLevelInfo {
+						if cfg.VerboseLevel >= logLevelInfo {
 							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 						}
 					} else {
@@ -373,7 +372,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 						customSettings = &CustomSettings{Data: []Account{account}}
 						cs.Store(customSettings)
 						rw.WriteHeader(http.StatusAccepted)
-						if cfg.Verbose >= logLevelInfo {
+						if cfg.VerboseLevel >= logLevelInfo {
 							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 						}
 					}
@@ -433,7 +432,7 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 									}(customSettings.Data, i)
 									cs.Store(customSettings)
 									rw.WriteHeader(http.StatusAccepted)
-									if cfg.Verbose >= logLevelInfo {
+									if cfg.VerboseLevel >= logLevelInfo {
 										InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
 									}
 									return
@@ -498,7 +497,7 @@ func httpApp() {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	if cfg.Verbose >= logLevelInfo {
+	if cfg.VerboseLevel >= logLevelInfo {
 		InfoLogger.Printf("Starting geoip-policyd HTTP service with address: '%s'", www.Addr)
 	}
 	if app.useSSL {

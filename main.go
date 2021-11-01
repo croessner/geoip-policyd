@@ -90,7 +90,7 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		if cfg.Verbose >= logLevelInfo {
+		if cfg.VerboseLevel >= logLevelInfo {
 			InfoLogger.Println("Shutting down. Received signal:", sig)
 		}
 		os.Exit(0)
@@ -99,17 +99,17 @@ func main() {
 	if cfg.CommandServer {
 		cs.Store(initCustomSettings(cfg))
 
-		if cfg.Verbose >= logLevelInfo {
+		if cfg.VerboseLevel >= logLevelInfo {
 			InfoLogger.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 		}
 
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Println(cfg)
 		}
 
 		if cfg.UseLDAP {
 			ldapServer = &cfg.LDAP
-			if cfg.Verbose == logLevelDebug {
+			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Println("LDAP:", ldapServer)
 			}
 			ldapServer.connect("-")

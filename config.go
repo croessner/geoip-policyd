@@ -97,7 +97,7 @@ type CmdLineConfig struct {
 	MaxCountries    int
 	MaxIps          int
 	BlockedNoExpire bool
-	Verbose         int
+	VerboseLevel    int
 
 	// Flag that indicates which command was called
 	CommandServer bool
@@ -150,7 +150,7 @@ func (c *CmdLineConfig) String() string {
 
 	for i := 0; i < v.NumField(); i++ {
 		switch typeOfc.Field(i).Name {
-		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HttpApp", "Verbose":
+		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HttpApp", "VerboseLevel":
 			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
@@ -656,22 +656,22 @@ func (c *CmdLineConfig) Init(args []string) {
 	if val := os.Getenv("VERBOSE"); val != "" {
 		switch val {
 		case "none":
-			c.Verbose = logLevelNone
+			c.VerboseLevel = logLevelNone
 		case "info":
-			c.Verbose = logLevelInfo
+			c.VerboseLevel = logLevelInfo
 		case "debug":
-			c.Verbose = logLevelDebug
+			c.VerboseLevel = logLevelDebug
 		}
 	} else {
 		switch *argVerbose {
 		case logLevelNone:
-			c.Verbose = logLevelNone
+			c.VerboseLevel = logLevelNone
 		case logLevelInfo:
-			c.Verbose = logLevelInfo
+			c.VerboseLevel = logLevelInfo
 		case logLevelDebug:
-			c.Verbose = logLevelDebug
+			c.VerboseLevel = logLevelDebug
 		default:
-			c.Verbose = logLevelDebug
+			c.VerboseLevel = logLevelDebug
 		}
 	}
 
