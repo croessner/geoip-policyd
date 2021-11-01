@@ -134,10 +134,12 @@ type CustomSettings struct {
 }
 
 type Account struct {
-	Comment   string `json:"comment"`
-	Sender    string `json:"sender"`
-	Ips       int    `json:"ips"`
-	Countries int    `json:"countries"`
+	Comment          string   `json:"comment"`
+	Sender           string   `json:"sender"`
+	Ips              int      `json:"ips"`
+	Countries        int      `json:"countries"`
+	TrustedCountries []string `json:"trusted_countries"`
+	TrustedIps       []string `json:"trusted_ips"`
 }
 
 func (c *CmdLineConfig) String() string {

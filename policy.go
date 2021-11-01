@@ -83,6 +83,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		clientIP         string
 		ldapResult       string
 		instance         string
+		trustedCountries []string
+		trustedIps       []string
 		err              error
 		remote           RemoteClient
 		redisHelper      = &Redis{}
@@ -171,6 +173,12 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 											if record.Countries > 0 {
 												usedMaxCountries = record.Countries
 											}
+											if len(record.TrustedCountries) > 0 {
+												trustedCountries = record.TrustedCountries
+											}
+											if len(record.TrustedIps) > 0 {
+												trustedIps = record.TrustedIps
+											}
 											break // First match wins!
 										}
 									}
@@ -184,6 +192,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						// Flag indicates, if the operator action was successful
 						ranOperator := false
 
+						// TODO: Check if country is in trusted countries
 						if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
@@ -192,6 +201,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							runActions = true
 						}
 
+						// TODO: Check if IP is in trusted IPs
 						if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
