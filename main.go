@@ -112,8 +112,8 @@ func main() {
 			if cfg.Verbose == logLevelDebug {
 				DebugLogger.Println("LDAP:", ldapServer)
 			}
-			ldapServer.connect()
-			ldapServer.bind()
+			ldapServer.connect("-")
+			ldapServer.bind("-")
 		}
 
 		geoip := new(GeoIP)

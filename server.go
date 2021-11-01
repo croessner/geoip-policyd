@@ -46,6 +46,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	b := bufio.NewReader(client)
 	var policyRequest = make(map[string]string)
+	var instance string
 
 	for {
 		lineBytes, err := b.ReadBytes('\n')
@@ -63,7 +64,12 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
 			if cfg.Verbose == logLevelDebug {
-				DebugLogger.Println(policyRequest)
+				if val, ok := policyRequest["instance"]; ok {
+					instance = val
+				} else {
+					instance = "-"
+				}
+				DebugLogger.Printf("instance=\"%s\" %+v\n", instance, policyRequest)
 			}
 
 			result := getPolicyResponse(cfg, policyRequest)
