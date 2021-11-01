@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
+	"net"
 	"os"
 	"strings"
 )
@@ -192,8 +193,28 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						// Flag indicates, if the operator action was successful
 						ranOperator := false
 
-						// TODO: Check if country is in trusted countries
-						if len(remote.Countries) > usedMaxCountries {
+						if len(trustedCountries) > 0 {
+							matchCountry := false
+							for _, trustedCountry := range trustedCountries {
+								if cfg.Verbose == logLevelDebug {
+									DebugLogger.Println(trustedCountry)
+								}
+								if trustedCountry == countryCode {
+									if cfg.Verbose == logLevelDebug {
+										DebugLogger.Println("Match")
+									}
+									matchCountry = true
+									break
+								}
+							}
+							if !matchCountry {
+								actionText = rejectText
+								if cfg.BlockedNoExpire {
+									persist = true
+								}
+								runActions = true
+							}
+						} else if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
@@ -201,8 +222,34 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							runActions = true
 						}
 
-						// TODO: Check if IP is in trusted IPs
-						if len(remote.Ips) > usedMaxIps {
+						if len(trustedIps) > 0 {
+							matchIp := false
+							ip := net.ParseIP(clientIP)
+							for _, trustedIp := range trustedIps {
+								_, network, err := net.ParseCIDR(trustedIp)
+								if err != nil {
+									ErrorLogger.Printf("%s is not a network, error: %s\n", network, err)
+									continue
+								}
+								if cfg.Verbose == logLevelDebug {
+									DebugLogger.Println("Checking:", ip.String(), "->", network.String())
+								}
+								if network.Contains(ip) {
+									if cfg.Verbose == logLevelDebug {
+										DebugLogger.Println("Match")
+									}
+									matchIp = true
+									break
+								}
+							}
+							if !matchIp {
+								actionText = rejectText
+								if cfg.BlockedNoExpire {
+									persist = true
+								}
+								runActions = true
+							}
+						} else if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
