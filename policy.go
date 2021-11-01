@@ -203,6 +203,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 									if cfg.VerboseLevel == logLevelDebug {
 										DebugLogger.Printf("instance=\"%s\" Country matched\n", instance)
 									}
+									usedMaxCountries = len(trustedCountries)
 									matchCountry = true
 									break
 								}
@@ -238,6 +239,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 									if cfg.VerboseLevel == logLevelDebug {
 										DebugLogger.Printf("instance=\"%s\" IP matched", instance)
 									}
+									usedMaxIps = len(trustedIps)
 									matchIp = true
 									break
 								}
