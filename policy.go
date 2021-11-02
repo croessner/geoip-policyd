@@ -226,22 +226,31 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						if len(trustedIps) > 0 {
 							matchIp := false
 							ip := net.ParseIP(clientIP)
-							for _, trustedIp := range trustedIps {
-								_, network, err := net.ParseCIDR(trustedIp)
-								if err != nil {
-									ErrorLogger.Printf("%s is not a network, error: %s\n", network, err)
-									continue
-								}
-								if cfg.VerboseLevel == logLevelDebug {
-									DebugLogger.Printf("instance=\"%s\" Checking: %s -> %s\n", instance, ip.String(), network.String())
-								}
-								if network.Contains(ip) {
-									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Printf("instance=\"%s\" IP matched", instance)
+							for _, trustedIpOrNet := range trustedIps {
+								trustedIp := net.ParseIP(trustedIpOrNet)
+								if trustedIp == nil {
+									_, network, err := net.ParseCIDR(trustedIpOrNet)
+									if err != nil {
+										ErrorLogger.Printf("%s is not a network, error: %s\n", trustedIp, err)
+										continue
 									}
-									usedMaxIps = 0
-									matchIp = true
-									break
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Checking: %s -> %s\n", instance, ip.String(), network.String())
+									}
+									if network.Contains(ip) {
+										if cfg.VerboseLevel == logLevelDebug {
+											DebugLogger.Printf("instance=\"%s\" IP matched", instance)
+										}
+										usedMaxIps = 0
+										matchIp = true
+										break
+									}
+								} else {
+									if trustedIp.String() == ip.String() {
+										usedMaxIps = 0
+										matchIp = true
+										break
+									}
 								}
 							}
 							if !matchIp {
