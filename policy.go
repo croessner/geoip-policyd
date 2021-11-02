@@ -246,7 +246,13 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 										break
 									}
 								} else {
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Checking: %s -> %s\n", instance, ip.String(), trustedIp.String())
+									}
 									if trustedIp.String() == ip.String() {
+										if cfg.VerboseLevel == logLevelDebug {
+											DebugLogger.Printf("instance=\"%s\" IP matched", instance)
+										}
 										usedMaxIps = 0
 										matchIp = true
 										break
