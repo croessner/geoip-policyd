@@ -27,8 +27,8 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"reflect"
 	"strings"
+	"sync"
 )
 
 type LDAP struct {
@@ -46,37 +46,39 @@ type LDAP struct {
 	SASLExternal  bool
 	Scope         int
 
+	Mu       sync.Mutex
 	LDAPConn *ldap.Conn
 }
 
 func (l *LDAP) String() string {
-	var result string
-
-	v := reflect.ValueOf(*l)
-	typeOfc := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		switch typeOfc.Field(i).Name {
-		case "LDAPConn":
-			continue
-		case "Scope":
-			switch l.Scope {
-			case ldap.ScopeBaseObject:
-				result += fmt.Sprintf(" %s='base'", typeOfc.Field(i).Name)
-			case ldap.ScopeSingleLevel:
-				result += fmt.Sprintf(" %s='one'", typeOfc.Field(i).Name)
-			case ldap.ScopeWholeSubtree:
-				result += fmt.Sprintf(" %s='sub'", typeOfc.Field(i).Name)
-			}
-		default:
-			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
-		}
+	var scope string
+	switch l.Scope {
+	case ldap.ScopeBaseObject:
+		scope = "base"
+	case ldap.ScopeSingleLevel:
+		scope = "one"
+	case ldap.ScopeWholeSubtree:
+		scope = "sub"
 	}
-
-	return result[1:]
+	return fmt.Sprintf("ServerURIs='%v' BaseDN='%s' BindDN='%s' Filter='%s' ResaltAttr='%v' StartTLS='%v' TLSSkipVerify='%v' TLSCAFile='%s' TLSClientCert='%s' TLSClientKey='%s' SASLExternal='%v' Scope='%s'",
+		l.ServerURIs,
+		l.BaseDN,
+		l.BindDN,
+		l.Filter,
+		l.ResultAttr,
+		l.StartTLS,
+		l.TLSSkipVerify,
+		l.TLSCAFile,
+		l.TLSClientCert,
+		l.TLSClientKey,
+		l.SASLExternal,
+		scope)
 }
 
 func (l *LDAP) connect(instance string) {
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
+
 	var (
 		retryLimit   = 0
 		ldapCounter  = 0
@@ -152,6 +154,9 @@ func (l *LDAP) connect(instance string) {
 }
 
 func (l *LDAP) bind(instance string) {
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
+
 	var err error
 
 	if l.SASLExternal {
@@ -175,6 +180,9 @@ func (l *LDAP) bind(instance string) {
 }
 
 func (l *LDAP) search(sender string, instance string) (string, error) {
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
+
 	if strings.Contains(l.Filter, "%s") {
 		filter := fmt.Sprintf(l.Filter, sender)
 		if cfg.VerboseLevel == logLevelDebug {
