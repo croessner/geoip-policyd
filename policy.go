@@ -118,6 +118,9 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						if ldapResult, err = ldapServer.search(sender, instance); err != nil {
 							InfoLogger.Println(err)
 							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
+								if ldapServer.LDAPConn != nil {
+									ldapServer.LDAPConn.Close()
+								}
 								ldapServer.LDAPConn.Close()
 								ldapServer.connect(instance)
 								ldapServer.bind(instance)
