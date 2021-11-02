@@ -27,6 +27,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -46,33 +47,35 @@ type LDAP struct {
 	SASLExternal  bool
 	Scope         int
 
-	Mu       sync.Mutex
+	Mu       *sync.Mutex
 	LDAPConn *ldap.Conn
 }
 
 func (l *LDAP) String() string {
-	var scope string
-	switch l.Scope {
-	case ldap.ScopeBaseObject:
-		scope = "base"
-	case ldap.ScopeSingleLevel:
-		scope = "one"
-	case ldap.ScopeWholeSubtree:
-		scope = "sub"
+	var result string
+
+	v := reflect.ValueOf(*l)
+	typeOfc := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		switch typeOfc.Field(i).Name {
+		case "Mu", "LDAPConn":
+			continue
+		case "Scope":
+			switch l.Scope {
+			case ldap.ScopeBaseObject:
+				result += fmt.Sprintf(" %s='base'", typeOfc.Field(i).Name)
+			case ldap.ScopeSingleLevel:
+				result += fmt.Sprintf(" %s='one'", typeOfc.Field(i).Name)
+			case ldap.ScopeWholeSubtree:
+				result += fmt.Sprintf(" %s='sub'", typeOfc.Field(i).Name)
+			}
+		default:
+			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
+		}
 	}
-	return fmt.Sprintf("ServerURIs='%v' BaseDN='%s' BindDN='%s' Filter='%s' ResaltAttr='%v' StartTLS='%v' TLSSkipVerify='%v' TLSCAFile='%s' TLSClientCert='%s' TLSClientKey='%s' SASLExternal='%v' Scope='%s'",
-		l.ServerURIs,
-		l.BaseDN,
-		l.BindDN,
-		l.Filter,
-		l.ResultAttr,
-		l.StartTLS,
-		l.TLSSkipVerify,
-		l.TLSCAFile,
-		l.TLSClientCert,
-		l.TLSClientKey,
-		l.SASLExternal,
-		scope)
+
+	return result[1:]
 }
 
 func (l *LDAP) connect(instance string) {
