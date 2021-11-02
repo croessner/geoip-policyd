@@ -92,7 +92,6 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
 		actionText       = "DUNNO"
-		ldapServer       = &cfg.LDAP
 	)
 
 	redisConn := redisHelper.ReadConn()

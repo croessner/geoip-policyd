@@ -27,6 +27,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 )
@@ -34,7 +35,8 @@ import (
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	cfg *CmdLineConfig
+	cfg        *CmdLineConfig
+	ldapServer *LDAP
 
 	// Reloadable data
 	cs atomic.Value
@@ -76,9 +78,8 @@ func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
 
 func main() {
 	var (
-		err        error
-		server     net.Listener
-		ldapServer *LDAP
+		err    error
+		server net.Listener
 	)
 
 	sigs := make(chan os.Signal, 1)
@@ -108,7 +109,23 @@ func main() {
 		}
 
 		if cfg.UseLDAP {
-			ldapServer = &cfg.LDAP
+			ldapServer = &LDAP{
+				ServerURIs:    cfg.LDAP.ServerURIs,
+				BaseDN:        cfg.LDAP.BaseDN,
+				BindDN:        cfg.LDAP.BindDN,
+				BindPW:        cfg.LDAP.BindPW,
+				Filter:        cfg.LDAP.Filter,
+				ResultAttr:    cfg.LDAP.ResultAttr,
+				StartTLS:      cfg.LDAP.StartTLS,
+				TLSSkipVerify: cfg.LDAP.TLSSkipVerify,
+				TLSCAFile:     cfg.LDAP.TLSCAFile,
+				TLSClientCert: cfg.LDAP.TLSClientCert,
+				TLSClientKey:  cfg.LDAP.TLSClientKey,
+				SASLExternal:  cfg.LDAP.SASLExternal,
+				Scope:         cfg.LDAP.Scope,
+				Mu:            new(sync.Mutex),
+			}
+
 			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Println("LDAP:", ldapServer)
 			}
