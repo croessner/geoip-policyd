@@ -27,6 +27,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 )
@@ -34,7 +35,8 @@ import (
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	cfg *CmdLineConfig
+	cfg        *CmdLineConfig
+	ldapServer *LDAP
 
 	// Reloadable data
 	cs atomic.Value
@@ -76,9 +78,8 @@ func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
 
 func main() {
 	var (
-		err        error
-		server     net.Listener
-		ldapServer *LDAP
+		err    error
+		server net.Listener
 	)
 
 	sigs := make(chan os.Signal, 1)
@@ -90,7 +91,7 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		if cfg.Verbose >= logLevelInfo {
+		if cfg.VerboseLevel >= logLevelInfo {
 			InfoLogger.Println("Shutting down. Received signal:", sig)
 		}
 		os.Exit(0)
@@ -99,21 +100,37 @@ func main() {
 	if cfg.CommandServer {
 		cs.Store(initCustomSettings(cfg))
 
-		if cfg.Verbose >= logLevelInfo {
+		if cfg.VerboseLevel >= logLevelInfo {
 			InfoLogger.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
 		}
 
-		if cfg.Verbose == logLevelDebug {
+		if cfg.VerboseLevel == logLevelDebug {
 			DebugLogger.Println(cfg)
 		}
 
 		if cfg.UseLDAP {
-			ldapServer = &cfg.LDAP
-			if cfg.Verbose == logLevelDebug {
+			ldapServer = &LDAP{
+				ServerURIs:    cfg.LDAP.ServerURIs,
+				BaseDN:        cfg.LDAP.BaseDN,
+				BindDN:        cfg.LDAP.BindDN,
+				BindPW:        cfg.LDAP.BindPW,
+				Filter:        cfg.LDAP.Filter,
+				ResultAttr:    cfg.LDAP.ResultAttr,
+				StartTLS:      cfg.LDAP.StartTLS,
+				TLSSkipVerify: cfg.LDAP.TLSSkipVerify,
+				TLSCAFile:     cfg.LDAP.TLSCAFile,
+				TLSClientCert: cfg.LDAP.TLSClientCert,
+				TLSClientKey:  cfg.LDAP.TLSClientKey,
+				SASLExternal:  cfg.LDAP.SASLExternal,
+				Scope:         cfg.LDAP.Scope,
+				Mu:            new(sync.Mutex),
+			}
+
+			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Println("LDAP:", ldapServer)
 			}
-			ldapServer.connect()
-			ldapServer.bind()
+			ldapServer.connect("-")
+			ldapServer.bind("-")
 		}
 
 		geoip := new(GeoIP)

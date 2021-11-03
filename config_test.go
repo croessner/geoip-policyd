@@ -32,8 +32,8 @@ func envSetter(envs map[string]string) (closer func()) {
 func TestConfigVerboseNone(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.Verbose != logLevelNone {
-		t.Errorf("Expected --verbose not set, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelNone {
+		t.Errorf("Expected --verbose not set, got value=%v", cfg.VerboseLevel)
 	}
 }
 
@@ -44,16 +44,16 @@ func TestConfigEnvVerboseNone(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.Verbose != logLevelNone {
-		t.Errorf("Expected --verbose not set, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelNone {
+		t.Errorf("Expected --verbose not set, got value=%v", cfg.VerboseLevel)
 	}
 }
 
 func TestConfigVerboseInfo(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--verbose"})
-	if cfg.Verbose != logLevelInfo {
-		t.Errorf("Expected --verbose, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelInfo {
+		t.Errorf("Expected --verbose, got value=%v", cfg.VerboseLevel)
 	}
 }
 
@@ -64,16 +64,16 @@ func TestConfigEnvVerboseInfo(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.Verbose != logLevelInfo {
-		t.Errorf("Expected --verbose, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelInfo {
+		t.Errorf("Expected --verbose, got value=%v", cfg.VerboseLevel)
 	}
 }
 
 func TestConfigVerboseDebug(t *testing.T) {
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server", "--verbose", "--verbose"})
-	if cfg.Verbose != logLevelDebug {
-		t.Errorf("Expected --verbose --verbose, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelDebug {
+		t.Errorf("Expected --verbose --verbose, got value=%v", cfg.VerboseLevel)
 	}
 }
 
@@ -84,8 +84,8 @@ func TestConfigEnvVerboseDebug(t *testing.T) {
 	defer closer()
 	cfg := new(CmdLineConfig)
 	cfg.Init([]string{"app", "server"})
-	if cfg.Verbose != logLevelDebug {
-		t.Errorf("Expected --verbose --verbose, got value=%v", cfg.Verbose)
+	if cfg.VerboseLevel != logLevelDebug {
+		t.Errorf("Expected --verbose --verbose, got value=%v", cfg.VerboseLevel)
 	}
 }
 

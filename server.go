@@ -33,7 +33,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 				ErrorLogger.Println("Couldn't accept connection:", err)
 				continue
 			}
-			if cfg.Verbose == logLevelDebug {
+			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Printf("Client %v connected\n", client.RemoteAddr())
 			}
 			ch <- client
@@ -46,11 +46,12 @@ func clientConnections(listener net.Listener) chan net.Conn {
 func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	b := bufio.NewReader(client)
 	var policyRequest = make(map[string]string)
+	var instance string
 
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
-			if cfg.Verbose == logLevelDebug {
+			if cfg.VerboseLevel == logLevelDebug {
 				DebugLogger.Printf("Client %v disconnected\n", client.RemoteAddr())
 			}
 			client.Close()
@@ -62,8 +63,13 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			if cfg.Verbose == logLevelDebug {
-				DebugLogger.Println(policyRequest)
+			if cfg.VerboseLevel == logLevelDebug {
+				if val, ok := policyRequest["instance"]; ok {
+					instance = val
+				} else {
+					instance = "-"
+				}
+				DebugLogger.Printf("instance=\"%s\" %+v\n", instance, policyRequest)
 			}
 
 			result := getPolicyResponse(cfg, policyRequest)

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
+	"net"
 	"os"
 	"strings"
 )
@@ -83,13 +84,14 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		clientIP         string
 		ldapResult       string
 		instance         string
+		trustedCountries []string
+		trustedIps       []string
 		err              error
 		remote           RemoteClient
 		redisHelper      = &Redis{}
 		usedMaxIps       = cfg.MaxIps
 		usedMaxCountries = cfg.MaxCountries
 		actionText       = "DUNNO"
-		ldapServer       = &cfg.LDAP
 	)
 
 	redisConn := redisHelper.ReadConn()
@@ -113,13 +115,16 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 			if sender, ok = policyRequest[userAttribute]; ok {
 				if len(sender) > 0 {
 					if cfg.UseLDAP {
-						if ldapResult, err = ldapServer.search(sender); err != nil {
+						if ldapResult, err = ldapServer.search(sender, instance); err != nil {
 							InfoLogger.Println(err)
 							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
+								if ldapServer.LDAPConn != nil {
+									ldapServer.LDAPConn.Close()
+								}
 								ldapServer.LDAPConn.Close()
-								ldapServer.connect()
-								ldapServer.bind()
-								ldapResult, _ = ldapServer.search(sender)
+								ldapServer.connect(instance)
+								ldapServer.bind(instance)
+								ldapResult, _ = ldapServer.search(sender, instance)
 							}
 						}
 						if ldapResult != "" {
@@ -152,8 +157,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
 						if len(countryCode) == 0 {
-							if cfg.Verbose == logLevelDebug {
-								DebugLogger.Println("No country code present for", clientIP)
+							if cfg.VerboseLevel == logLevelDebug {
+								DebugLogger.Printf("instance=\"%s\" No country code present for %s\n", instance, clientIP)
 							}
 						} else {
 							newCC = remote.AddCountryCode(countryCode)
@@ -171,6 +176,12 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 											if record.Countries > 0 {
 												usedMaxCountries = record.Countries
 											}
+											if len(record.TrustedCountries) > 0 {
+												trustedCountries = record.TrustedCountries
+											}
+											if len(record.TrustedIps) > 0 {
+												trustedIps = record.TrustedIps
+											}
 											break // First match wins!
 										}
 									}
@@ -184,7 +195,29 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 						// Flag indicates, if the operator action was successful
 						ranOperator := false
 
-						if len(remote.Countries) > usedMaxCountries {
+						if len(trustedCountries) > 0 {
+							matchCountry := false
+							for _, trustedCountry := range trustedCountries {
+								if cfg.VerboseLevel == logLevelDebug {
+									DebugLogger.Printf("instance=\"%s\" %s\n", instance, trustedCountry)
+								}
+								if trustedCountry == countryCode {
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Country matched\n", instance)
+									}
+									usedMaxCountries = len(trustedCountries)
+									matchCountry = true
+									break
+								}
+							}
+							if !matchCountry {
+								actionText = rejectText
+								if cfg.BlockedNoExpire {
+									persist = true
+								}
+								runActions = true
+							}
+						} else if len(remote.Countries) > usedMaxCountries {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
@@ -192,7 +225,50 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 							runActions = true
 						}
 
-						if len(remote.Ips) > usedMaxIps {
+						if len(trustedIps) > 0 {
+							matchIp := false
+							ip := net.ParseIP(clientIP)
+							for _, trustedIpOrNet := range trustedIps {
+								trustedIp := net.ParseIP(trustedIpOrNet)
+								if trustedIp == nil {
+									_, network, err := net.ParseCIDR(trustedIpOrNet)
+									if err != nil {
+										ErrorLogger.Printf("%s is not a network, error: %s\n", trustedIp, err)
+										continue
+									}
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Checking: %s -> %s\n", instance, ip.String(), network.String())
+									}
+									if network.Contains(ip) {
+										if cfg.VerboseLevel == logLevelDebug {
+											DebugLogger.Printf("instance=\"%s\" IP matched", instance)
+										}
+										usedMaxIps = 0
+										matchIp = true
+										break
+									}
+								} else {
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Checking: %s -> %s\n", instance, ip.String(), trustedIp.String())
+									}
+									if trustedIp.String() == ip.String() {
+										if cfg.VerboseLevel == logLevelDebug {
+											DebugLogger.Printf("instance=\"%s\" IP matched", instance)
+										}
+										usedMaxIps = 0
+										matchIp = true
+										break
+									}
+								}
+							}
+							if !matchIp {
+								actionText = rejectText
+								if cfg.BlockedNoExpire {
+									persist = true
+								}
+								runActions = true
+							}
+						} else if len(remote.Ips) > usedMaxIps {
 							actionText = rejectText
 							if cfg.BlockedNoExpire {
 								persist = true
@@ -215,8 +291,8 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 								if err := a.Call(sender, cfg); err != nil {
 									ErrorLogger.Println(err)
 								} else {
-									if cfg.Verbose == logLevelDebug {
-										DebugLogger.Println("Action operator finished successfully")
+									if cfg.VerboseLevel == logLevelDebug {
+										DebugLogger.Printf("instance=\"%s\" Action operator finished successfully\n", instance)
 									}
 									remote.Actions = append(remote.Actions, "operator")
 									ranOperator = true
@@ -260,7 +336,7 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		sender = fmt.Sprintf("sender=\"<%s>\"", sender)
 	}
 
-	if cfg.Verbose >= logLevelInfo {
+	if cfg.VerboseLevel >= logLevelInfo {
 		InfoLogger.Printf("instance=\"%s\" %s countries=%s ip_addresses=%s #countries=%d/%d #ip_addresses=%d/%d action=\"%s\"\n",
 			instance, sender, remote.Countries, remote.Ips,
 			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
