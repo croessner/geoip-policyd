@@ -59,7 +59,7 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 		}
 
 		lineStr := strings.TrimSpace(string(lineBytes))
-		items := strings.Split(lineStr, "=")
+		items := strings.SplitN(lineStr, "=", 2)
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
