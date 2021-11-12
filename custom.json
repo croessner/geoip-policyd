@@ -4,7 +4,8 @@
       "comment": "Allow only two countries and a maximum of 5 IP addresses",
       "sender": "christian@roessner.email",
       "trusted_countries": [
-        "DE", "AU"
+        "DE",
+        "AU"
       ],
       "trusted_ips": [
         "127.0.0.0/8",

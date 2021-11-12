@@ -2,8 +2,8 @@
 
 ## About
 
-This is a very simple ansible role that installs **geoip-policyd** and **stresstest** on a remote system. It also creates a
-system user and group as well as the needed systemd unit file. A default configuration is placed under
+This is a very simple ansible role that installs **geoip-policyd** and **stresstest** on a remote system. It also
+creates a system user and group as well as the needed systemd unit file. A default configuration is placed under
 **/etc/default/geoip-policyd**. It is a template, which you can modify to suit your needs.
 
 ## Note
