@@ -2,7 +2,7 @@
 
 ## About
 
-Postfix-Submission policy server that checks sender IPs and blocks senders, if they come from too many countries or if 
+Postfix-Submission policy server that checks sender IPs and blocks senders, if they come from too many countries or if
 they come from too many IP addresses.
 
 ## Features
@@ -16,24 +16,24 @@ they come from too many IP addresses.
 # Table of contents
 
 1. [Install](#install)
-   * [Postfix integration](#postfix-integration)
-   * [Custom settings](#custom-settings)
-   * [Preparing a docker image](#preparing-a-docker-image)
-   * [Server options](#server-options)
+    * [Postfix integration](#postfix-integration)
+    * [Custom settings](#custom-settings)
+    * [Preparing a docker image](#preparing-a-docker-image)
+    * [Server options](#server-options)
 2. [Environment variables](#environment-variables)
-   * [Server](#server)
+    * [Server](#server)
 3. [REST interface](#rest-interface)
-   * [GET request /reload](#get-request-reload)
-   * [GET request /custom-settings](#get-request-custom-settings)
-   * [POST request /remove](#post-request-remove)
-   * [PUT request /update](#put-request-update)
-   * [PATCH request /modify](#patch-request-modify)
-   * [DELETE request /remove](#delete-request-remove)
+    * [GET request /reload](#get-request-reload)
+    * [GET request /custom-settings](#get-request-custom-settings)
+    * [POST request /remove](#post-request-remove)
+    * [PUT request /update](#put-request-update)
+    * [PATCH request /modify](#patch-request-modify)
+    * [DELETE request /remove](#delete-request-remove)
 4. [Actions](#actions)
-   * [Operator action](#operator-action)
+    * [Operator action](#operator-action)
 5. [LDAP](#ldap)
-   * [docker-compose.yml](#docker-composeyml)
-   * [custom.json](#customjson)
+    * [docker-compose.yml](#docker-composeyml)
+    * [custom.json](#customjson)
 
 # Install
 
@@ -86,8 +86,8 @@ cd /path/to/Dockerfile
 docker build -t geoip-policyd:latest .
 ```
 
-You need to change the docker-compose.yml file as well. If you prefer, you can add a Redis
-service and run the *geoip-policyd* container in bridged mode.
+You need to change the docker-compose.yml file as well. If you prefer, you can add a Redis service and run the *
+geoip-policyd* container in bridged mode.
 
 For a complete example see [here](docker-compose.yml)
 
@@ -322,8 +322,8 @@ Back to [table of contents](#table-of-contents)
 
 ## PUT request /update
 
-Request: Set custom settings. This will overwrite a custom settings file or initiates settings, if there have
-not been any settings before (no config file given).       
+Request: Set custom settings. This will overwrite a custom settings file or initiates settings, if there have not been
+any settings before (no config file given).       
 Response: No results
 
 ---
@@ -351,7 +351,8 @@ Back to [table of contents](#table-of-contents)
 
 ## PATCH request /modify
 
-Request: Send changed settings for a given sender. If the sender does not exist, add a new record to the custom settings.       
+Request: Send changed settings for a given sender. If the sender does not exist, add a new record to the custom
+settings.       
 Response: No results
 
 Example:
@@ -394,8 +395,8 @@ Back to [table of contents](#table-of-contents)
 ## Operator action
 
 You can activate actions that will be taken, if a sender was declared compromised. At the moment you can send a
-notification to an e-mail operator. To do this, you must activate actions in general as well as the operator action.
-You need also to define all the required operator parameters as To, From, Subject, CT and of course an e-mail server (
+notification to an e-mail operator. To do this, you must activate actions in general as well as the operator action. You
+need also to define all the required operator parameters as To, From, Subject, CT and of course an e-mail server (
 including all required settings) to get things done.
 
 Example:
@@ -522,6 +523,7 @@ If you do so, you also have to modify your custom.json file, if you use one:
   ]
 }
 ```
+
 Back to [table of contents](#table-of-contents)
 
 Hope you enjoy :-)
