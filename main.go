@@ -30,6 +30,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 const version = "@@gittag@@-@@gitcommit@@"
@@ -81,6 +82,14 @@ func main() {
 		err    error
 		server net.Listener
 	)
+
+	// Manually set time zone
+	if tz := os.Getenv("TZ"); tz != "" {
+		var err error
+		if time.Local, err = time.LoadLocation(tz); err != nil {
+			ErrorLogger.Printf("Error loading location '%s': %v\n", tz, err.Error())
+		}
+	}
 
 	sigs := make(chan os.Signal, 1)
 
