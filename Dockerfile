@@ -23,9 +23,11 @@ WORKDIR /usr/app
 # Copy binary to destination image
 COPY --from=builder ["/build/geoip-policyd", "./"]
 COPY --from=builder ["/build/stresstest/stresstest", "./"]
+COPY --from=builder ["/usr/local/go/lib/time/zoneinfo.zip", "/"]
 
-EXPOSE 4646
-EXPOSE 8080
+ENV ZONEINFO=/zoneinfo.zip
+
+EXPOSE 4646 8080
 
 ENTRYPOINT ["/usr/app/geoip-policyd"]
 CMD ["server"]

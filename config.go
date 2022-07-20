@@ -76,14 +76,14 @@ type CmdLineConfig struct {
 	// Use 'sender' or 'sasl_username' attribute?
 	UseSASLUsername bool
 
-	// Redis settings for a raed and/or write server pool
+	// Redis settings for a reading and/or writing server pool
 	RedisAddress  string
 	RedisPort     int
 	RedisDB       int
 	RedisUsername string
 	RedisPassword string
 
-	// Redis for a write server pool
+	// Redis for a writing server pool
 	RedisAddressW  string
 	RedisPortW     int
 	RedisDBW       int
