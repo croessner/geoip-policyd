@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine AS builder
+FROM golang:1.19-alpine AS builder
 
 WORKDIR /build
 
@@ -8,8 +8,8 @@ RUN go mod download
 
 # Set necessarry environment vairables and compile the app
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -v -ldflags="-s -w" -o geoip-policyd .
-RUN cd ./stresstest && go build -v -v -ldflags="-s -w" -o stresstest main.go
+RUN go build -mod vendor -v -ldflags="-s -w" -o geoip-policyd .
+RUN cd ./stresstest && go build -mod vendor -v -v -ldflags="-s -w" -o stresstest main.go
 
 FROM scratch
 
