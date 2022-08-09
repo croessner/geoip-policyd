@@ -1,7 +1,6 @@
 image: golang:1.19-alpine
 
 variables:
-  MILESTONE: "v0.1.0"
   CGO_ENABLED: 0
   GOOS: "linux"
   GOARCH: "amd64"
