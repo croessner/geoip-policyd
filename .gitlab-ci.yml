@@ -14,7 +14,7 @@ stages:
   - deploy
 
 format:
-  image: golang:1.17-alpine
+  image: golang:1.19-alpine
   stage: test
   script:
     - apk add build-base
@@ -44,7 +44,7 @@ compile:
   stage: build
   script:
     - apk add build-base
-    - go build -race -ldflags "-extldflags '-static'" -o $CI_PROJECT_DIR/geoip-policyd
+    - go build -mod vendor -race -ldflags "-extldflags '-static'" -o $CI_PROJECT_DIR/geoip-policyd
   artifacts:
     paths:
       - geoip-policyd
