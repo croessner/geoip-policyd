@@ -2,13 +2,11 @@ image: golang:1.19-alpine
 
 variables:
   CGO_ENABLED: 0
-  GOOS: "linux"
-  GOARCH: "amd64"
   GOLINT_VERSION: "v1.48.0"
   RELEASE_CLI_VERSION: "v0.8.0"
   DEVELOPER_BRANCH: "features"
-  LINUX_AMD64_BINARY: "$CI_PROJECT_NAME-linux-amd64-${CI_COMMIT_TAG}"
-  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/$CI_PROJECT_NAME/${CI_COMMIT_TAG}/"
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/"
+  PLATFORMS: "darwin/amd64 darwin/arm64 freebsd/amd64 freebsd/arm64 linux/amd64 linux/arm64 netbsd/amd64 netbsd/arm64 openbsd/amd64 openbsd/arm64 windows/amd64 windows/arm64"
 
 stages:
   - test
@@ -17,7 +15,10 @@ stages:
   - release
   - push
 
-pre_checks:
+sast:
+  stage: test
+
+test analyze 1/3:
   stage: test
   script:
     - go fmt $(go list ./... | grep -v /vendor/)
@@ -25,23 +26,14 @@ pre_checks:
   rules:
     - if: $CI_COMMIT_BRANCH == $DEVELOPER_BRANCH
 
-lint_code:
-  image: golangci/golangci-lint:$GOLINT_VERSION
-  stage: test
-  allow_failure: true
-  script:
-    - golangci-lint run -v
-  rules:
-    - if: $CI_COMMIT_BRANCH == $DEVELOPER_BRANCH
-
-unit_tests:
+test analyze 2/3:
   stage: test
   script:
     - go test -short $(go list ./... | grep -v /vendor/)
   rules:
     - if: $CI_COMMIT_BRANCH == $DEVELOPER_BRANCH
 
-race_detector:
+test analyze 3/3:
   stage: test
   variables:
     CGO_ENABLED: 1
@@ -51,12 +43,39 @@ race_detector:
   rules:
     - if: $CI_COMMIT_BRANCH == $DEVELOPER_BRANCH
 
+lint code:
+  stage: test
+  image: golangci/golangci-lint:$GOLINT_VERSION
+  allow_failure: true
+  script:
+    - golangci-lint run -v
+  rules:
+    - if: $CI_COMMIT_BRANCH == $DEVELOPER_BRANCH
+
 build:
   stage: build
   script:
-    - mkdir -p bin
-    - sed -i -e "s/@@gittag@@-@@gitcommit@@/$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA/" main.go
-    - go build -mod vendor -v -o bin/$LINUX_AMD64_BINARY $CI_PROJECT_NAME
+    - sed -i -e "s/@@gittag@@-@@gitcommit@@/${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}/" main.go
+    - |
+      tag="dev"
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+          tag="${CI_COMMIT_TAG}"
+      fi
+
+      for PLATFORM in ${PLATFORMS}; do
+          GOOS=${PLATFORM%/*}
+          GOARCH=${PLATFORM#*/}
+          FILEPATH="${CI_PROJECT_DIR}/bin/${GOOS}-${GOARCH}"
+          mkdir -p ${FILEPATH}
+          BIN_FILE_NAME="${FILEPATH}/${CI_PROJECT_NAME}-${GOOS}-${GOARCH}-${tag}"
+
+          if [[ "${GOOS}" == "windows" ]]; then
+              BIN_FILE_NAME="${BIN_FILE_NAME}.exe"
+          fi
+
+          echo "Building ${BIN_FILE_NAME}"
+          GOOS=${GOOS} GOARCH=${GOARCH} go build -mod=vendor -ldflags="-s -w" -o ${BIN_FILE_NAME} ${CI_PROJECT_NAME}
+      done
   artifacts:
     paths:
       - bin/
@@ -66,7 +85,9 @@ upload:
   image: curlimages/curl:latest
   script:
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file bin/${LINUX_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}/${LINUX_AMD64_BINARY}
+      find ${CI_PROJECT_DIR}/bin/ -type f | while read filename; do
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${filename} ${PACKAGE_REGISTRY_URL}/$(basename ${filename})
+      done
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -74,65 +95,86 @@ release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:$RELEASE_CLI_VERSION
   script:
-    - >
-      release-cli create
-      --name "Release $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG
-      --assets-link "{\"name\":\"${LINUX_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_AMD64_BINARY}\"}"
+    - |
+      ASSETS=""
+
+      for PLATFORM in ${PLATFORMS}; do
+          GOOS=${PLATFORM%/*}
+          GOARCH=${PLATFORM#*/}
+          BIN_FILE_NAME="${CI_PROJECT_NAME}-${GOOS}-${GOARCH}-${CI_COMMIT_TAG}"
+
+          if [[ "${GOOS}" == "windows" ]]; then
+              BIN_FILE_NAME="${BIN_FILE_NAME}.exe"
+          fi
+      
+          echo "Adding asset ${BIN_FILE_NAME}"
+          ASSETS="${ASSETS} --assets-link {\"name\":\"${BIN_FILE_NAME}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${BIN_FILE_NAME}\"}"
+      done
+      
+      release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} ${ASSETS}
   rules:
     - if: $CI_COMMIT_TAG
 
 docker:
+  stage: build
   image: docker:20
   before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-  stage: build
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
   script:
-    - sed -i -e "s/@@gittag@@-@@gitcommit@@/$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA/" main.go
-    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - sed -i -e "s/@@gittag@@-@@gitcommit@@/${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}/" main.go
+    - docker pull ${CI_REGISTRY_IMAGE}:latest || true
     - >
       docker build
       --pull
-      --build-arg http_proxy=$http_proxy
-      --build-arg https_proxy=$https_proxy
-      --build-arg no_proxy=$no_proxy
-      --cache-from $CI_REGISTRY_IMAGE:latest
-      --label "org.opencontainers.image.title=$CI_PROJECT_TITLE"
-      --label "org.opencontainers.image.url=$CI_PROJECT_URL"
-      --label "org.opencontainers.image.created=$CI_JOB_STARTED_AT"
-      --label "org.opencontainers.image.revision=$CI_COMMIT_SHA"
-      --label "org.opencontainers.image.version=$CI_COMMIT_REF_NAME"
-      --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+      --build-arg http_proxy=${http_proxy}
+      --build-arg https_proxy=${https_proxy}
+      --build-arg no_proxy=${no_proxy}
+      --cache-from ${CI_REGISTRY_IMAGE}:latest
+      --label "org.opencontainers.image.title=${CI_PROJECT_TITLE}"
+      --label "org.opencontainers.image.url=${CI_PROJECT_URL}"
+      --label "org.opencontainers.image.created=${CI_JOB_STARTED_AT}"
+      --label "org.opencontainers.image.revision=${CI_COMMIT_SHA}"
+      --label "org.opencontainers.image.version=${CI_COMMIT_REF_NAME}"
+      --tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       .
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
 
-push_latest:
+push tags 1/2:
+  stage: push
   image: docker:20
   before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
   variables:
     GIT_STRATEGY: none
-  stage: push
   script:
-    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker pull ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
     - |
-      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+      if [[ "${CI_COMMIT_BRANCH}" == "${CI_DEFAULT_BRANCH}" ]]; then
         docker_tag="latest"
       else
         docker_tag="dev"
       fi
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:$docker_tag
-    - docker push $CI_REGISTRY_IMAGE:$docker_tag
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:${docker_tag}
+    - docker push ${CI_REGISTRY_IMAGE}:${docker_tag}
 
-push_tag:
+push tags 2/2:
+  stage: push
   image: docker:20
   before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
   variables:
     GIT_STRATEGY: none
-  stage: push
   script:
-    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+    - docker pull ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
   rules:
     - if: $CI_COMMIT_TAG
+
+secret_detection:
+  variables:
+    SECRET_DETECTION_HISTORIC_SCAN: "true"
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
