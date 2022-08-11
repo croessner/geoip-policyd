@@ -74,7 +74,7 @@ build:
           fi
 
           echo "Building ${BIN_FILE_NAME}"
-          GOOS=${GOOS} GOARCH=${GOARCH} go build -mod=vendor -ldflags="-s -w" -o ${BIN_FILE_NAME} ${CI_PROJECT_NAME}
+          GOOS=${GOOS} GOARCH=${GOARCH} go build -mod=vendor -ldflags="-s -w" -o ${BIN_FILE_NAME} .
       done
   artifacts:
     paths:
