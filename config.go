@@ -20,34 +20,40 @@ package main
 
 import (
 	"fmt"
-	"github.com/akamensky/argparse"
-	"github.com/go-ldap/ldap/v3"
 	"log"
 	"net"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/akamensky/argparse"
+	"github.com/go-kit/log/level"
+	"github.com/go-ldap/ldap/v3"
 )
 
-// Defaults
+const Localhost4 = "127.0.0.1"
+
+// Defaults.
 const (
-	serverAddress = "127.0.0.1"
-	serverPort    = 4646
-	redisAddress  = "127.0.0.1"
-	redisPort     = 6379
-	geoipPath     = "/usr/share/GeoIP/GeoLite2-City.mmdb"
-	redisPrefix   = "geopol_"
-	redisTTL      = 3600
-	maxCountries  = 3
-	maxIps        = 10
-	httpAddress   = "127.0.0.1:8080"
-	httpX509Cert  = "/localhost.pem"
-	httpX509Key   = "/localhost-key.pem"
-	maxRetries    = 9
-	mailPort      = 587
-	mailSubject   = "[geoip-policyd] An e-mail account was compromised"
-	mailHelo      = "localhost"
+	serverAddress  = Localhost4
+	serverPort     = 4646
+	redisAddress   = Localhost4
+	redisPort      = 6379
+	geoipPath      = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+	redisPrefix    = "geopol_"
+	redisTTL       = 3600
+	maxCountries   = 3
+	maxIPs         = 10
+	httpAddress    = Localhost4
+	httpPort       = 8080
+	httpX509Cert   = "/localhost.pem"
+	httpX509Key    = "/localhost-key.pem"
+	ldapPoolSize   = 10
+	ldapMaxRetries = 9
+	mailPort       = 587
+	mailSubject    = "[geoip-policyd] An e-mail account was compromised"
+	mailHelo       = "localhost"
 )
 
 const (
@@ -62,6 +68,33 @@ const (
 	SUB  = "sub"
 )
 
+type ConnProtocol struct {
+	name string
+}
+
+func (c *ConnProtocol) String() string {
+	return c.name
+}
+
+func (c *ConnProtocol) Set(value string) error {
+	switch value {
+	case "tcp", "tcp6", "unix":
+		c.name = value
+	default:
+		return errWrongProtocol
+	}
+
+	return nil
+}
+
+func (c *ConnProtocol) Type() string {
+	return "ConnProtocol"
+}
+
+func (c *ConnProtocol) Get() string {
+	return c.name
+}
+
 type CmdLineConfig struct {
 	// Listen address for the policy service
 	ServerAddress string
@@ -70,8 +103,9 @@ type CmdLineConfig struct {
 	ServerPort int
 
 	// REST interface of the policy service
-	HttpAddress string
-	HttpApp
+	HTTPAddress string
+	HTTPPort    int
+	HTTPApp
 
 	// Use 'sender' or 'sasl_username' attribute?
 	UseSASLUsername bool
@@ -82,6 +116,7 @@ type CmdLineConfig struct {
 	RedisDB       int
 	RedisUsername string
 	RedisPassword string
+	RedisProtocol ConnProtocol
 
 	// Redis for a writing server pool
 	RedisAddressW  string
@@ -89,13 +124,14 @@ type CmdLineConfig struct {
 	RedisDBW       int
 	RedisUsernameW string
 	RedisPasswordW string
+	RedisProtocolW ConnProtocol
 
 	RedisPrefix string
 	RedisTTL    int
 
 	GeoipPath       string
 	MaxCountries    int
-	MaxIps          int
+	MaxIPs          int
 	BlockedNoExpire bool
 	VerboseLevel    int
 
@@ -105,6 +141,7 @@ type CmdLineConfig struct {
 	UseLDAP bool
 	LDAP
 
+	LogFormatJSON      bool
 	CustomSettingsPath string
 
 	// Global flag that indicates if any action should be taken
@@ -136,30 +173,31 @@ type CustomSettings struct {
 type Account struct {
 	Comment          string   `json:"comment"`
 	Sender           string   `json:"sender"`
-	Ips              int      `json:"ips"`
+	IPs              int      `json:"ips"`
 	Countries        int      `json:"countries"`
-	TrustedCountries []string `json:"trusted_countries"`
-	TrustedIps       []string `json:"trusted_ips"`
+	TrustedCountries []string `json:"trusted_countries"` //nolint:tagliatelle // No camel case
+	TrustedIPs       []string `json:"trusted_ips"`       //nolint:tagliatelle // No camel case
 }
 
 func (c *CmdLineConfig) String() string {
 	var result string
 
-	v := reflect.ValueOf(*c)
-	typeOfc := v.Type()
+	value := reflect.ValueOf(*c)
+	typeOfC := value.Type()
 
-	for i := 0; i < v.NumField(); i++ {
-		switch typeOfc.Field(i).Name {
-		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HttpApp", "VerboseLevel":
+	for index := 0; index < value.NumField(); index++ {
+		switch typeOfC.Field(index).Name {
+		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel":
 			continue
 		default:
-			result += fmt.Sprintf(" %s='%v'", typeOfc.Field(i).Name, v.Field(i).Interface())
+			result += fmt.Sprintf(" %s='%v'", typeOfC.Field(index).Name, value.Field(index).Interface())
 		}
 	}
 
 	return result[1:]
 }
 
+//nolint:gocognit,gocyclo,maintidx // Ignore complexity
 func (c *CmdLineConfig) Init(args []string) {
 	parser := argparse.NewParser("geoip-policyd", "Detect compromised e-mail accounts")
 
@@ -175,9 +213,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
+						return errNotIPOrHostname
 					}
 				}
+
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for the policy service",
@@ -188,21 +227,35 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  serverPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if !(arg > 0 && arg <= 65535) {
-						return fmt.Errorf("%s is not a valid port number", opt[0])
-					}
+					return errNotInteger
+				} else if !(arg > 0 && arg <= 65535) {
+					return errNotValidPortNumber
 				}
+
 				return nil
 			},
 			Help: "Port for the policy service",
 		})
-	argServerHttpAddress := commandServer.String(
+	argServerHTTPAddress := commandServer.String(
 		"", "http-address", &argparse.Options{
 			Required: false,
 			Default:  httpAddress,
 			Help:     "HTTP address for incoming requests",
+		})
+	argHTTPPort := commandServer.Int(
+		"", "http-port", &argparse.Options{
+			Required: false,
+			Default:  httpPort,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if !(arg > 0 && arg <= 65535) {
+					return errNotValidPortNumber
+				}
+
+				return nil
+			},
+			Help: "HTTP port for incoming requests",
 		})
 
 	argServerUseSASLUsername := commandServer.Flag(
@@ -222,9 +275,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
+						return errNotIPOrHostname
 					}
 				}
+
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for the Redis service",
@@ -235,12 +289,11 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  redisPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if !(arg > 0 && arg <= 65535) {
-						return fmt.Errorf("%s is not a valid port number", opt[0])
-					}
+					return errNotInteger
+				} else if !(arg > 0 && arg <= 65535) {
+					return errNotValidPortNumber
 				}
+
 				return nil
 			},
 			Help: "Port for the Redis service",
@@ -263,6 +316,12 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "",
 			Help:     "Redis password",
 		})
+	argServerRedisProtocol := commandServer.String(
+		"", "redis-protocol", &argparse.Options{
+			Required: false,
+			Default:  "tcp",
+			Help:     "Redis connection protocol; one of 'tcp', 'tcp6' or 'unix'",
+		})
 
 	/*
 	 * Redis options for write requests
@@ -274,9 +333,10 @@ func (c *CmdLineConfig) Init(args []string) {
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
+						return errNotIPOrHostname
 					}
 				}
+
 				return nil
 			},
 			Help: "IPv4 or IPv6 address for a Redis service (writer)",
@@ -287,12 +347,11 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  redisPort,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if !(arg > 0 && arg <= 65535) {
-						return fmt.Errorf("%s is not a valid port number", opt[0])
-					}
+					return errNotInteger
+				} else if !(arg > 0 && arg <= 65535) {
+					return errNotValidPortNumber
 				}
+
 				return nil
 			},
 			Help: "Port for a Redis service (writer)",
@@ -315,6 +374,12 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "",
 			Help:     "Redis password (writer)",
 		})
+	argServerRedisProtocolW := commandServer.String(
+		"", "redis-writer-protocol", &argparse.Options{
+			Required: false,
+			Default:  "tcp",
+			Help:     "Redis connection protocol (writer); one of 'tcp', 'tcp6' or 'unix'",
+		})
 
 	/*
 	 * Common Redis options
@@ -331,12 +396,11 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  redisTTL,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if arg < 1 {
-						return fmt.Errorf("%d must be an unsigned integer and not 0", arg)
-					}
+					return errNotInteger
+				} else if arg < 1 {
+					return errNotValidPortNumber
 				}
+
 				return nil
 			},
 			Help: "Redis TTL in seconds",
@@ -351,8 +415,9 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  geoipPath,
 			Validate: func(opt []string) error {
 				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return fmt.Errorf("%s: %s", opt[0], err)
+					return errFileNotFound
 				}
+
 				return nil
 			},
 			Help: "Full path to the GeoIP database file",
@@ -363,34 +428,32 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  maxCountries,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if arg < 2 {
-						return fmt.Errorf("%d must be an unsigned integer and greate or equal than 2", arg)
-					}
+					return errNotInteger
+				} else if arg < 2 { //nolint:gomnd // Threshold value
+					return errMaxCountries
 				}
+
 				return nil
 			},
 			Help: "Maximum number of countries before rejecting e-mails",
 		})
-	argServerMaxIps := commandServer.Int(
+	argServerMaxIPs := commandServer.Int(
 		"", "max-ips", &argparse.Options{
 			Required: false,
-			Default:  maxIps,
+			Default:  maxIPs,
 			Validate: func(opt []string) error {
 				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if arg < 1 {
-						return fmt.Errorf("%d must be an unsigned integer and not 0", arg)
-					}
+					return errNotInteger
+				} else if arg < 1 {
+					return errMaxIPs
 				}
+
 				return nil
 			},
 			Help: "Maximum number of IP addresses before rejecting e-mails",
 		})
 	argServerBlockedNoExpire := commandServer.Flag(
-		"", "blocked-no-expire", &argparse.Options{
+		"", "block-permanent", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Do not expire senders from Redis, if they were blocked in the past",
@@ -401,37 +464,37 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "",
 			Help:     "Custom settings with different IP and country limits",
 		})
-	argServerHttpUseBasicAuth := commandServer.Flag(
+	argServerHTTPUseBasicAuth := commandServer.Flag(
 		"", "http-use-basic-auth", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Enable basic HTTP auth",
 		})
-	argServerHttpUseSSL := commandServer.Flag(
+	argServerHTTPUseSSL := commandServer.Flag(
 		"", "http-use-ssl", &argparse.Options{
 			Required: false,
 			Default:  false,
 			Help:     "Enable HTTPS",
 		})
-	argServerHttpBasicAuthUsername := commandServer.String(
+	argServerHTTPBasicAuthUsername := commandServer.String(
 		"", "http-basic-auth-username", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "HTTP basic auth username",
 		})
-	argServerHttpBasicAuthPassword := commandServer.String(
+	argServerHTTPBasicAuthPassword := commandServer.String(
 		"", "http-basic-auth-password", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Help:     "HTTP basic auth password",
 		})
-	argServerHttpTLSCert := commandServer.String(
+	argServerHTTPTLSCert := commandServer.String(
 		"", "http-tls-cert", &argparse.Options{
 			Required: false,
 			Default:  httpX509Cert,
 			Help:     "HTTP TLS server certificate (full chain)",
 		})
-	argServerHttpTLSKey := commandServer.String(
+	argServerHTTPTLSKey := commandServer.String(
 		"", "http-tls-key", &argparse.Options{
 			Required: false,
 			Default:  httpX509Key,
@@ -524,15 +587,36 @@ func (c *CmdLineConfig) Init(args []string) {
 				case BASE, ONE, SUB:
 					return nil
 				default:
-					return fmt.Errorf("value '%s' must be one of: 'one', 'base' or 'sub'", opt[0])
+					return errLDAPScope
 				}
 			},
 			Help: "LDAP search scope [base, one, sub]",
+		})
+	argServerLDAPPoolSize := commandServer.Int(
+		"", "ldap-pool-size", &argparse.Options{
+			Required: false,
+			Default:  ldapPoolSize,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if arg < 1 {
+					return errPoolSize
+				}
+
+				return nil
+			},
+			Help: "LDAP pre-forked pool size",
 		})
 
 	argVerbose := parser.FlagCounter(
 		"v", "verbose", &argparse.Options{
 			Help: "Verbose mode. Repeat this for an increased log level",
+		})
+	argServerLogFormatJSON := commandServer.Flag(
+		"", "log-json", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Enable JSON log format",
 		})
 	argVersion := parser.Flag(
 		"", "version", &argparse.Options{
@@ -581,48 +665,49 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "",
 			Validate: func(opt []string) error {
 				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return fmt.Errorf("%s: %s", opt[0], err)
+					return errFileNotFound
 				}
+
 				return nil
 			},
 			Help: "Full path to the e-mail message file for the operator action",
 		})
 
 	argServerMailServer := commandServer.String(
-		"", "mail-server", &argparse.Options{
+		"", "mail-server-address", &argparse.Options{
 			Required: false,
 			Default:  "",
 			Validate: func(opt []string) error {
 				if addr := net.ParseIP(opt[0]); addr == nil {
 					if _, err := net.LookupHost(opt[0]); err != nil {
-						return fmt.Errorf("%s is not a valid IP address or hostname", opt[0])
+						return errNotIPOrHostname
 					}
 				}
+
 				return nil
 			},
 			Help: "E-mail server address for notifications",
+		})
+	argServerMailPort := commandServer.Int(
+		"", "mail-server-port", &argparse.Options{
+			Required: false,
+			Default:  mailPort,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if !(arg > 0 && arg <= 65535) {
+					return errNotValidPortNumber
+				}
+
+				return nil
+			},
+			Help: "E-mail server port number",
 		})
 	argServerMailHelo := commandServer.String(
 		"", "mail-helo", &argparse.Options{
 			Required: false,
 			Default:  mailHelo,
 			Help:     "E-mail server HELO/EHLO hostname",
-		})
-	argServerMailPort := commandServer.Int(
-		"", "mail-port", &argparse.Options{
-			Required: false,
-			Default:  mailPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return fmt.Errorf("%s is not an integer", opt[0])
-				} else {
-					if !(arg > 0 && arg <= 65535) {
-						return fmt.Errorf("%s is not a valid port number", opt[0])
-					}
-				}
-				return nil
-			},
-			Help: "E-mail server port number",
 		})
 	argServerMailUsername := commandServer.String(
 		"", "mail-username", &argparse.Options{
@@ -637,23 +722,23 @@ func (c *CmdLineConfig) Init(args []string) {
 			Help:     "E-mail server password",
 		})
 	argServerMailSSL := commandServer.Flag(
-		"", "mail-ssl", &argparse.Options{
+		"", "mail-ssl-on-connect", &argparse.Options{
 			Required: false,
 			Default:  false,
-			Help:     "Use TLS on connect for the e-mail server",
+			Help:     "Use SSL/TLS on connect for the e-mail server",
 		})
 
 	err := parser.Parse(args)
 	if err != nil {
-		log.Fatalln(parser.Usage(err))
+		log.Fatalln(parser.Usage(err.Error()))
 	}
 
 	if *argVersion {
-		fmt.Println("Version:", version)
+		fmt.Println("Version:", version) //nolint:forbidigo // Printing a version number is okay
 		os.Exit(0)
 	}
 
-	if val := os.Getenv("VERBOSE"); val != "" {
+	if val := os.Getenv("GEOIPPOLICYD_VERBOSE_LEVEL"); val != "" {
 		switch val {
 		case "none":
 			c.VerboseLevel = logLevelNone
@@ -671,297 +756,383 @@ func (c *CmdLineConfig) Init(args []string) {
 		case logLevelDebug:
 			c.VerboseLevel = logLevelDebug
 		default:
-			c.VerboseLevel = logLevelDebug
+			c.VerboseLevel = logLevelInfo
 		}
+	}
+
+	if val := os.Getenv("GEOIPPOLICYD_LOG_JSON"); val != "" {
+		param, err := strconv.ParseBool(val)
+		if err != nil {
+			log.Fatalln("Error:", err.Error())
+		}
+
+		c.LogFormatJSON = param
+	} else {
+		c.LogFormatJSON = *argServerLogFormatJSON
 	}
 
 	c.CommandServer = commandServer.Happened()
 
 	if commandServer.Happened() {
-		if val := os.Getenv("SERVER_ADDRESS"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_SERVER_ADDRESS"); val != "" {
 			c.ServerAddress = val
 		} else {
 			c.ServerAddress = *argServerAddress
 		}
-		if val := os.Getenv("SERVER_PORT"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_SERVER_PORT"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: SERVER_PORT an not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_SERVER_PORT an not be used:", parser.Usage(err.Error()))
 			}
-			c.ServerPort = p
+
+			c.ServerPort = param
 		} else {
 			c.ServerPort = *argServerPort
 		}
-		if val := os.Getenv("HTTP_ADDRESS"); val != "" {
-			c.HttpAddress = val
+
+		if val := os.Getenv("GEOIPPOLICYD_HTTP_ADDRESS"); val != "" {
+			c.HTTPAddress = val
 		} else {
-			c.HttpAddress = *argServerHttpAddress
+			c.HTTPAddress = *argServerHTTPAddress
 		}
 
-		if val := os.Getenv("USE_SASL_USERNAME"); val != "" {
-			p, err := strconv.ParseBool(val)
+		if val := os.Getenv("GEOIPPOLICYD_HTTP_PORT"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error:", err)
+				log.Fatalln("Error: GEOIPPOLICYD_HTTP_PORT an not be used:", parser.Usage(err.Error()))
 			}
-			c.UseSASLUsername = p
+
+			c.HTTPPort = param
+		} else {
+			c.HTTPPort = *argHTTPPort
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_USE_SASL_USERNAME"); val != "" {
+			param, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err.Error())
+			}
+
+			c.UseSASLUsername = param
 		} else {
 			c.UseSASLUsername = *argServerUseSASLUsername
 		}
 
-		if val := os.Getenv("REDIS_ADDRESS"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_ADDRESS"); val != "" {
 			c.RedisAddress = val
 		} else {
 			c.RedisAddress = *argServerRedisAddress
 		}
-		if val := os.Getenv("REDIS_PORT"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_PORT"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: REDIS_PORT can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PORT can not be used:", parser.Usage(err.Error()))
 			}
-			c.RedisPort = p
+
+			c.RedisPort = param
 		} else {
 			c.RedisPort = *argServerRedisPort
 		}
-		if val := os.Getenv("REDIS_DATABASE_NUMBER"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_DATABASE_NUMBER"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: REDIS_DATABASE_NUMBER can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_DATABASE_NUMBER can not be used:", parser.Usage(err.Error()))
 			}
-			c.RedisDB = p
+
+			c.RedisDB = param
 		} else {
 			c.RedisDB = *argServerRedisDB
 		}
-		if val := os.Getenv("REDIS_USERNAME"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_USERNAME"); val != "" {
 			c.RedisUsername = val
 		} else {
 			c.RedisUsername = *argServerRedisUsername
 		}
-		if val := os.Getenv("REDIS_PASSWORD"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_PASSWORD"); val != "" {
 			c.RedisPassword = val
 		} else {
 			c.RedisPassword = *argServerRedisPassword
 		}
 
-		if val := os.Getenv("REDIS_WRITER_ADDRESS"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_PROTOCOL"); val != "" {
+			if err := c.RedisProtocol.Set(val); err != nil {
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
+			}
+		} else if err := c.RedisProtocol.Set(*argServerRedisProtocol); err != nil {
+			log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_ADDRESS"); val != "" {
 			c.RedisAddressW = val
 		} else {
 			c.RedisAddressW = *argServerRedisAddressW
 		}
-		if val := os.Getenv("REDIS_WRITER_PORT"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PORT"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: REDIS_WRITER_PORT can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_PORT can not be used:", parser.Usage(err.Error()))
 			}
-			c.RedisPortW = p
+
+			c.RedisPortW = param
 		} else {
 			c.RedisPortW = *argServerRedisPortW
 		}
-		if val := os.Getenv("REDIS_WRITER_DATABASE_NUMBER"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: REDIS_WRITER_DATABASE_NUMBER can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER can not be used:",
+					parser.Usage(err.Error()))
 			}
-			c.RedisDBW = p
+
+			c.RedisDBW = param
 		} else {
 			c.RedisDBW = *argServerRedisDBW
 		}
-		if val := os.Getenv("REDIS_WRITER_USERNAME"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_USERNAME"); val != "" {
 			c.RedisUsernameW = val
 		} else {
 			c.RedisUsernameW = *argServerRedisUsernameW
 		}
-		if val := os.Getenv("REDIS_WRITER_PASSWORD"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PASSWORD"); val != "" {
 			c.RedisPasswordW = val
 		} else {
 			c.RedisPasswordW = *argServerRedisPasswordW
 		}
 
-		if val := os.Getenv("REDIS_PREFIX"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PROTOCOL"); val != "" {
+			if err := c.RedisProtocolW.Set(val); err != nil {
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
+			}
+		} else if err := c.RedisProtocolW.Set(*argServerRedisProtocolW); err != nil {
+			log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_PROTOCOL can not be used:", parser.Usage(err.Error()))
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_PREFIX"); val != "" {
 			c.RedisPrefix = val
 		} else {
 			c.RedisPrefix = *argServerRedisPrefix
 		}
-		if val := os.Getenv("REDIS_TTL"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_TTL"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: REDIS_TTL can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_TTL can not be used:", parser.Usage(err.Error()))
 			}
-			c.RedisTTL = p
+
+			c.RedisTTL = param
 		} else {
 			c.RedisTTL = *argServerRedisTTL
 		}
 
-		if val := os.Getenv("GEOIP_PATH"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_GEOIP_PATH"); val != "" {
 			c.GeoipPath = val
 		} else {
 			c.GeoipPath = *argServerGeoIPDB
 		}
 
-		if val := os.Getenv("MAX_COUNTRIES"); val != "" {
-			p, err := strconv.Atoi(val)
+		if val := os.Getenv("GEOIPPOLICYD_MAX_COUNTRIES"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: MAX_COUNTRIES can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_MAX_COUNTRIES can not be used:", parser.Usage(err.Error()))
 			}
-			c.MaxCountries = p
+
+			c.MaxCountries = param
 		} else {
 			c.MaxCountries = *argServerMaxCountries
 		}
-		if val := os.Getenv("MAX_IPS"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_MAX_IPS"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: MAX_IPS can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_MAX_IPS can not be used:", parser.Usage(err.Error()))
 			}
-			c.MaxIps = p
+
+			c.MaxIPs = param
 		} else {
-			c.MaxIps = *argServerMaxIps
+			c.MaxIPs = *argServerMaxIPs
 		}
-		if val := os.Getenv("BLOCKED_NO_EXPIRE"); val != "" {
-			p, err := strconv.ParseBool(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_BLOCK_PERMANENT"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Fatalln("Error:", err)
+				log.Fatalln("Error:", err.Error())
 			}
-			c.BlockedNoExpire = p
+
+			c.BlockedNoExpire = param
 		} else {
 			c.BlockedNoExpire = *argServerBlockedNoExpire
 		}
 
-		if val := os.Getenv("CUSTOM_SETTINGS_PATH"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_CUSTOM_SETTINGS_PATH"); val != "" {
 			c.CustomSettingsPath = val
 		} else {
 			c.CustomSettingsPath = *argServerCustomSettingsPath
 		}
 
-		if val := os.Getenv("HTTP_USE_BASIC_AUTH"); val != "" {
-			p, err := strconv.ParseBool(val)
+		if val := os.Getenv("GEOIPPOLICYD_HTTP_USE_BASIC_AUTH"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				ErrorLogger.Println(err)
+				level.Error(logger).Log("error", err.Error())
 			}
-			c.HttpApp.useBasicAuth = p
+
+			c.HTTPApp.useBasicAuth = param
 		} else {
-			c.HttpApp.useBasicAuth = *argServerHttpUseBasicAuth
+			c.HTTPApp.useBasicAuth = *argServerHTTPUseBasicAuth
 		}
-		if c.HttpApp.useBasicAuth {
-			if val := os.Getenv("HTTP_BASIC_AUTH_USERNAME"); val != "" {
-				c.HttpApp.auth.username = val
+
+		if c.HTTPApp.useBasicAuth {
+			if val := os.Getenv("GEOIPPOLICYD_HTTP_BASIC_AUTH_USERNAME"); val != "" {
+				c.HTTPApp.auth.username = val
 			} else {
-				c.HttpApp.auth.username = *argServerHttpBasicAuthUsername
+				c.HTTPApp.auth.username = *argServerHTTPBasicAuthUsername
 			}
-			if val := os.Getenv("HTTP_BASIC_AUTH_PASSWORD"); val != "" {
-				c.HttpApp.auth.password = val
+
+			if val := os.Getenv("GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD"); val != "" {
+				c.HTTPApp.auth.password = val
 			} else {
-				c.HttpApp.auth.password = *argServerHttpBasicAuthPassword
+				c.HTTPApp.auth.password = *argServerHTTPBasicAuthPassword
 			}
 		}
 
-		if val := os.Getenv("HTTP_USE_SSL"); val != "" {
-			p, err := strconv.ParseBool(val)
+		if val := os.Getenv("GEOIPPOLICYD_HTTP_USE_SSL"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				ErrorLogger.Println(err)
+				log.Fatalln("Error:", err.Error())
 			}
-			c.HttpApp.useSSL = p
+
+			c.HTTPApp.useSSL = param
 		} else {
-			c.HttpApp.useSSL = *argServerHttpUseSSL
+			c.HTTPApp.useSSL = *argServerHTTPUseSSL
 		}
-		if c.HttpApp.useSSL {
-			if val := os.Getenv("HTTP_TLS_CERT"); val != "" {
-				c.HttpApp.x509.cert = val
+
+		if c.HTTPApp.useSSL {
+			if val := os.Getenv("GEOIPPOLICYD_HTTP_TLS_CERT"); val != "" {
+				c.HTTPApp.x509.cert = val
 			} else {
-				c.HttpApp.x509.cert = *argServerHttpTLSCert
+				c.HTTPApp.x509.cert = *argServerHTTPTLSCert
 			}
-			if val := os.Getenv("HTTP_TLS_KEY"); val != "" {
-				c.HttpApp.x509.key = val
+
+			if val := os.Getenv("GEOIPPOLICYD_HTTP_TLS_KEY"); val != "" {
+				c.HTTPApp.x509.key = val
 			} else {
-				c.HttpApp.x509.key = *argServerHttpTLSKey
+				c.HTTPApp.x509.key = *argServerHTTPTLSKey
 			}
 		}
 
-		if val := os.Getenv("USE_LDAP"); val != "" {
-			p, err := strconv.ParseBool(val)
+		if val := os.Getenv("GEOIPPOLICYD_USE_LDAP"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Fatalln("Error:", err)
+				log.Fatalln("Error:", err.Error())
 			}
-			c.UseLDAP = p
+
+			c.UseLDAP = param
 		} else {
 			c.UseLDAP = *argServerUseLDAP
 		}
+
 		if c.UseLDAP {
-			if val := os.Getenv("LDAP_SERVER_URIS"); val != "" {
-				p := strings.Split(val, ",")
-				for i, uri := range p {
-					p[i] = strings.TrimSpace(uri)
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_SERVER_URIS"); val != "" {
+				param := strings.Split(val, ",")
+				for i, uri := range param {
+					param[i] = strings.TrimSpace(uri)
 				}
-				c.LDAP.ServerURIs = p
+
+				c.LDAP.ServerURIs = param
 			} else {
 				c.LDAP.ServerURIs = *argServerLDAPServerURIs
 			}
-			if val := os.Getenv("LDAP_BASEDN"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_BASEDN"); val != "" {
 				c.LDAP.BaseDN = val
 			} else {
 				c.LDAP.BaseDN = *argServerLDAPBaseDN
 			}
-			if val := os.Getenv("LDAP_BINDDN"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDDN"); val != "" {
 				c.LDAP.BindDN = val
 			} else {
 				c.LDAP.BindDN = *argServerLDAPBindDN
 			}
-			if val := os.Getenv("LDAP_BINDPW"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDPW"); val != "" {
 				c.LDAP.BindPW = val
 			} else {
 				c.LDAP.BindPW = *argServerLDAPBindPWPATH
 			}
-			if val := os.Getenv("LDAP_FILTER"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_FILTER"); val != "" {
 				c.LDAP.Filter = val
 			} else {
 				c.LDAP.Filter = *argServerLDAPFilter
 			}
-			if val := os.Getenv("LDAP_RESULT_ATTRIBUTE"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE"); val != "" {
 				c.LDAP.ResultAttr = []string{val}
 			} else {
 				c.LDAP.ResultAttr = []string{*argServerLDAPResultAttr}
 			}
-			if val := os.Getenv("LDAP_STARTTLS"); val != "" {
-				p, err := strconv.ParseBool(val)
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_STARTTLS"); val != "" {
+				param, err := strconv.ParseBool(val)
 				if err != nil {
-					log.Fatalln("Error:", err)
+					log.Fatalln("Error:", err.Error())
 				}
-				c.LDAP.StartTLS = p
+
+				c.LDAP.StartTLS = param
 			} else {
 				c.LDAP.StartTLS = *argServerLDAPStartTLS
 			}
-			if val := os.Getenv("LDAP_TLS_SKIP_VERIFY"); val != "" {
-				p, err := strconv.ParseBool(val)
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY"); val != "" {
+				param, err := strconv.ParseBool(val)
 				if err != nil {
-					log.Fatalln("Error:", err)
+					log.Fatalln("Error:", err.Error())
 				}
-				c.LDAP.TLSSkipVerify = p
+
+				c.LDAP.TLSSkipVerify = param
 			} else {
 				c.LDAP.TLSSkipVerify = *argServerLDAPTLSVerify
 			}
-			if val := os.Getenv("LDAP_TLS_CAFILE"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CAFILE"); val != "" {
 				c.LDAP.TLSCAFile = val
 			} else {
 				c.LDAP.TLSCAFile = *argServerLDAPTLSCAFile
 			}
-			if val := os.Getenv("LDAP_TLS_CLIENT_CERT"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT"); val != "" {
 				c.LDAP.TLSClientCert = val
 			} else {
 				c.LDAP.TLSClientCert = *argServerLDAPTLSClientCert
 			}
-			if val := os.Getenv("LDAP_TLS_CLIENT_KEY"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY"); val != "" {
 				c.LDAP.TLSClientKey = val
 			} else {
 				c.LDAP.TLSClientKey = *argServerLDAPTLSClientKey
 			}
-			if val := os.Getenv("LDAP_SASL_EXTERNAL"); val != "" {
-				p, err := strconv.ParseBool(val)
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_SASL_EXTERNAL"); val != "" {
+				param, err := strconv.ParseBool(val)
 				if err != nil {
-					log.Fatalln("Error:", err)
+					log.Fatalln("Error:", err.Error())
 				}
-				c.LDAP.SASLExternal = p
+
+				c.LDAP.SASLExternal = param
 			} else {
 				c.LDAP.SASLExternal = *argServerLDAPSASLExternal
 			}
-			if val := os.Getenv("LDAP_SCOPE"); val != "" {
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_SCOPE"); val != "" {
 				switch val {
 				case BASE:
 					c.LDAP.Scope = ldap.ScopeBaseObject
@@ -982,53 +1153,72 @@ func (c *CmdLineConfig) Init(args []string) {
 					c.LDAP.Scope = ldap.ScopeWholeSubtree
 				}
 			}
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_POOL_SIZE"); val != "" {
+				param, err := strconv.Atoi(val)
+				if err != nil {
+					log.Fatalln("Error: GEOIPPOLICYD_LDAP_POOL_SIZE can not be used:", parser.Usage(err.Error()))
+				}
+
+				c.LDAP.PoolSize = param
+			} else {
+				c.LDAP.PoolSize = *argServerLDAPPoolSize
+			}
 		}
 
 		/*
 		 * Actions
 		 */
 
-		if val := os.Getenv("RUN_ACTIONS"); val != "" {
-			p, err := strconv.ParseBool(val)
+		if val := os.Getenv("GEOIPPOLICYD_RUN_ACTIONS"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Fatalln("Error:", err)
+				log.Fatalln("Error:", err.Error())
 			}
-			c.RunActions = p
+
+			c.RunActions = param
 		} else {
 			c.RunActions = *argServerRunActions
 		}
+
 		if c.RunActions {
-			if val := os.Getenv("RUN_ACTION_OPERATOR"); val != "" {
-				p, err := strconv.ParseBool(val)
+			if val := os.Getenv("GEOIPPOLICYD_RUN_ACTION_OPERATOR"); val != "" {
+				param, err := strconv.ParseBool(val)
 				if err != nil {
-					log.Fatalln("Error:", err)
+					log.Fatalln("Error:", err.Error())
 				}
-				c.RunActionOperator = p
+
+				c.RunActionOperator = param
 			} else {
 				c.RunActionOperator = *argServerRunActionOperator
 			}
+
 			if c.RunActionOperator {
-				if val := os.Getenv("OPERATOR_TO"); val != "" {
+				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_TO"); val != "" {
 					c.EmailOperatorTo = val
 				} else {
 					c.EmailOperatorTo = *argServerOperatorTo
 				}
-				if val := os.Getenv("OPERATOR_FROM"); val != "" {
+
+				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_FROM"); val != "" {
 					c.EmailOperatorFrom = val
 				} else {
 					c.EmailOperatorFrom = *argServerOperatorFrom
 				}
-				if val := os.Getenv("OPERATOR_SUBJECT"); val != "" {
+
+				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_SUBJECT"); val != "" {
 					c.EmailOperatorSubject = val
 				} else {
 					c.EmailOperatorSubject = *argServerOperatorSubject
 				}
-				if val := os.Getenv("OPERATOR_MESSAGE_CT"); val != "" {
+
+				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_MESSAGE_CT"); val != "" {
 					c.EmailOperatorMessageCT = val
 				} else {
 					c.EmailOperatorMessageCT = *argServerOperatorMessageCT
 				}
-				if val := os.Getenv("OPERATOR_MESSAGE_PATH"); val != "" {
+
+				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_MESSAGE_PATH"); val != "" {
 					c.EmailOperatorMessagePath = val
 				} else {
 					c.EmailOperatorMessagePath = *argServerOperatorMessagePath
@@ -1040,41 +1230,48 @@ func (c *CmdLineConfig) Init(args []string) {
 		 * Mail server settings
 		 */
 
-		if val := os.Getenv("MAIL_SERVER"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_SERVER_ADDRESS"); val != "" {
 			c.MailServer = val
 		} else {
 			c.MailServer = *argServerMailServer
 		}
-		if val := os.Getenv("MAIL_HELO"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_HELO"); val != "" {
 			c.MailHelo = val
 		} else {
 			c.MailHelo = *argServerMailHelo
 		}
-		if val := os.Getenv("MAIL_PORT"); val != "" {
-			p, err := strconv.Atoi(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_SERVER_PORT"); val != "" {
+			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: MAIL_PORT can not be used:", parser.Usage(err))
+				log.Fatalln("Error: GEOIPPOLICYD_MAIL_SERVER_PORT can not be used:", parser.Usage(err.Error()))
 			}
-			c.MailPort = p
+
+			c.MailPort = param
 		} else {
 			c.MailPort = *argServerMailPort
 		}
-		if val := os.Getenv("MAIL_USERNAME"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_USERNAME"); val != "" {
 			c.MailUsername = val
 		} else {
 			c.MailUsername = *argServerMailUsername
 		}
-		if val := os.Getenv("MAIL_PASSWORD"); val != "" {
+
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_PASSWORD"); val != "" {
 			c.MailPassword = val
 		} else {
 			c.MailPassword = *argServerMailPasswordPath
 		}
-		if val := os.Getenv("MAIL_SSL"); val != "" {
-			p, err := strconv.ParseBool(val)
+
+		if val := os.Getenv("GEOIPPOLICYD_MAIL_SSL_ON_CONNECT"); val != "" {
+			param, err := strconv.ParseBool(val)
 			if err != nil {
-				log.Fatalln("Error:", err)
+				log.Fatalln("Error:", err.Error())
 			}
-			c.MailSSL = p
+
+			c.MailSSL = param
 		} else {
 			c.MailSSL = *argServerMailSSL
 		}

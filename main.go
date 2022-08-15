@@ -21,144 +21,142 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/oschwald/maxminddb-golang"
-	"io/ioutil"
-	"log"
+	"io"
 	"net"
 	"os"
 	"os/signal"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
+	"github.com/oschwald/maxminddb-golang"
 )
 
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	cfg        *CmdLineConfig
-	ldapServer *LDAP
-
-	// Reloadable data
-	cs atomic.Value
-	gi atomic.Value
-
-	DebugLogger *log.Logger
-	InfoLogger  *log.Logger
-	ErrorLogger *log.Logger
+	config              *CmdLineConfig   //nolint:gochecknoglobals // System wide configuration
+	customSettingsStore atomic.Value     //nolint:gochecknoglobals // System wide configuration from custom.yml file
+	geoIPStore          atomic.Value     //nolint:gochecknoglobals // System wide GeoIP handler
+	ldapRequestChan     chan LdapRequest //nolint:gochecknoglobals // Needed for LDAP pooling
+	ldapEnd             chan bool        //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
+	redisRWPool         RedisPool        //nolint:gochecknoglobals // System wide redis pool
+	logger              log.Logger       //nolint:gochecknoglobals // System wide logger
 )
 
-func init() {
-	InfoLogger = log.New(os.Stdout, "INFO: ", 0)
-	DebugLogger = log.New(os.Stdout, "DEBUG: ", log.Lshortfile)
-	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Lshortfile)
-}
+func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
+	customSettings := &CustomSettings{}
 
-func initCustomSettings(cfg *CmdLineConfig) *CustomSettings {
-	customSettings := new(CustomSettings)
-	if cfg.CustomSettingsPath != "" {
-		jsonFile, err := os.Open(cfg.CustomSettingsPath)
+	if cmdLineConfig.CustomSettingsPath != "" {
+		jsonFile, err := os.Open(cmdLineConfig.CustomSettingsPath)
 		if err != nil {
-			ErrorLogger.Fatalln(err)
+			level.Error(logger).Log("error", err.Error())
 		}
 
 		//goland:noinspection GoUnhandledErrorResult
 		defer jsonFile.Close()
 
-		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
-			ErrorLogger.Fatalln(err)
-		} else {
-			if err := json.Unmarshal(byteValue, customSettings); err != nil {
-				log.Fatalln("Error:", err)
-			}
+		if byteValue, err := io.ReadAll(jsonFile); err != nil {
+			level.Error(logger).Log("error", err.Error())
+		} else if err := json.Unmarshal(byteValue, customSettings); err != nil {
+			level.Error(logger).Log("error", err.Error())
 		}
+
 		return customSettings
 	}
+
 	return nil
 }
 
 func main() {
 	var (
-		err    error
-		server net.Listener
+		err      error
+		server   net.Listener
+		logLevel level.Option
 	)
-
-	// Manually set time zone
-	if tz := os.Getenv("TZ"); tz != "" {
-		var err error
-		if time.Local, err = time.LoadLocation(tz); err != nil {
-			ErrorLogger.Printf("Error loading location '%s': %v\n", tz, err.Error())
-		}
-	}
 
 	sigs := make(chan os.Signal, 1)
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	cfg = new(CmdLineConfig)
-	cfg.Init(os.Args)
+	config = &CmdLineConfig{}
+	config.Init(os.Args)
+
+	ioWriter := log.NewSyncWriter(os.Stdout)
+
+	if config.LogFormatJSON {
+		logger = log.NewJSONLogger(ioWriter)
+	} else {
+		logger = log.NewLogfmtLogger(ioWriter)
+	}
+
+	switch config.VerboseLevel {
+	case logLevelNone:
+		logLevel = level.AllowNone()
+	case logLevelInfo:
+		logLevel = level.AllowInfo()
+	case logLevelDebug:
+		logLevel = level.AllowDebug()
+	}
+
+	logger = level.NewFilter(logger, logLevel)
+	logger = log.With(logger, "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)
+
+	// Manually set time zone
+	if tz := os.Getenv("TZ"); tz != "" {
+		if time.Local, err = time.LoadLocation(tz); err != nil {
+			level.Error(logger).Log("error", fmt.Sprintf("Error loading location '%s': %v", tz, err.Error()))
+		}
+	}
 
 	go func() {
 		sig := <-sigs
-		if cfg.VerboseLevel >= logLevelInfo {
-			InfoLogger.Println("Shutting down. Received signal:", sig)
-		}
+
+		level.Info(logger).Log("msg", "Shutting down geoip-policyd", "signal", sig)
 		os.Exit(0)
 	}()
 
-	if cfg.CommandServer {
-		cs.Store(initCustomSettings(cfg))
+	if config.CommandServer {
+		customSettingsStore.Store(initCustomSettings(config))
 
-		if cfg.VerboseLevel >= logLevelInfo {
-			InfoLogger.Printf("Starting geoip-policyd server (%s): '%s:%d'\n", version, cfg.ServerAddress, cfg.ServerPort)
+		level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
+
+		if config.UseLDAP {
+			ldapRequestChan = make(chan LdapRequest, ldapPoolSize)
+			ldapEnd = make(chan bool)
+
+			// Start LDAP worker process
+			go ldapWorker()
 		}
 
-		if cfg.VerboseLevel == logLevelDebug {
-			DebugLogger.Println(cfg)
-		}
+		geoIP := &GeoIP{}
+		geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
 
-		if cfg.UseLDAP {
-			ldapServer = &LDAP{
-				ServerURIs:    cfg.LDAP.ServerURIs,
-				BaseDN:        cfg.LDAP.BaseDN,
-				BindDN:        cfg.LDAP.BindDN,
-				BindPW:        cfg.LDAP.BindPW,
-				Filter:        cfg.LDAP.Filter,
-				ResultAttr:    cfg.LDAP.ResultAttr,
-				StartTLS:      cfg.LDAP.StartTLS,
-				TLSSkipVerify: cfg.LDAP.TLSSkipVerify,
-				TLSCAFile:     cfg.LDAP.TLSCAFile,
-				TLSClientCert: cfg.LDAP.TLSClientCert,
-				TLSClientKey:  cfg.LDAP.TLSClientKey,
-				SASLExternal:  cfg.LDAP.SASLExternal,
-				Scope:         cfg.LDAP.Scope,
-				Mu:            new(sync.Mutex),
-			}
-
-			if cfg.VerboseLevel == logLevelDebug {
-				DebugLogger.Println("LDAP:", ldapServer)
-			}
-			ldapServer.connect("-")
-			ldapServer.bind("-")
-		}
-
-		geoip := new(GeoIP)
-		geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
 		if err != nil {
-			ErrorLogger.Fatal("Can not open GeoLite2-City database file", err)
+			level.Error(logger).Log("msg", "Can not open GeoLite2-City database file", "error", err.Error())
+
+			geoIP = nil
 		}
-		gi.Store(geoip)
+
+		geoIPStore.Store(geoIP)
 
 		// REST interface
 		go httpApp()
 
-		server, err = net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort))
+		// Initialize global redis pools
+		redisRWPool = NewRedisPool()
+
+		server, err = net.Listen("tcp", fmt.Sprintf("%s:%d", config.ServerAddress, config.ServerPort))
 		if server == nil {
-			ErrorLogger.Panic("Unable to start server:", err)
+			level.Error(logger).Log("msg", "Unable to start server", "error", err.Error())
 		}
-		clientChannel := clientConnections(server)
+
+		clientChan := clientConnections(server)
+
 		for {
-			go handleConnection(<-clientChannel, cfg)
+			go handleConnection(<-clientChan, config)
 		}
 	}
 }

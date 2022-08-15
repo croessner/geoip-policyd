@@ -23,15 +23,18 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
-	"github.com/gomodule/redigo/redis"
-	"github.com/oschwald/maxminddb-golang"
-	"io/ioutil"
+	"io"
 	"log"
 	"mime"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/go-kit/log/level"
+	"github.com/gomodule/redigo/redis"
+	"github.com/oschwald/maxminddb-golang"
+	"github.com/segmentio/ksuid"
 )
 
 const (
@@ -42,8 +45,10 @@ const (
 	DELETE = "DELETE"
 )
 
-// HttpApp Basic auth for the HTTP service
-type HttpApp struct {
+const Sender = "sender"
+
+// HTTPApp Basic auth for the HTTP service.
+type HTTPApp struct {
 	auth struct {
 		username string
 		password string
@@ -63,82 +68,108 @@ type Body struct {
 
 func HasContentType(request *http.Request, mimetype string) bool {
 	contentType := request.Header.Get("Content-type")
+
 	for _, v := range strings.Split(contentType, ",") {
 		t, _, err := mime.ParseMediaType(v)
 		if err != nil {
 			break
 		}
+
 		if t == mimetype {
 			return true
 		}
 	}
+
 	return false
 }
 
-func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
-	/*
-		if err := request.ParseForm(); err != nil {
-			ErrorLogger.Println(err)
-			return
-		}
-	*/
-
+//nolint:gocognit,gocyclo,maintidx // Ignore complexity
+func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http.Request) {
 	method := request.Method
 	uri := request.URL
 	client := request.RemoteAddr
+	guid := ksuid.New().String()
 
 	switch method {
 	case GET:
 		switch uri.Path {
 		case "/reload":
-			var err error
-			var customSettings *CustomSettings
-			var newCustomSettings *CustomSettings
+			var (
+				err               error
+				customSettings    *CustomSettings
+				newCustomSettings *CustomSettings
+			)
 
-			geoip := new(GeoIP)
-			geoip.Reader, err = maxminddb.Open(cfg.GeoipPath)
+			geoip := &GeoIP{}
+			geoip.Reader, err = maxminddb.Open(config.GeoipPath)
+
 			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", err.Error())
+
 				return
 			}
-			gi.Store(geoip)
-			if cfg.VerboseLevel >= logLevelInfo {
-				InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.GeoipPath)
-			}
 
-			if customSettings = cs.Load().(*CustomSettings); customSettings != nil {
-				newCustomSettings = initCustomSettings(cfg)
+			geoIPStore.Store(geoip)
+
+			level.Info(logger).Log(
+				"guid", guid,
+				"client", client,
+				"request", method,
+				"path", uri.Path,
+				"file", config.GeoipPath,
+				"result", "reloaded")
+
+			//nolint:forcetypeassert // Global variable
+			if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
+				newCustomSettings = initCustomSettings(config)
 				if newCustomSettings != nil {
-					cs.Store(newCustomSettings)
-					if cfg.VerboseLevel >= logLevelInfo {
-						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s reloaded'", client, method, uri.Path, cfg.CustomSettingsPath)
-					}
+					customSettingsStore.Store(newCustomSettings)
+
+					level.Info(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"file", config.CustomSettingsPath,
+						"result", "reloaded")
 				}
 			}
-			rw.WriteHeader(http.StatusAccepted)
+
+			responseWriter.WriteHeader(http.StatusAccepted)
 
 		case "/custom-settings":
-			rw.Header().Set("Content-Type", "application/json")
+			responseWriter.Header().Set("Content-Type", "application/json")
 
-			if customSettings := cs.Load().(*CustomSettings); customSettings != nil {
-				if err := json.NewEncoder(rw).Encode(customSettings.Data); err != nil {
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+			//nolint:forcetypeassert // Global variable
+			if customSettings := customSettingsStore.Load().(*CustomSettings); customSettings != nil {
+				if err := json.NewEncoder(responseWriter).Encode(customSettings.Data); err != nil {
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", err.Error())
+
 					return
-				} else {
-					if cfg.VerboseLevel >= logLevelInfo {
-						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-					}
 				}
+
+				level.Info(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path)
 			} else {
-				rw.WriteHeader(http.StatusNoContent)
-				if cfg.VerboseLevel >= logLevelInfo {
-					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-				}
+				responseWriter.WriteHeader(http.StatusNoContent)
+
+				level.Info(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path)
 			}
 
 		default:
-			rw.WriteHeader(http.StatusNotFound)
+			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case POST:
@@ -147,110 +178,154 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			var requestData *Body
 
 			if !HasContentType(request, "application/json") {
-				rw.WriteHeader(http.StatusBadRequest)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", "wrong Content-Type header")
+
 				return
 			}
 
-			body, err := ioutil.ReadAll(request.Body)
+			body, err := io.ReadAll(request.Body)
 			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
 				return
-			} else {
-				requestData = new(Body)
-				if err := json.Unmarshal(body, requestData); err != nil {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
-					return
-				}
 			}
 
-			if requestData.Key == "sender" {
+			requestData = &Body{}
+			if err := json.Unmarshal(body, requestData); err != nil {
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
+				return
+			}
+
+			if requestData.Key == Sender {
 				sender, ok := requestData.Value.(string)
 				if !ok {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "value must be string")
+
 					return
 				}
+
 				if sender == "" {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "value must not be empty")
+
 					return
 				}
-				var redisHelper = &Redis{}
-				redisConnW := redisHelper.WriteConn()
+
+				redisConnW := redisRWPool.NewWriteConn()
 
 				//goland:noinspection GoUnhandledErrorResult
 				defer redisConnW.Close()
 
-				if cfg.UseLDAP {
-					var err error
-					var ldapResult string
+				if config.UseLDAP {
+					var (
+						err         error
+						ldapReply   LdapReply
+						ldapRequest LdapRequest
+					)
 
-					ldapServer := &cfg.LDAP
+					ldapReplyChan := make(chan LdapReply)
 
-					if ldapResult, err = ldapServer.search(sender, "-"); err != nil {
-						InfoLogger.Println(err)
-						if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-							ldapServer.LDAPConn.Close()
-							ldapServer.connect("-")
-							ldapServer.bind("-")
-							ldapResult, _ = ldapServer.search(sender, "-")
-						}
+					ldapRequest.username = sender
+					ldapRequest.filter = config.LDAP.Filter
+					ldapRequest.guid = guid
+					ldapRequest.attributes = config.LDAP.ResultAttr
+					ldapRequest.replyChan = ldapReplyChan
+
+					ldapRequestChan <- ldapRequest
+
+					ldapReply = <-ldapReplyChan
+
+					if ldapReply.err != nil {
+						level.Error(logger).Log("guid", guid, "error", err.Error())
+					} else if resultAttr, ok := ldapReply.result[config.LDAP.ResultAttr[0]]; ok {
+						// LDAP single value
+						sender = resultAttr[0]
 					}
-					if ldapResult != "" {
-						sender = ldapResult
-					}
 				}
 
-				key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
-				if _, err := redisConnW.Do("DEL",
-					redis.Args{}.Add(key)...); err != nil {
-					ErrorLogger.Println(err)
+				key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
+				if _, err := redisConnW.Do("DEL", redis.Args{}.Add(key)...); err != nil {
+					level.Error(logger).Log("guid", guid, "error", err.Error())
 				}
-				if cfg.VerboseLevel >= logLevelInfo {
-					InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='%s unlocked'", client, method, uri.Path, sender)
-				}
-				rw.WriteHeader(http.StatusAccepted)
+
+				level.Info(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"sender", sender,
+					"result", "unlocked")
+
+				responseWriter.WriteHeader(http.StatusAccepted)
 			} else {
-				rw.WriteHeader(http.StatusBadRequest)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='unknown key'", client, method, uri.Path)
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", "unknown key")
 			}
 
 		default:
-			rw.WriteHeader(http.StatusNotFound)
+			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case PUT:
 		switch uri.Path {
 		case "/update":
 			if !HasContentType(request, "application/json") {
-				rw.WriteHeader(http.StatusBadRequest)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", "wrong Content-Type header")
+
 				return
 			}
 
-			body, err := ioutil.ReadAll(request.Body)
+			body, err := io.ReadAll(request.Body)
 			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
 			} else {
-				customSettings := new(CustomSettings)
+				customSettings := &CustomSettings{}
 				if err := json.Unmarshal(body, customSettings); err != nil {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
 				} else {
-					rw.WriteHeader(http.StatusAccepted)
-					cs.Store(customSettings)
-					if cfg.VerboseLevel >= logLevelInfo {
-						InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-					}
+					responseWriter.WriteHeader(http.StatusAccepted)
+					customSettingsStore.Store(customSettings)
+
+					level.Info(logger).Log(
+						"guid", guid, "client", client, "request", method, "path", uri.Path, "result", "success")
 				}
 			}
 
 		default:
-			rw.WriteHeader(http.StatusNotFound)
+			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case PATCH:
@@ -259,29 +334,41 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			var requestData *Body
 
 			if !HasContentType(request, "application/json") {
-				rw.WriteHeader(http.StatusBadRequest)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", "wrong Content-Type header")
+
 				return
 			}
 
-			body, err := ioutil.ReadAll(request.Body)
+			body, err := io.ReadAll(request.Body)
 			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
 			} else {
-				requestData = new(Body)
+				requestData = &Body{}
+				//nolint:govet // Ignore
 				if err := json.Unmarshal(body, requestData); err != nil {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
 					return
 				}
 			}
 
-			if requestData.Key == "sender" {
-				account, ok := requestData.Value.(map[string]interface{})
+			if requestData.Key == Sender {
+				account, ok := requestData.Value.(map[string]any)
 				if !ok {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be account'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
 					return
 				}
 
@@ -295,92 +382,161 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 
 				if val, ok := account["comment"]; ok {
 					if comment, ok = val.(string); !ok {
-						rw.WriteHeader(http.StatusBadRequest)
-						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='comment not string'", client, method, uri.Path)
+						responseWriter.WriteHeader(http.StatusBadRequest)
+						level.Error(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"error", "'comment' is not a string")
+
 						return
 					}
 				}
+
 				if val, ok := account["countries"]; ok {
 					if tempFloat, ok = val.(float64); !ok {
 						log.Printf("%T: %v\n", account["countries"], account["countries"])
-						rw.WriteHeader(http.StatusBadRequest)
-						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='countries not float64'", client, method, uri.Path)
+						responseWriter.WriteHeader(http.StatusBadRequest)
+						level.Error(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"error", "'countries' is not a float64")
+
 						return
-					} else {
-						countries = int(tempFloat)
 					}
+
+					countries = int(tempFloat)
 				}
+
 				if val, ok := account["ips"]; ok {
 					if tempFloat, ok = val.(float64); !ok {
-						rw.WriteHeader(http.StatusBadRequest)
-						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='ips not float64'", client, method, uri.Path)
+						responseWriter.WriteHeader(http.StatusBadRequest)
+						level.Error(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"error", "'ips' is not a float64")
+
 						return
-					} else {
-						ips = int(tempFloat)
 					}
+
+					ips = int(tempFloat)
 				}
-				if val, ok := account["sender"]; ok {
+
+				if val, ok := account[Sender]; ok {
 					if sender, ok = val.(string); !ok {
-						rw.WriteHeader(http.StatusBadRequest)
-						ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='sender not string'", client, method, uri.Path)
+						responseWriter.WriteHeader(http.StatusBadRequest)
+						level.Error(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"error", "'sender' is not a string")
+
 						return
 					}
 				}
+
 				if countries <= 0 {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='countries %d <= 0'", client, method, uri.Path, countries)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "'countries' lower than zero",
+						"countries", countries)
+
 					return
 				}
+
 				if ips <= 0 {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='ips %d <= 0'", client, method, uri.Path, ips)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "'ips' lower than zero",
+						"ips", ips)
+
 					return
 				}
+
 				if sender == "" {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='empty sender'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "'sender' is empty")
+
 					return
 				}
 
 				if val := os.Getenv("GO_TESTING"); val == "" {
-					customSettings := cs.Load().(*CustomSettings)
+					customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
 					if customSettings != nil {
-						for i, record := range customSettings.Data {
-							if record.Sender == sender {
-								// Update record
-								customSettings.Data[i].Ips = ips
-								customSettings.Data[i].Countries = countries
-								customSettings.Data[i].Comment = comment
-								cs.Store(customSettings)
-								rw.WriteHeader(http.StatusAccepted)
-								if cfg.VerboseLevel >= logLevelInfo {
-									InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-								}
-								return
+						for index, record := range customSettings.Data {
+							if record.Sender != sender {
+								continue
 							}
+
+							// Update record
+							customSettings.Data[index].IPs = ips
+							customSettings.Data[index].Countries = countries
+							customSettings.Data[index].Comment = comment
+
+							customSettingsStore.Store(customSettings)
+							responseWriter.WriteHeader(http.StatusAccepted)
+
+							level.Info(logger).Log(
+								"guid", guid,
+								"client", client,
+								"request", method,
+								"path", uri.Path,
+								"result", "success")
+
+							return
 						}
+
 						// Add record
-						account := Account{Comment: comment, Sender: sender, Ips: ips, Countries: countries}
+						account := Account{Comment: comment, Sender: sender, IPs: ips, Countries: countries}
 						customSettings.Data = append(customSettings.Data, account)
-						cs.Store(customSettings)
-						rw.WriteHeader(http.StatusAccepted)
-						if cfg.VerboseLevel >= logLevelInfo {
-							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-						}
+
+						customSettingsStore.Store(customSettings)
+						responseWriter.WriteHeader(http.StatusAccepted)
+
+						level.Info(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"result", "success")
 					} else {
-						account := Account{Comment: comment, Sender: sender, Ips: ips, Countries: countries}
+						account := Account{Comment: comment, Sender: sender, IPs: ips, Countries: countries}
 						customSettings = &CustomSettings{Data: []Account{account}}
-						cs.Store(customSettings)
-						rw.WriteHeader(http.StatusAccepted)
-						if cfg.VerboseLevel >= logLevelInfo {
-							InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-						}
+
+						customSettingsStore.Store(customSettings)
+						responseWriter.WriteHeader(http.StatusAccepted)
+
+						level.Info(logger).Log(
+							"guid", guid,
+							"client", client,
+							"request", method,
+							"path", uri.Path,
+							"result", "success")
 					}
 				}
 			}
 
 		default:
-			rw.WriteHeader(http.StatusNotFound)
+			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case DELETE:
@@ -389,74 +545,117 @@ func (a *HttpApp) httpRootPage(rw http.ResponseWriter, request *http.Request) {
 			var requestData *Body
 
 			if !HasContentType(request, "application/json") {
-				rw.WriteHeader(http.StatusBadRequest)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='wrong Content-Type header'", client, method, uri.Path)
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", "wrong Content-Type header")
+
 				return
 			}
 
-			body, err := ioutil.ReadAll(request.Body)
+			body, err := io.ReadAll(request.Body)
 			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-				ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", err.Error())
 			} else {
-				requestData = new(Body)
+				requestData = &Body{}
 				if err := json.Unmarshal(body, requestData); err != nil {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s'", client, method, uri.Path, err)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
 					return
 				}
 			}
 
-			if requestData.Key == "sender" {
+			if requestData.Key == Sender {
 				sender, ok := requestData.Value.(string)
 				if !ok {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must be string'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "value must be string")
+
 					return
 				}
+
 				if sender == "" {
-					rw.WriteHeader(http.StatusBadRequest)
-					ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='value must not be emtpy'", client, method, uri.Path)
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "value must not be empty")
+
 					return
 				}
 
 				if val := os.Getenv("GO_TESTING"); val == "" {
-					customSettings := cs.Load().(*CustomSettings)
+					customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
 					if customSettings != nil {
 						if len(customSettings.Data) > 0 {
-							for i, record := range customSettings.Data {
-								if record.Sender == sender {
-									customSettings.Data = func(s []Account, i int) []Account {
-										s[i] = s[len(s)-1]
-										return s[:len(s)-1]
-									}(customSettings.Data, i)
-									cs.Store(customSettings)
-									rw.WriteHeader(http.StatusAccepted)
-									if cfg.VerboseLevel >= logLevelInfo {
-										InfoLogger.Printf("client=%s; request='%s'; path='%s'; result='success'", client, method, uri.Path)
-									}
-									return
+							for index, record := range customSettings.Data {
+								if record.Sender != sender {
+									continue
 								}
+
+								customSettings.Data = func(s []Account, i int) []Account {
+									s[i] = s[len(s)-1]
+
+									return s[:len(s)-1]
+								}(customSettings.Data, index)
+
+								customSettingsStore.Store(customSettings)
+								responseWriter.WriteHeader(http.StatusAccepted)
+
+								level.Info(logger).Log(
+									"guid", guid,
+									"client", client,
+									"request", method,
+									"path", uri.Path,
+									"result", "success")
+
+								return
 							}
-							rw.WriteHeader(http.StatusBadRequest)
-							ErrorLogger.Printf("client=%s; request='%s'; path='%s'; result='%s not found'", client, method, uri.Path, sender)
+
+							responseWriter.WriteHeader(http.StatusBadRequest)
+							level.Error(logger).Log(
+								"guid", guid,
+								"client", client,
+								"request", method,
+								"path", uri.Path,
+								"error", "sender not found",
+								"sender", sender)
 						}
 					}
 				}
 			}
 
 		default:
-			rw.WriteHeader(http.StatusNotFound)
+			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	default:
-		rw.WriteHeader(http.StatusMethodNotAllowed)
+		responseWriter.WriteHeader(http.StatusMethodNotAllowed)
+
 		return
 	}
 }
 
-func (a *HttpApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
-	return func(rw http.ResponseWriter, request *http.Request) {
+func (a *HTTPApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(responseWriter http.ResponseWriter, request *http.Request) {
 		username, password, ok := request.BasicAuth()
 		if ok {
 			usernameHash := sha256.Sum256([]byte(username))
@@ -468,19 +667,21 @@ func (a *HttpApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 			passwordMatch := subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1
 
 			if usernameMatch && passwordMatch {
-				next.ServeHTTP(rw, request)
+				next.ServeHTTP(responseWriter, request)
+
 				return
 			}
 		}
 
-		rw.Header().Set("WWW-Authenticate", `Basic realm="Protected area", charset="UTF-8"`)
-		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		responseWriter.Header().Set("WWW-Authenticate", `Basic realm="Protected area", charset="UTF-8"`)
+		http.Error(responseWriter, "Unauthorized", http.StatusUnauthorized)
 	}
 }
 
 func httpApp() {
 	var err error
-	app := &cfg.HttpApp
+
+	app := &config.HTTPApp
 
 	mux := http.NewServeMux()
 	if app.useBasicAuth {
@@ -490,20 +691,22 @@ func httpApp() {
 	}
 
 	www := &http.Server{
-		Addr:         cfg.HttpAddress,
-		Handler:      mux,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:              fmt.Sprintf("%s:%d", config.HTTPAddress, config.HTTPPort),
+		Handler:           mux,
+		IdleTimeout:       time.Minute,
+		ReadTimeout:       10 * time.Second, //nolint:gomnd // Time factor
+		ReadHeaderTimeout: 10 * time.Second, //nolint:gomnd // Time factor
+		WriteTimeout:      30 * time.Second, //nolint:gomnd // Time factor
 	}
 
-	if cfg.VerboseLevel >= logLevelInfo {
-		InfoLogger.Printf("Starting geoip-policyd HTTP service with address: '%s'", www.Addr)
-	}
+	level.Info(logger).Log("msg", "Starting geoip-policyd HTTP service", "address", www.Addr)
+
 	if app.useSSL {
 		err = www.ListenAndServeTLS(app.x509.cert, app.x509.key)
 	} else {
 		err = www.ListenAndServe()
 	}
-	ErrorLogger.Fatalln(err)
+
+	level.Error(logger).Log("error", err.Error())
+	os.Exit(1)
 }

@@ -22,59 +22,57 @@ import (
 	"bufio"
 	"net"
 	"strings"
+
+	"github.com/go-kit/log/level"
 )
 
 func clientConnections(listener net.Listener) chan net.Conn {
-	ch := make(chan net.Conn)
+	clientConnectionsChan := make(chan net.Conn)
+
 	go func() {
 		for {
 			client, err := listener.Accept()
 			if client == nil {
-				ErrorLogger.Println("Couldn't accept connection:", err)
+				level.Error(logger).Log("error", err.Error())
+
 				continue
 			}
-			if cfg.VerboseLevel == logLevelDebug {
-				DebugLogger.Printf("Client %v connected\n", client.RemoteAddr())
-			}
-			ch <- client
+
+			level.Debug(logger).Log("msg", "Client connected", "client_ip", client.RemoteAddr().String())
+
+			clientConnectionsChan <- client
 		}
 	}()
-	return ch
+
+	return clientConnectionsChan
 }
 
 //goland:noinspection GoUnhandledErrorResult
 func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 	b := bufio.NewReader(client)
-	var policyRequest = make(map[string]string)
-	var instance string
+	policyRequest := make(map[string]string)
 
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
-			if cfg.VerboseLevel == logLevelDebug {
-				DebugLogger.Printf("Client %v disconnected\n", client.RemoteAddr())
-			}
+			level.Debug(logger).Log("msg", "Client disconnected", "client_ip", client.RemoteAddr().String())
 			client.Close()
+
 			break
 		}
 
 		lineStr := strings.TrimSpace(string(lineBytes))
+		//nolint:gomnd // Split into key and "list" of values
 		items := strings.SplitN(lineStr, "=", 2)
+
+		//nolint:gomnd // Either items is a key=value pair or it is empty, indicating the end of the request
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			if cfg.VerboseLevel == logLevelDebug {
-				if val, ok := policyRequest["instance"]; ok {
-					instance = val
-				} else {
-					instance = "-"
-				}
-				DebugLogger.Printf("instance=\"%s\" %+v\n", instance, policyRequest)
-			}
+			client.Write([]byte(getPolicyResponse(cfg, policyRequest) + "\n\n"))
 
-			result := getPolicyResponse(cfg, policyRequest)
-			client.Write([]byte(result + "\n\n"))
-			policyRequest = make(map[string]string) // Clear policy request for next connection
+			// Clear policy request for next connection
+			policyRequest = make(map[string]string)
 		}
 	}
 }
