@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/go-kit/log/level"
 	"github.com/gomodule/redigo/redis"
@@ -409,10 +410,12 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 	level.Info(logger).Log(
 		"guid", guid,
 		senderKey, sender,
-		"countries", remoteClient.Countries,
-		"ip_addresses", remoteClient.IPs,
-		"number_of_countries", fmt.Sprintf("%d/%d", len(remoteClient.Countries), usedMaxCountries),
-		"number_of_ips", fmt.Sprintf("%d/%d", len(remoteClient.IPs), usedMaxIPs),
+		"countries", func() string { return strings.Join(remoteClient.Countries, ",") }(),
+		"total_countries", len(remoteClient.Countries),
+		"allowed_max_countries", usedMaxCountries,
+		"ips", func() string { return strings.Join(remoteClient.IPs, ",") }(),
+		"total_ips", len(remoteClient.IPs),
+		"allowed_max_ips", usedMaxIPs,
 		"action", actionText)
 
 	return fmt.Sprintf("action=%s", actionText)
