@@ -109,24 +109,27 @@ Arguments:
   -h  --help                          Print help information
   -a  --server-address                IPv4 or IPv6 address for the policy service. Default: 127.0.0.1
   -p  --server-port                   Port for the policy service. Default: 4646
-      --http-address                  HTTP address for incoming requests. Default: 127.0.0.1:8080
+      --http-address                  HTTP address for incoming requests. Default: 127.0.0.1
+      --http-port                     HTTP port for incoming requests. Default 8080
       --sasl-username                 Use 'sasl_username' instead of the 'sender' attribute. Default: false
   -A  --redis-address                 IPv4 or IPv6 address for the Redis service. Default: 127.0.0.1
   -P  --redis-port                    Port for the Redis service. Default: 6379
       --redis-database-number         Redis database number. Default: 0
       --redis-username                Redis username. Default: 
       --redis-password                Redis password. Default: 
+      --redis-protocol                Redis connection protocol; one of 'tcp', 'tcp6' or 'unix'. Default: tcp
       --redis-writer-address          IPv4 or IPv6 address for a Redis service (writer). Default: 127.0.0.1
       --redis-writer-port             Port for a Redis service (writer). Default: 6379
       --redis-writer-database-number  Redis database number (writer). Default: 0
       --redis-writer-username         Redis username (writer). Default: 
       --redis-writer-password         Redis password (writer). Default: 
+      --redis-writer-protocol         Redis connection protocol (writer); one of 'tcp', 'tcp6' or 'unix'. Default: tcp
       --redis-prefix                  Redis prefix. Default: geopol_
       --redis-ttl                     Redis TTL in seconds. Default: 3600
   -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
-      --blocked-no-expire             Do not expire senders from Redis, if they were blocked in the past. Default: false
+      --block-permanent               Do not expire senders from Redis, if they were blocked in the past. Default: false
   -c  --custom-settings-path          Custom settings with different IP and country limits. Default: 
       --http-use-basic-auth           Enable basic HTTP auth. Default: false
       --http-use-ssl                  Enable HTTPS. Default: false
@@ -148,6 +151,7 @@ Arguments:
       --ldap-tls-client-key           File containing a TLS client key. Default: 
       --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
       --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
+      --ldap-pool-size                LDAP pre-forked pool size. Default: 10
       --run-actions                   Run actions, if a sender is over limits. Default: false
       --run-action-operator           Run the operator action. Default: false
       --operator-to                   E-Mail To-header for the operator action. Default: 
@@ -155,12 +159,13 @@ Arguments:
       --operator-subject              E-Mail Subject-header for the operator action. Default: [geoip-policyd] An e-mail account was compromised
       --operator-message-ct           E-Mail Content-Type-header for the operator action. Default: text/plain
       --operator-message-path         Full path to the e-mail message file for the operator action. Default: 
-      --mail-server                   E-mail server address for notifications. Default: 
+      --mail-server-address           E-mail server address for notifications. Default: 
+      --mail-server-port              E-mail server port number. Default: 
       --mail-helo                     E-mail server HELO/EHLO hostname. Default: localhost
       --mail-port                     E-mail server port number. Default: 587
       --mail-username                 E-mail server username. Default: 
       --mail-password                 E-mail server password. Default: 
-      --mail-ssl                      Use TLS on connect for the e-mail server. Default: false
+      --mail-ssl-on-connect           Use TLS on connect for the e-mail server. Default: false
   -v  --verbose                       Verbose mode. Repeat this for an increased log level
       --version                       Current version
 ```
@@ -174,62 +179,66 @@ on running the service as a docker service.
 
 ## Server
 
-Variable | Description
----|---
-SERVER_ADDRESS | IPv4 or IPv6 address for the policy service; default(127.0.0.1)
-SERVER_PORT | Port for the policy service; default(4646)
-HTTP_ADDRESS | HTTP address for incoming requests; default(127.0.0.1:8080)
-USE_SASL_USERNAME | Use 'sasl_username' instead of the 'sender' attribute; default(false)
-REDIS_ADDRESS | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)
-REDIS_PORT | Port for the Redis service; default(6379)
-REDIS_DATABASE_NUMBER | Redis database number
-REDIS_USERNAME | Redis username
-REDIS_PASSWORD | Redis password
-REDIS_WRITER_ADDRESS | IPv4 or IPv6 address for a Redis service (writer)
-REDIS_WRITER_PORT | Port for a Redis service (writer)
-REDIS_WRITER_DATABASE_NUMBER | Redis database number (writer)
-REDIS_WRITER_USERNAME | Redis username (writer)
-REDIS_WRITER_PASSWORD | Redis password (writer)
-REDIS_PREFIX | Redis prefix; default(geopol_)
-REDIS_TTL | Redis TTL; default(3600)
-GEOIP_PATH | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)
-MAX_COUNTRIES | Maximum number of countries before rejecting e-mails; default(3)
-MAX_IPS | Maximum number of IP addresses before rejecting e-mails; default(10)
-BLOCKED_NO_EXPIRE | Do not expire senders from Redis, if they were blocked in the past
-CUSTOM_SETTINGS_PATH | Custom settings with different IP and country limits
-HTTP_USE_BASIC_AUTH | Enable basic HTTP auth; default(false)
-HTTP_USE_SSL | Enable HTTPS; default(false)
-HTTP_BASIC_AUTH_USERNAME | HTTP basic auth username
-HTTP_BASIC_AUTH_PASSWORD | HTTP basic auth password
-HTTP_TLS_CERT | HTTP TLS server certificate (full chain); default(/localhost.pem)
-HTTP_TLS_KEY | HTTP TLS server key; default(/localhost-key.pem)
-USE_LDAP | Enable LDAP support; default(false)
-LDAP_SERVER_URIS | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)
-LDAP_BASEDN | Base DN
-LDAP_BINDPW | Bind PW
-LDAP_FILTER | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )
-LDAP_RESULT_ATTRIBUTE | Result attribute for the requested mail sender; default(mailAccount)
-LDAP_STARTTLS | If this option is given, use StartTLS
-LDAP_TLS_SKIP_VERIFY | Skip TLS server name verification
-LDAP_TLS_CAFILE | File containing TLS CA certificate(s)
-LDAP_TLS_CLIENT_CERT | File containing a TLS client certificate
-LDAP_TLS_CLIENT_KEY | File containing a TLS client key
-LDAP_SASL_EXTERNAL | Use SASL/EXTERNAL instead of a simple bind; default(false)
-LDAP_SCOPE | LDAP search scope [base, one, sub]; default(sub)
-RUN_ACTIONS | Run actions, if a sender is over limits; default(false)
-RUN_ACTION_OPERATOR | Run the operator action; default(false)
-OPERATOR_TO | E-Mail To-header for the operator action
-OPERATOR_FROM | E-Mail From-header for the operator action
-OPERATOR_SUBJECT | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised)
-OPERATOR_MESSAGE_CT | E-Mail Content-Type-header for the operator action; default(text/plain)
-OPERATOR_MESSAGE_PATH | Full path to the e-mail message file for the operator action
-MAIL_SERVER | E-mail server address for notifications
-MAIL_HELO | E-mail server HELO/EHLO hostname; default(localhost)
-MAIL_PORT | E-mail server port number; default(587)
-MAIL_USERNAME | E-mail server username
-MAIL_PASSWORD | E-mail server password
-MAIL_SSL | Use TLS on connect for the e-mail server; default(false)
-VERBOSE | Log level. One of 'none', 'info' or 'debug'
+| Variable                                  | Description                                                                                               |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| GEOIPPOLICYD_SERVER_ADDRESS               | IPv4 or IPv6 address for the policy service; default(127.0.0.1)                                           |
+| GEOIPPOLICYD_SERVER_PORT                  | Port for the policy service; default(4646)                                                                |
+| GEOIPPOLICYD_HTTP_ADDRESS                 | HTTP address for incoming requests; default(127.0.0.1:8080)                                               |
+ | GEOIPPOLICYD_HTTP_PORT                    | HTTP port for incoming requests; default(8080)                                                            |
+| GEOIPPOLICYD_USE_SASL_USERNAME            | Use 'sasl_username' instead of the 'sender' attribute; default(false)                                     |
+| GEOIPPOLICYD_REDIS_ADDRESS                | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)                                            |
+| GEOIPPOLICYD_REDIS_PORT                   | Port for the Redis service; default(6379)                                                                 |
+| GEOIPPOLICYD_REDIS_DATABASE_NUMBER        | Redis database number                                                                                     |
+| GEOIPPOLICYD_REDIS_USERNAME               | Redis username                                                                                            |
+| GEOIPPOLICYD_REDIS_PROTOCOL               | Redis connection protocol; one of 'tcp', 'tcp6' or 'unix'; default(tcp)                                   |
+| GEOIPPOLICYD_REDIS_WRITER_ADDRESS         | IPv4 or IPv6 address for a Redis service (writer)                                                         |
+| GEOIPPOLICYD_REDIS_WRITER_PORT            | Port for a Redis service (writer)                                                                         |
+| GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER | Redis database number (writer)                                                                            |
+| GEOIPPOLICYD_REDIS_WRITER_USERNAME        | Redis username (writer)                                                                                   |
+| GEOIPPOLICYD_REDIS_WRITER_PASSWORD        | Redis password (writer)                                                                                   |
+| GEOIPPOLICYD_REDIS_WRITER_PROTOCOL        | Redis connection protocol )writer); one of 'tcp', 'tcp6' or 'unix'; default(tcp)                          |
+| GEOIPPOLICYD_REDIS_PREFIX                 | Redis prefix; default(geopol_)                                                                            |
+| GEOIPPOLICYD_REDIS_TTL                    | Redis TTL; default(3600)                                                                                  |
+| GEOIPPOLICYD_GEOIP_PATH                   | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)                        |
+| GEOIPPOLICYD_MAX_COUNTRIES                | Maximum number of countries before rejecting e-mails; default(3)                                          |
+| GEOIPPOLICYD_MAX_IPS                      | Maximum number of IP addresses before rejecting e-mails; default(10)                                      |
+| GEOIPPOLICYD_BLOCK_PERMANENT              | Do not expire senders from Redis, if they were blocked in the past                                        |
+| GEOIPPOLICYD_CUSTOM_SETTINGS_PATH         | Custom settings with different IP and country limits                                                      |
+| GEOIPPOLICYD_HTTP_USE_BASIC_AUTH          | Enable basic HTTP auth; default(false)                                                                    |
+| GEOIPPOLICYD_HTTP_USE_SSL                 | Enable HTTPS; default(false)                                                                              |
+| GEOIPPOLICYD_HTTP_BASIC_AUTH_USERNAME     | HTTP basic auth username                                                                                  |
+| GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD     | HTTP basic auth password                                                                                  |
+| GEOIPPOLICYD_HTTP_TLS_CERT                | HTTP TLS server certificate (full chain); default(/localhost.pem)                                         |
+| GEOIPPOLICYD_HTTP_TLS_KEY                 | HTTP TLS server key; default(/localhost-key.pem)                                                          |
+| GEOIPPOLICYD_USE_LDAP                     | Enable LDAP support; default(false)                                                                       |
+| GEOIPPOLICYD_LDAP_SERVER_URIS             | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)      |
+| GEOIPPOLICYD_LDAP_BASEDN                  | Base DN                                                                                                   |
+| GEOIPPOLICYD_LDAP_BINDPW                  | Bind PW                                                                                                   |
+| GEOIPPOLICYD_LDAP_FILTER                  | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )                                   |
+| GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE        | Result attribute for the requested mail sender; default(mailAccount)                                      |
+| GEOIPPOLICYD_LDAP_STARTTLS                | If this option is given, use StartTLS                                                                     |
+| GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY         | Skip TLS server name verification                                                                         |
+| GEOIPPOLICYD_LDAP_TLS_CAFILE              | File containing TLS CA certificate(s)                                                                     |
+| GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT         | File containing a TLS client certificate                                                                  |
+| GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY          | File containing a TLS client key                                                                          |
+| GEOIPPOLICYD_LDAP_SASL_EXTERNAL           | Use SASL/EXTERNAL instead of a simple bind; default(false)                                                |
+| GEOIPPOLICYD_LDAP_SCOPE                   | LDAP search scope [base, one, sub]; default(sub)                                                          |
+| GEOIPPOLICYD_LDAP_POOL_SIZE               | LDAP pre-forked pool size; default(10)                                                                    |
+| GEOIPPOLICYD_RUN_ACTIONS                  | Run actions, if a sender is over limits; default(false)                                                   |
+| GEOIPPOLICYD_RUN_ACTION_OPERATOR          | Run the operator action; default(false)                                                                   |
+| GEOIPPOLICYD_OPERATOR_TO                  | E-Mail To-header for the operator action                                                                  |
+| GEOIPPOLICYD_OPERATOR_FROM                | E-Mail From-header for the operator action                                                                |
+| GEOIPPOLICYD_OPERATOR_SUBJECT             | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised) |
+| GEOIPPOLICYD_OPERATOR_MESSAGE_CT          | E-Mail Content-Type-header for the operator action; default(text/plain)                                   |
+| GEOIPPOLICYD_OPERATOR_MESSAGE_PATH        | Full path to the e-mail message file for the operator action                                              |
+| GEOIPPOLICYD_MAIL_SERVER_ADDRESS          | E-mail server address for notifications                                                                   |
+| GEOIPPOLICYD_MAIL_SERVER_PORT             | E-mail server port number                                                                                 |
+| GEOIPPOLICYD_MAIL_HELO                    | E-mail server HELO/EHLO hostname; default(localhost)                                                      |
+| GEOIPPOLICYD_MAIL_PORT                    | E-mail server port number; default(587)                                                                   |
+| GEOIPPOLICYD_MAIL_USERNAME                | E-mail server username                                                                                    |
+| GEOIPPOLICYD_MAIL_PASSWORD                | E-mail server password                                                                                    |
+| GEOIPPOLICYD_MAIL_SSL_ON_CONNECT          | Use TLS on connect for the e-mail server; default(false)                                                  |
+| GEOIPPOLICYD_VERBOSE_LEVEL                | Log level. One of 'none', 'info' or 'debug'                                                               |
 
 Back to [table of contents](#table-of-contents)
 

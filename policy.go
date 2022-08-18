@@ -21,166 +21,201 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gomodule/redigo/redis"
-	"github.com/segmentio/ksuid"
 	"net"
 	"os"
 	"strings"
+
+	"github.com/go-kit/log/level"
+	"github.com/gomodule/redigo/redis"
+	"github.com/segmentio/ksuid"
 )
 
-const deferText = "DEFER Service temporarily not available"
-const rejectText = "REJECT Your account seems to be compromised. Please contact your support"
+const (
+	deferText  = "DEFER Service temporarily not available"
+	rejectText = "REJECT Your account seems to be compromised. Please contact your support"
+)
 
 type RemoteClient struct {
-	Ips       []string `redis:"ips"`       // All known IP addresses
+	IPs       []string `redis:"ips"`       // All known IP addresses
 	Countries []string `redis:"countries"` // All known country codes
 	Actions   []string `redis:"actions"`   // All actions that may have run
 }
 
 func (r *RemoteClient) AddCountryCode(countryCode string) bool {
-	var updated = false
+	updated := false
+
 	if len(r.Countries) == 0 {
 		r.Countries = append(r.Countries, countryCode)
 		updated = true
 	} else {
-		var haveCC = false
+		haveCC := false
+
 		for _, value := range r.Countries {
 			if value == countryCode {
 				haveCC = true
 			}
 		}
+
 		if !haveCC {
 			r.Countries = append(r.Countries, countryCode)
 			updated = true
 		}
 	}
+
 	return updated
 }
 
-func (r *RemoteClient) AddIPAddress(ip string) bool {
-	var updated = false
-	if len(r.Ips) == 0 {
-		r.Ips = append(r.Ips, ip)
+func (r *RemoteClient) AddIPAddress(ipAddress string) bool {
+	updated := false
+
+	if len(r.IPs) == 0 {
+		r.IPs = append(r.IPs, ipAddress)
 		updated = true
 	} else {
-		var haveIP = false
-		for _, value := range r.Ips {
-			if value == ip {
+		haveIP := false
+
+		for _, value := range r.IPs {
+			if value == ipAddress {
 				haveIP = true
 			}
 		}
+
 		if !haveIP {
-			r.Ips = append(r.Ips, ip)
+			r.IPs = append(r.IPs, ipAddress)
 			updated = true
 		}
 	}
+
 	return updated
 }
 
-func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) string {
+//nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
+func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]string) string {
 	var (
-		ok               bool
+		mapKeyFound      bool
 		request          string
 		sender           string
 		clientIP         string
-		ldapResult       string
 		guid             string
 		trustedCountries []string
-		trustedIps       []string
+		trustedIPs       []string
 		err              error
-		remote           RemoteClient
-		redisHelper      = &Redis{}
-		usedMaxIps       = cfg.MaxIps
-		usedMaxCountries = cfg.MaxCountries
+		remoteClient     RemoteClient
+		usedMaxIPs       = cmdLineConfig.MaxIPs
+		usedMaxCountries = cmdLineConfig.MaxCountries
 		actionText       = "DUNNO"
 	)
 
-	redisConn := redisHelper.ReadConn()
-	redisConnW := redisHelper.WriteConn()
+	redisConn := redisRWPool.NewReadConn()
+	redisConnW := redisRWPool.NewWriteConn()
 
 	//goland:noinspection GoUnhandledErrorResult
 	defer redisConn.Close()
+	defer redisConnW.Close()
 
 	guid = ksuid.New().String()
 
-	if request, ok = policyRequest["request"]; ok {
+	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
 		if request == "smtpd_access_policy" {
 			userAttribute := "sender"
-			if cfg.UseSASLUsername {
+			if cmdLineConfig.UseSASLUsername {
 				userAttribute = "sasl_username"
 			}
-			if sender, ok = policyRequest[userAttribute]; ok {
+
+			if sender, mapKeyFound = policyRequest[userAttribute]; mapKeyFound {
 				if len(sender) > 0 {
-					if cfg.UseLDAP {
-						if ldapResult, err = ldapServer.search(sender, guid); err != nil {
-							InfoLogger.Println(err)
-							if !strings.Contains(fmt.Sprint(err), "No Such Object") {
-								if ldapServer.LDAPConn != nil {
-									ldapServer.LDAPConn.Close()
-								}
-								ldapServer.LDAPConn.Close()
-								ldapServer.connect(guid)
-								ldapServer.bind(guid)
-								ldapResult, _ = ldapServer.search(sender, guid)
-							}
-						}
-						if ldapResult != "" {
-							sender = ldapResult
+					if cmdLineConfig.UseLDAP {
+						var (
+							ldapReply   LdapReply
+							ldapRequest LdapRequest
+							resultAttr  []string
+						)
+
+						ldapReplyChan := make(chan LdapReply)
+
+						ldapRequest.username = sender
+						ldapRequest.filter = config.LDAP.Filter
+						ldapRequest.guid = guid
+						ldapRequest.attributes = config.LDAP.ResultAttr
+						ldapRequest.replyChan = ldapReplyChan
+
+						ldapRequestChan <- ldapRequest
+
+						ldapReply = <-ldapReplyChan
+
+						if ldapReply.err != nil {
+							level.Error(logger).Log("guid", guid, "error", err.Error())
+						} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
+							// LDAP single value
+							sender = resultAttr[0]
 						}
 					}
-					if clientIP, ok = policyRequest["client_address"]; ok {
-						key := fmt.Sprintf("%s%s", cfg.RedisPrefix, sender)
+
+					if clientIP, mapKeyFound = policyRequest["client_address"]; mapKeyFound {
+						var reply any
+
+						key := fmt.Sprintf("%s%s", cmdLineConfig.RedisPrefix, sender)
 
 						// Check Redis for the current sender
-						if reply, err := redisConn.Do("GET", key); err != nil {
-							ErrorLogger.Println(err)
+						if reply, err = redisConn.Do("GET", key); err != nil {
+							level.Error(logger).Log("guid", guid, "error", err.Error())
+
 							return fmt.Sprintf("action=%s", deferText)
-						} else {
-							if reply != nil {
-								if redisValue, err := redis.Bytes(reply, err); err != nil {
-									ErrorLogger.Println(err)
-									return fmt.Sprintf("action=%s", deferText)
-								} else {
-									if err := json.Unmarshal(redisValue, &remote); err != nil {
-										ErrorLogger.Println(err)
-									}
-								}
+						}
+
+						if reply != nil {
+							var redisValue []byte
+
+							if redisValue, err = redis.Bytes(reply, err); err != nil {
+								level.Error(logger).Log("guid", guid, "error", err.Error())
+
+								return fmt.Sprintf("action=%s", deferText)
+							}
+
+							if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
+								level.Error(logger).Log("guid", guid, "error", err.Error())
 							}
 						}
 
 						newCC := false
-						newIP := remote.AddIPAddress(clientIP)
+						newIP := remoteClient.AddIPAddress(clientIP)
 
 						// Check current IP address country code
 						countryCode := getCountryCode(clientIP)
-						if len(countryCode) == 0 {
-							if cfg.VerboseLevel == logLevelDebug {
-								DebugLogger.Printf("guid=\"%s\" No country code present for %s\n", guid, clientIP)
-							}
+						if countryCode == "" {
+							level.Debug(logger).Log(
+								"guid", guid, "msg", "No country code present", "client_address", clientIP)
 						} else {
-							newCC = remote.AddCountryCode(countryCode)
+							newCC = remoteClient.AddCountryCode(countryCode)
 						}
 
 						if val := os.Getenv("GO_TESTING"); val == "" {
-							customSettings := cs.Load().(*CustomSettings)
+							//nolint:forcetypeassert // Global variable
+							customSettings := customSettingsStore.Load().(*CustomSettings)
 							if customSettings != nil {
 								if len(customSettings.Data) > 0 {
 									for _, record := range customSettings.Data {
-										if record.Sender == sender {
-											if record.Ips > 0 {
-												usedMaxIps = record.Ips
-											}
-											if record.Countries > 0 {
-												usedMaxCountries = record.Countries
-											}
-											if len(record.TrustedCountries) > 0 {
-												trustedCountries = record.TrustedCountries
-											}
-											if len(record.TrustedIps) > 0 {
-												trustedIps = record.TrustedIps
-											}
-											break // First match wins!
+										if record.Sender != sender {
+											continue
 										}
+
+										if record.IPs > 0 {
+											usedMaxIPs = record.IPs
+										}
+
+										if record.Countries > 0 {
+											usedMaxCountries = record.Countries
+										}
+
+										if len(record.TrustedCountries) > 0 {
+											trustedCountries = record.TrustedCountries
+										}
+
+										if len(record.TrustedIPs) > 0 {
+											trustedIPs = record.TrustedIPs
+										}
+
+										break // First match wins!
 									}
 								}
 							}
@@ -194,104 +229,136 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 						if len(trustedCountries) > 0 {
 							matchCountry := false
+
 							for _, trustedCountry := range trustedCountries {
-								if cfg.VerboseLevel == logLevelDebug {
-									DebugLogger.Printf("guid=\"%s\" %s\n", guid, trustedCountry)
-								}
+								level.Debug(logger).Log(
+									"guid", guid, "msg", "Checking", "trusted_country", trustedCountry)
+
 								if trustedCountry == countryCode {
-									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Printf("guid=\"%s\" Country matched\n", guid)
-									}
+									level.Debug(logger).Log(
+										"guid", guid, "msg", "Country matched", "trusted_country", trustedCountry)
+
 									usedMaxCountries = len(trustedCountries)
 									matchCountry = true
+
 									break
 								}
 							}
+
 							if !matchCountry {
 								actionText = rejectText
-								if cfg.BlockedNoExpire {
+
+								if cmdLineConfig.BlockedNoExpire {
 									persist = true
 								}
+
 								runActions = true
 							}
-						} else if len(remote.Countries) > usedMaxCountries {
+						} else if len(remoteClient.Countries) > usedMaxCountries {
 							actionText = rejectText
-							if cfg.BlockedNoExpire {
+
+							if cmdLineConfig.BlockedNoExpire {
 								persist = true
 							}
+
 							runActions = true
 						}
 
-						if len(trustedIps) > 0 {
-							matchIp := false
-							ip := net.ParseIP(clientIP)
-							for _, trustedIpOrNet := range trustedIps {
-								trustedIp := net.ParseIP(trustedIpOrNet)
-								if trustedIp == nil {
-									_, network, err := net.ParseCIDR(trustedIpOrNet)
+						if len(trustedIPs) > 0 {
+							matchIP := false
+							ipAddress := net.ParseIP(clientIP)
+
+							for _, trustedIPOrNet := range trustedIPs {
+								trustedIP := net.ParseIP(trustedIPOrNet)
+								if trustedIP == nil {
+									var network *net.IPNet
+
+									_, network, err = net.ParseCIDR(trustedIPOrNet)
 									if err != nil {
-										ErrorLogger.Printf("%s is not a network, error: %s\n", trustedIp, err)
+										level.Error(logger).Log(
+											"guid", guid,
+											"msg", "Not a trusted network",
+											"network", trustedIP,
+											"error", err.Error())
+
 										continue
 									}
-									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Printf("guid=\"%s\" Checking: %s -> %s\n", guid, ip.String(), network.String())
-									}
-									if network.Contains(ip) {
-										if cfg.VerboseLevel == logLevelDebug {
-											DebugLogger.Printf("guid=\"%s\" IP matched", guid)
-										}
-										usedMaxIps = 0
-										matchIp = true
+
+									level.Debug(logger).Log(
+										"guid", guid,
+										"msg", "Checking",
+										"ip_address", ipAddress.String(),
+										"trusted_network", network.String())
+
+									if network.Contains(ipAddress) {
+										level.Debug(logger).Log(
+											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+
+										usedMaxIPs = 0
+										matchIP = true
+
 										break
 									}
 								} else {
-									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Printf("guid=\"%s\" Checking: %s -> %s\n", guid, ip.String(), trustedIp.String())
-									}
-									if trustedIp.String() == ip.String() {
-										if cfg.VerboseLevel == logLevelDebug {
-											DebugLogger.Printf("guid=\"%s\" IP matched", guid)
-										}
-										usedMaxIps = 0
-										matchIp = true
+									level.Debug(logger).Log(
+										"guid", guid,
+										"msg", "Checking",
+										"ip_address", ipAddress.String(),
+										"trusted_ip_address", trustedIP.String())
+
+									if trustedIP.String() == ipAddress.String() {
+										level.Debug(logger).Log(
+											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+
+										usedMaxIPs = 0
+										matchIP = true
+
 										break
 									}
 								}
 							}
-							if !matchIp {
+
+							if !matchIP {
 								actionText = rejectText
-								if cfg.BlockedNoExpire {
+
+								if cmdLineConfig.BlockedNoExpire {
 									persist = true
 								}
+
 								runActions = true
 							}
-						} else if len(remote.Ips) > usedMaxIps {
+						} else if len(remoteClient.IPs) > usedMaxIPs {
 							actionText = rejectText
-							if cfg.BlockedNoExpire {
+
+							if cmdLineConfig.BlockedNoExpire {
 								persist = true
 							}
+
 							runActions = true
 						}
 
-						if cfg.RunActions && runActions {
-							var a Action
+						if cmdLineConfig.RunActions && runActions {
+							var action Action
+
 							runOperator := true
-							for _, action := range remote.Actions {
-								if action == "operator" {
+
+							for _, actionItem := range remoteClient.Actions {
+								if actionItem == "operator" {
 									runOperator = false
+
 									break
 								}
 							}
 
-							if cfg.RunActionOperator && runOperator {
-								a = &EmailOperator{}
-								if err := a.Call(sender, cfg); err != nil {
-									ErrorLogger.Println(err)
+							if cmdLineConfig.RunActionOperator && runOperator {
+								action = &EmailOperator{}
+								if err = action.Call(sender, cmdLineConfig); err != nil {
+									level.Error(logger).Log("guid", guid, "error", err.Error())
 								} else {
-									if cfg.VerboseLevel == logLevelDebug {
-										DebugLogger.Printf("guid=\"%s\" Action operator finished successfully\n", guid)
-									}
-									remote.Actions = append(remote.Actions, "operator")
+									level.Debug(logger).Log(
+										"guid", guid, "msg", "Action 'operator' finished successfully")
+
+									remoteClient.Actions = append(remoteClient.Actions, "operator")
 									ranOperator = true
 								}
 							}
@@ -299,25 +366,33 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 
 						// Only change client information, if there was a new IP, a new country code or an action was taken.
 						if newIP || newCC || ranOperator {
-							redisValue, _ := json.Marshal(remote)
-							if _, err := redisConnW.Do("SET",
+							var redisValue []byte
+
+							redisValue, err = json.Marshal(remoteClient)
+							if err != nil {
+								return fmt.Sprintf("action=%s", deferText)
+							}
+
+							if _, err = redisConnW.Do("SET",
 								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
-								ErrorLogger.Println(err)
+								level.Error(logger).Log("guid", guid, "error", err.Error())
+
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
 
 						// For each request update the expiry timestamp
 						if persist {
-							if _, err := redisConnW.Do("PERSIST",
-								redis.Args{}.Add(key)...); err != nil {
-								ErrorLogger.Println(err)
+							if _, err := redisConnW.Do("PERSIST", redis.Args{}.Add(key)...); err != nil {
+								level.Error(logger).Log("guid", guid, "error", err.Error())
+
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						} else {
 							if _, err := redisConnW.Do("EXPIRE",
-								redis.Args{}.Add(key).Add(cfg.RedisTTL)...); err != nil {
-								ErrorLogger.Println(err)
+								redis.Args{}.Add(key).Add(cmdLineConfig.RedisTTL)...); err != nil {
+								level.Error(logger).Log("guid", guid, "error", err.Error())
+
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						}
@@ -327,17 +402,21 @@ func getPolicyResponse(cfg *CmdLineConfig, policyRequest map[string]string) stri
 		}
 	}
 
-	if cfg.UseSASLUsername {
-		sender = fmt.Sprintf("sasl_username=\"%s\"", sender)
-	} else {
-		sender = fmt.Sprintf("sender=\"<%s>\"", sender)
+	senderKey := "sender"
+	if cmdLineConfig.UseSASLUsername {
+		senderKey = "sasl_username"
 	}
 
-	if cfg.VerboseLevel >= logLevelInfo {
-		InfoLogger.Printf("guid=\"%s\" %s countries=%s ip_addresses=%s #countries=%d/%d #ip_addresses=%d/%d action=\"%s\"\n",
-			guid, sender, remote.Countries, remote.Ips,
-			len(remote.Countries), usedMaxCountries, len(remote.Ips), usedMaxIps, actionText)
-	}
+	level.Info(logger).Log(
+		"guid", guid,
+		senderKey, sender,
+		"countries", func() string { return strings.Join(remoteClient.Countries, ",") }(),
+		"total_countries", len(remoteClient.Countries),
+		"allowed_max_countries", usedMaxCountries,
+		"ips", func() string { return strings.Join(remoteClient.IPs, ",") }(),
+		"total_ips", len(remoteClient.IPs),
+		"allowed_max_ips", usedMaxIPs,
+		"action", actionText)
 
 	return fmt.Sprintf("action=%s", actionText)
 }

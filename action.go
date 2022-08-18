@@ -21,9 +21,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"gopkg.in/gomail.v2"
-	"io/ioutil"
+	"os"
 	"strings"
+
+	"gopkg.in/gomail.v2"
 )
 
 type Action interface {
@@ -33,53 +34,69 @@ type Action interface {
 
 type EmailOperator struct{}
 
-func (a *EmailOperator) Call(sender string, c interface{}) error {
-	cfg, ok := c.(*CmdLineConfig)
+func (a *EmailOperator) Call(sender string, cmdLineConfig any) error {
+	var (
+		messageTextRaw []byte
+		err            error
+	)
+
+	cfg, ok := cmdLineConfig.(*CmdLineConfig)
 	if !ok {
-		return fmt.Errorf("config argument must be of type *CmdLineConfig")
+		return errCmdLineConfig
 	}
 
 	if cfg.EmailOperatorFrom == "" {
-		return fmt.Errorf("operator 'from' must not be empty")
+		return errOperatorFromEmpty
 	}
+
 	if cfg.EmailOperatorTo == "" {
-		return fmt.Errorf("operator 'to' must not be empty")
+		return errOperatorToEmpty
 	}
 
-	m := gomail.NewMessage()
+	message := gomail.NewMessage()
 
-	m.SetHeader("From", cfg.EmailOperatorFrom)
-	m.SetHeader("To", cfg.EmailOperatorTo)
-	m.SetHeader("Subject", cfg.EmailOperatorSubject)
+	message.SetHeader("From", cfg.EmailOperatorFrom)
+	message.SetHeader("To", cfg.EmailOperatorTo)
+	message.SetHeader("Subject", cfg.EmailOperatorSubject)
 
-	if messageTextRaw, err := ioutil.ReadFile(cfg.EmailOperatorMessagePath); err != nil {
+	if messageTextRaw, err = os.ReadFile(cfg.EmailOperatorMessagePath); err != nil {
 		return err
-	} else {
-		messageText := string(messageTextRaw)
-		if !strings.Contains(messageText, "%s") {
-			return fmt.Errorf("email message file must contain a macro '%%s' for the sender")
-		}
-		if strings.Count(messageText, "%s") != 1 {
-			return fmt.Errorf("email message file must contain exactly one '%%s' macro for the sender")
-		}
-		messageText = fmt.Sprintf(messageText, sender)
-		m.SetBody(cfg.EmailOperatorMessageCT, messageText)
 	}
 
-	d := &gomail.Dialer{Host: cfg.MailServer, Port: cfg.MailPort}
-	d.SSL = cfg.MailSSL
+	messageText := string(messageTextRaw)
+	if !strings.Contains(messageText, "%s") {
+		return errMacroPercentS
+	}
+
+	if strings.Count(messageText, "%s") != 1 {
+		return errMacroPercentSOnce
+	}
+
+	messageText = fmt.Sprintf(messageText, sender)
+	message.SetBody(cfg.EmailOperatorMessageCT, messageText)
+
+	dialer := &gomail.Dialer{Host: cfg.MailServer, Port: cfg.MailPort}
+	dialer.SSL = cfg.MailSSL
+
 	if cfg.MailUsername != "" {
-		d.Username = cfg.MailUsername
+		dialer.Username = cfg.MailUsername
 	}
-	if cfg.MailPassword != "" {
-		d.Password = cfg.MailPassword
-	}
-	if cfg.MailHelo != "" {
-		d.LocalName = cfg.MailHelo
-	}
-	d.TLSConfig = &tls.Config{ServerName: cfg.MailServer, InsecureSkipVerify: false}
 
-	if err := d.DialAndSend(m); err != nil {
+	if cfg.MailPassword != "" {
+		dialer.Password = cfg.MailPassword
+	}
+
+	if cfg.MailHelo != "" {
+		dialer.LocalName = cfg.MailHelo
+	}
+
+	dialer.TLSConfig = &tls.Config{
+		ServerName:         cfg.MailServer,
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: false,
+	}
+
+	if err := dialer.DialAndSend(message); err != nil {
 		return err
 	}
 

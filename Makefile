@@ -1,4 +1,4 @@
-PROJECT_NAME := "authserv"
+PROJECT_NAME := "geoip-policyd"
 PKG := "$(PROJECT_NAME)"
 
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)

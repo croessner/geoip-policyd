@@ -19,10 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	"github.com/oschwald/maxminddb-golang"
-	"log"
 	"net"
 	"os"
+
+	"github.com/go-kit/log/level"
+	"github.com/oschwald/maxminddb-golang"
 )
 
 type GeoIP struct {
@@ -30,24 +31,29 @@ type GeoIP struct {
 }
 
 //goland:noinspection GoUnhandledErrorResult
-func getCountryCode(s string) string {
-	var record struct {
-		Country struct {
-			ISOCode string `maxminddb:"iso_code"`
-		} `maxminddb:"country"`
-	}
-	var err error
-	if val := os.Getenv("GO_TESTING"); val == "" {
-		geoip := gi.Load().(*GeoIP)
+func getCountryCode(ipAddress string) string {
+	var (
+		err    error
+		record struct {
+			Country struct {
+				ISOCode string `maxminddb:"iso_code"`
+			} `maxminddb:"country"`
+		}
+	)
 
-		ip := net.ParseIP(s)
+	if val := os.Getenv("GO_TESTING"); val == "" {
+		geoIP := geoIPStore.Load().(*GeoIP) //nolint:forcetypeassert // Global variable
+
+		ip := net.ParseIP(ipAddress)
 		if ip != nil {
-			err = geoip.Reader.Lookup(ip, &record)
+			err = geoIP.Reader.Lookup(ip, &record)
 			if err != nil {
-				log.Panic("Panic: Critical error while looking up ISO code:", err)
+				level.Error(logger).Log("error", err.Error())
 			}
+
 			return record.Country.ISOCode
 		}
 	}
+
 	return ""
 }

@@ -11,8 +11,10 @@ import (
 	"time"
 )
 
-const MaxConnections = 100
-const TotalConnections = 100000
+const (
+	MaxConnections   = 100
+	TotalConnections = 100000
+)
 
 const (
 	ALL   = "all"
@@ -25,9 +27,11 @@ type SimultaneousConnections struct {
 	current int32
 }
 
+//nolint:gocognit,gocyclo,forbidigo,maintidx,gomnd,forcetypeassert // This is a q&d stress test...
 func main() {
 	if len(os.Args) < 5 || len(os.Args) > 6 {
 		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests> [optional test]")
+
 		os.Exit(1)
 	}
 
@@ -37,10 +41,13 @@ func main() {
 	sender := os.Args[2]
 	clientAddress := os.Args[3]
 	totalConnections, _ := strconv.Atoi(os.Args[4])
+
 	if totalConnections < MaxConnections {
 		totalConnections = TotalConnections
 	}
+
 	var test string
+
 	if len(os.Args) == 6 {
 		switch os.Args[5] {
 		case TEST1:
@@ -72,6 +79,7 @@ func main() {
 		fmt.Printf("Testing 1 request per connection, %d parallel\n", MaxConnections)
 
 		numberOfConnections := &SimultaneousConnections{current: 0}
+
 		failed.Store(0)
 		failedConnect.Store(0)
 		failedDeadline.Store(0)
@@ -80,11 +88,14 @@ func main() {
 
 		start := time.Now()
 
-		for i := 0; i < totalConnections; i++ {
-			counter <- i
+		for connectionCounter := 0; connectionCounter < totalConnections; connectionCounter++ {
+			counter <- connectionCounter
+
 			go func() {
 				numberOfConnections.mu.Lock()
-				numberOfConnections.current += 1
+
+				numberOfConnections.current++
+
 				numberOfConnections.mu.Unlock()
 
 				var (
@@ -93,11 +104,13 @@ func main() {
 					line   string
 					cycles int
 				)
+
 				timeoutDuration := time.Second * 30
 
 				if conn, err = net.Dial("tcp", host); err != nil {
 					failed.Store(failed.Load().(int) + 1)
 					failedConnect.Store(failedConnect.Load().(int) + 1)
+
 					goto abort
 				}
 
@@ -108,6 +121,7 @@ func main() {
 				if err != nil {
 					failed.Store(failed.Load().(int) + 1)
 					failedDeadline.Store(failedDeadline.Load().(int) + 1)
+
 					goto abort
 				}
 
@@ -115,41 +129,51 @@ func main() {
 				if err != nil {
 					failed.Store(failed.Load().(int) + 1)
 					failedWrite.Store(failedWrite.Load().(int) + 1)
+
 					goto abort
 				}
 
 				cycles = 0
+
 				for {
-					var buffer = make([]byte, 1024)
+					buffer := make([]byte, 1024)
 					// Read action= string
 					_, err = conn.Read(buffer)
+
 					if err != nil {
 						failed.Store(failed.Load().(int) + 1)
 						failedRead.Store(failedRead.Load().(int) + 1)
+
 						goto abort
 					}
+
 					line = strings.TrimSpace(string(buffer))
 					if strings.HasPrefix(line, "action=") {
 						break
-					} else {
-						time.Sleep(time.Millisecond)
-						if cycles > 5000 {
-							failed.Store(failed.Load().(int) + 1)
-							failedRead.Store(failedRead.Load().(int) + 1)
-							break
-						}
+					}
+
+					time.Sleep(time.Millisecond)
+
+					if cycles > 5000 {
+						failed.Store(failed.Load().(int) + 1)
+						failedRead.Store(failedRead.Load().(int) + 1)
+
+						break
 					}
 				}
 
 			abort:
 
 				numberOfConnections.mu.Lock()
+
 				number := numberOfConnections.current
-				numberOfConnections.current -= 1
+				numberOfConnections.current--
+
 				numberOfConnections.mu.Unlock()
 
 				absolut := <-counter
-				absolut += 1
+
+				absolut++
 
 				fmt.Printf("\rCurrent connections: %3d total: %d%%", number, 100*absolut/totalConnections)
 
@@ -175,9 +199,11 @@ func main() {
 	 */
 	if test == ALL || test == TEST2 {
 		requestsPerConnection := totalConnections / MaxConnections
+
 		fmt.Printf("Testing %d requests per connection, %d parallel\n", requestsPerConnection, MaxConnections)
 
 		numberOfConnections := &SimultaneousConnections{current: 0}
+
 		failed.Store(0)
 		failedConnect.Store(0)
 		failedDeadline.Store(0)
@@ -186,7 +212,7 @@ func main() {
 
 		start := time.Now()
 
-		wg := sync.WaitGroup{}
+		waitGroup := sync.WaitGroup{}
 
 		stats := make(chan int32)
 		statsEnd := make(chan int)
@@ -202,8 +228,9 @@ func main() {
 			}
 		}()
 
-		for i := 0; i < MaxConnections; i++ {
-			wg.Add(1)
+		for connection := 0; connection < MaxConnections; connection++ {
+			waitGroup.Add(1)
+
 			go func() {
 				var (
 					conn   net.Conn
@@ -211,12 +238,14 @@ func main() {
 					line   string
 					cycles int
 				)
+
 				timeoutDuration := time.Second * 900 // Safety net 15 minutes timeout
-				r := 0                               // Request counter
+				requestCounter := 0
 
 				if conn, err = net.Dial("tcp", host); err != nil {
 					failed.Store(failed.Load().(int) + 1)
 					failedConnect.Store(failedConnect.Load().(int) + 1)
+
 					goto abort
 				}
 
@@ -227,42 +256,51 @@ func main() {
 				if err != nil {
 					failed.Store(failed.Load().(int) + 1)
 					failedDeadline.Store(failedDeadline.Load().(int) + 1)
+
 					goto abort
 				}
 
-				for ; r < requestsPerConnection; r++ {
+				for ; requestCounter < requestsPerConnection; requestCounter++ {
 					_, err = conn.Write([]byte(msg))
 					if err != nil {
 						failedWrite.Store(failedWrite.Load().(int) + 1)
+
 						goto abort
 					}
 
 					cycles = 0
+
 					for {
-						var buffer = make([]byte, 1024)
+						buffer := make([]byte, 1024)
 
 						// Read action= string
 						_, err = conn.Read(buffer)
 						if err != nil {
 							fmt.Println(err.Error())
 							failedRead.Store(failedRead.Load().(int) + 1)
+
 							goto abort
 						}
+
 						line = strings.TrimSpace(string(buffer))
 						if strings.HasPrefix(line, "action=") {
 							break
-						} else {
-							time.Sleep(time.Millisecond)
-							if cycles > 5000 {
-								failedRead.Store(failedRead.Load().(int) + 1)
-								break
-							}
+						}
+
+						time.Sleep(time.Millisecond)
+
+						if cycles > 5000 {
+							failedRead.Store(failedRead.Load().(int) + 1)
+
+							break
 						}
 					}
 
 					numberOfConnections.mu.Lock()
-					numberOfConnections.current += 1
+
+					numberOfConnections.current++
 					number := numberOfConnections.current
+
 					numberOfConnections.mu.Unlock()
 
 					stats <- number
@@ -270,12 +308,12 @@ func main() {
 
 			abort:
 
-				failed.Store(failed.Load().(int) + (requestsPerConnection - r))
-				wg.Done()
+				failed.Store(failed.Load().(int) + (requestsPerConnection - requestCounter))
+				waitGroup.Done()
 			}()
 		}
 
-		wg.Wait()
+		waitGroup.Wait()
 		statsEnd <- 0
 
 		elapsed := time.Since(start)
