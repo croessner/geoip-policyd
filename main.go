@@ -55,6 +55,7 @@ type RedisLogger struct{}
 func (r *RedisLogger) Printf(_ context.Context, format string, values ...any) {
 	level.Info(logger).Log("redis", fmt.Sprintf(format, values...))
 }
+
 func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
 	customSettings := &CustomSettings{}
 

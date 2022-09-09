@@ -349,7 +349,7 @@ func (c *CmdLineConfig) Init(args []string) {
 		"", "redis-sentinels", &argparse.Options{
 			Required: false,
 			Default:  []string{},
-			Help:     "List of space seperated sentinel servers",
+			Help:     "List of space separated sentinel servers",
 		})
 	argServerRedisSentinelMasterName := commandServer.String(
 		"", "redis-sentinel-master-name", &argparse.Options{

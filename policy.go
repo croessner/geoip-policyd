@@ -20,6 +20,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/go-redis/redis/v8"
 	"github.com/segmentio/ksuid"
 )
 
@@ -151,12 +153,12 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 
 						// Check Redis for the current sender
 						if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
-							level.Error(logger).Log("guid", guid, "error", err.Error())
+							if !errors.Is(err, redis.Nil) {
+								level.Error(logger).Log("guid", guid, "error", err.Error())
 
-							return fmt.Sprintf("action=%s", deferText)
-						}
-
-						if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
+								return fmt.Sprintf("action=%s", deferText)
+							}
+						} else if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
 							level.Error(logger).Log("guid", guid, "error", err.Error())
 						}
 
