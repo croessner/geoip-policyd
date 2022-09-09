@@ -24,9 +24,9 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-kit/log/level"
-	"github.com/gomodule/redigo/redis"
 	"github.com/segmentio/ksuid"
 )
 
@@ -106,13 +106,6 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 		actionText       = "DUNNO"
 	)
 
-	redisConn := redisRWPool.NewReadConn()
-	redisConnW := redisRWPool.NewWriteConn()
-
-	//goland:noinspection GoUnhandledErrorResult
-	defer redisConn.Close()
-	defer redisConnW.Close()
-
 	guid = ksuid.New().String()
 
 	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
@@ -152,29 +145,19 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 					}
 
 					if clientIP, mapKeyFound = policyRequest["client_address"]; mapKeyFound {
-						var reply any
+						var redisValue []byte
 
 						key := fmt.Sprintf("%s%s", cmdLineConfig.RedisPrefix, sender)
 
 						// Check Redis for the current sender
-						if reply, err = redisConn.Do("GET", key); err != nil {
+						if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
 							level.Error(logger).Log("guid", guid, "error", err.Error())
 
 							return fmt.Sprintf("action=%s", deferText)
 						}
 
-						if reply != nil {
-							var redisValue []byte
-
-							if redisValue, err = redis.Bytes(reply, err); err != nil {
-								level.Error(logger).Log("guid", guid, "error", err.Error())
-
-								return fmt.Sprintf("action=%s", deferText)
-							}
-
-							if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
-								level.Error(logger).Log("guid", guid, "error", err.Error())
-							}
+						if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
+							level.Error(logger).Log("guid", guid, "error", err.Error())
 						}
 
 						newCC := false
@@ -366,15 +349,12 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 
 						// Only change client information, if there was a new IP, a new country code or an action was taken.
 						if newIP || newCC || ranOperator {
-							var redisValue []byte
-
 							redisValue, err = json.Marshal(remoteClient)
 							if err != nil {
 								return fmt.Sprintf("action=%s", deferText)
 							}
 
-							if _, err = redisConnW.Do("SET",
-								redis.Args{}.Add(key).Add(redisValue)...); err != nil {
+							if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
 								return fmt.Sprintf("action=%s", deferText)
@@ -383,14 +363,13 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 
 						// For each request update the expiry timestamp
 						if persist {
-							if _, err := redisConnW.Do("PERSIST", redis.Args{}.Add(key)...); err != nil {
+							if err = redisHandle.Persist(ctx, key).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						} else {
-							if _, err := redisConnW.Do("EXPIRE",
-								redis.Args{}.Add(key).Add(cmdLineConfig.RedisTTL)...); err != nil {
+							if err = redisHandle.Expire(ctx, key, time.Duration(cmdLineConfig.RedisTTL)*time.Second).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
 								return fmt.Sprintf("action=%s", deferText)

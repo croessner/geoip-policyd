@@ -303,72 +303,6 @@ func TestConfigRedisPassword(t *testing.T) {
 	}
 }
 
-func TestConfigRedisProtocolTCP(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-protocol", "tcp"})
-
-	if cfg.RedisProtocol.Get() != "tcp" {
-		t.Errorf("Expected --redis-protocol=tcp, got value=%v", cfg.RedisProtocol)
-	}
-}
-
-func TestConfigRedisProtocolTCP6(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-protocol", "tcp6"})
-
-	if cfg.RedisProtocol.Get() != "tcp6" {
-		t.Errorf("Expected --redis-protocol=tcp6, got value=%v", cfg.RedisProtocol)
-	}
-}
-
-func TestConfigRedisProtocolUNIX(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-protocol", "unix"})
-
-	if cfg.RedisProtocol.Get() != "unix" {
-		t.Errorf("Expected --redis-protocol=unix, got value=%v", cfg.RedisProtocol)
-	}
-}
-
-func TestConfigEnvRedisProtocolTCP(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_PROTOCOL": "tcp",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisProtocol.Get() != "tcp" {
-		t.Errorf("Expected --redis-protocol=tcp, got value=%v", cfg.RedisProtocol)
-	}
-}
-
-func TestConfigEnvRedisProtocolTCP6(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_PROTOCOL": "tcp6",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisProtocol.Get() != "tcp6" {
-		t.Errorf("Expected --redis-protocol=tcp6, got value=%v", cfg.RedisProtocol)
-	}
-}
-
-func TestConfigEnvRedisProtocolUNIX(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_PROTOCOL": "unix",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisProtocol.Get() != "unix" {
-		t.Errorf("Expected --redis-protocol=unix, got value=%v", cfg.RedisProtocol)
-	}
-}
-
 func TestConfigEnvRedisPassword(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_REDIS_PASSWORD": "password",
@@ -382,179 +316,157 @@ func TestConfigEnvRedisPassword(t *testing.T) {
 	}
 }
 
-func TestConfigRedisWriterAddress(t *testing.T) {
+func TestConfigRedisReplicaAddress(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-address", "192.168.0.1"})
+	cfg.Init([]string{"app", "server", "--redis-replica-address", "192.168.0.1"})
 
-	if cfg.RedisAddressW != "192.168.0.1" {
-		t.Errorf("Expected --redis-writer-address=192.168.0.1, got value=%v", cfg.RedisAddressW)
+	if cfg.RedisAddressRO != "192.168.0.1" {
+		t.Errorf("Expected --redis-replica-address=192.168.0.1, got value=%v", cfg.RedisAddressRO)
 	}
 }
 
-func TestConfigEnvRedisWriterAddress(t *testing.T) {
+func TestConfigEnvRedisReplicaAddress(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_ADDRESS": "192.168.0.1",
+		"GEOIPPOLICYD_REDIS_REPLICA_ADDRESS": "192.168.0.1",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisAddressW != "192.168.0.1" {
-		t.Errorf("Expected --redis-writer-address=192.168.0.1, got value=%v", cfg.RedisAddressW)
+	if cfg.RedisAddressRO != "192.168.0.1" {
+		t.Errorf("Expected --redis-replica-address=192.168.0.1, got value=%v", cfg.RedisAddressRO)
 	}
 }
 
-func TestConfigRedisWriterPort(t *testing.T) {
+func TestConfigRedisReplicaPort(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-port", "6333"})
+	cfg.Init([]string{"app", "server", "--redis-replica-port", "6333"})
 
-	if cfg.RedisPortW != 6333 {
-		t.Errorf("Expected --redis-writer-port=6333, got value=%v", cfg.RedisPortW)
+	if cfg.RedisPortRO != 6333 {
+		t.Errorf("Expected --redis-replica-port=6333, got value=%v", cfg.RedisPortRO)
 	}
 }
 
-func TestConfigEnvRedisWriterPort(t *testing.T) {
+func TestConfigEnvRedisReplicaPort(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_PORT": "6333",
+		"GEOIPPOLICYD_REDIS_REPLICA_PORT": "6333",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisPortW != 6333 {
-		t.Errorf("Expected --redis-writer-port=6333, got value=%v", cfg.RedisPortW)
+	if cfg.RedisPortRO != 6333 {
+		t.Errorf("Expected --redis-replica-port=6333, got value=%v", cfg.RedisPortRO)
 	}
 }
 
-func TestConfigRedisWriterDatabaseNumber(t *testing.T) {
+func TestConfigRedisReplicaDatabaseNumber(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-database-number", "4"})
+	cfg.Init([]string{"app", "server", "--redis-replica-database-number", "4"})
 
-	if cfg.RedisDBW != 4 {
-		t.Errorf("Expected --redis-writer-database-number=4, got value=%v", cfg.RedisDBW)
+	if cfg.RedisDBRO != 4 {
+		t.Errorf("Expected --redis-replica-database-number=4, got value=%v", cfg.RedisDBRO)
 	}
 }
 
-func TestConfigEnvRedisWriterDatabaseNumber(t *testing.T) {
+func TestConfigEnvRedisReplicaDatabaseNumber(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER": "4",
+		"GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER": "4",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisDBW != 4 {
-		t.Errorf("Expected --redis-writer-database-number=4, got value=%v", cfg.RedisDBW)
+	if cfg.RedisDBRO != 4 {
+		t.Errorf("Expected --redis-replica-database-number=4, got value=%v", cfg.RedisDBRO)
 	}
 }
 
-func TestConfigRedisWriterUsername(t *testing.T) {
+func TestConfigRedisReplicaUsername(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-username", "username"})
+	cfg.Init([]string{"app", "server", "--redis-replica-username", "username"})
 
-	if cfg.RedisUsernameW != "username" {
-		t.Errorf("Expected --redis-writer-username=username, got value=%v", cfg.RedisUsernameW)
+	if cfg.RedisUsernameRO != "username" {
+		t.Errorf("Expected --redis-replica-username=username, got value=%v", cfg.RedisUsernameRO)
 	}
 }
 
-func TestConfigEnvRedisWriterUsername(t *testing.T) {
+func TestConfigEnvRedisReplicaUsername(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_USERNAME": "username",
+		"GEOIPPOLICYD_REDIS_REPLICA_USERNAME": "username",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisUsernameW != "username" {
-		t.Errorf("Expected --redis-writer-username=username, got value=%v", cfg.RedisUsernameW)
+	if cfg.RedisUsernameRO != "username" {
+		t.Errorf("Expected --redis-replica-username=username, got value=%v", cfg.RedisUsernameRO)
 	}
 }
 
-func TestConfigRedisWriterPassword(t *testing.T) {
+func TestConfigRedisReplicaPassword(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-password", "password"})
+	cfg.Init([]string{"app", "server", "--redis-replica-password", "password"})
 
-	if cfg.RedisPasswordW != "password" {
-		t.Errorf("Expected --redis-writer-password=password, got value=%v", cfg.RedisPasswordW)
+	if cfg.RedisPasswordRO != "password" {
+		t.Errorf("Expected --redis-replica-password=password, got value=%v", cfg.RedisPasswordRO)
 	}
 }
 
-func TestConfigEnvRedisWriterPassword(t *testing.T) {
+func TestConfigEnvRedisReplicaPassword(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_PASSWORD": "password",
+		"GEOIPPOLICYD_REDIS_REPLICA_PASSWORD": "password",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisPasswordW != "password" {
-		t.Errorf("Expected --redis-writer-password=password, got value=%v", cfg.RedisPasswordW)
+	if cfg.RedisPasswordRO != "password" {
+		t.Errorf("Expected --redis-replica-password=password, got value=%v", cfg.RedisPasswordRO)
 	}
 }
 
-func TestConfigRedisWriterProtocolTCP(t *testing.T) {
+func TestConfigRedisSentinels(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-protocol", "tcp"})
+	cfg.Init([]string{"app", "server", "--redis-sentinels", "10.0.0.1:26379 10.0.0.2:26379"})
 
-	if cfg.RedisProtocolW.Get() != "tcp" {
-		t.Errorf("Expected --redis-writer-protocol=tcp, got value=%v", cfg.RedisProtocolW)
+	if cfg.RedisSentinels[0] != "10.0.0.1:26379" && cfg.RedisSentinels[1] != "10.0.0.2:26379" {
+		t.Errorf("Expected --redis-sentinels='10.0.0.1:26379 10.0.0.2:26379', got value=%v", cfg.RedisSentinels)
 	}
 }
 
-func TestConfigRedisWriterProtocolTCP6(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-protocol", "tcp6"})
-
-	if cfg.RedisProtocolW.Get() != "tcp6" {
-		t.Errorf("Expected --redis-writer-protocol=tcp6, got value=%v", cfg.RedisProtocolW)
-	}
-}
-
-func TestConfigRedisWriterProtocolUNIX(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-writer-protocol", "unix"})
-
-	if cfg.RedisProtocolW.Get() != "unix" {
-		t.Errorf("Expected --redis-writer-protocol=unix, got value=%v", cfg.RedisProtocolW)
-	}
-}
-
-func TestConfigEnvRedisWriterProtocolTCP(t *testing.T) {
+func TestConfigEnvRedisSentinels(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_PROTOCOL": "tcp",
+		"GEOIPPOLICYD_REDIS_SENTINELS": "10.0.0.1:26379 10.0.0.2:26379",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisProtocolW.Get() != "tcp" {
-		t.Errorf("Expected --redis-writer-protocol=tcp, got value=%v", cfg.RedisProtocolW)
+	if cfg.RedisSentinels[0] != "10.0.0.1:26379" && cfg.RedisSentinels[1] != "10.0.0.2:26379" {
+		t.Errorf("Expected --redis-sentinels='10.0.0.1:26379 10.0.0.2:26379', got value=%v", cfg.RedisSentinels)
 	}
 }
 
-func TestConfigEnvRedisWriterProtocolTCP6(t *testing.T) {
+func TestConfigRedisSentinelMasterName(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--redis-sentinel-master-name", "mymaster"})
+
+	if cfg.RedisSentinelMasterName != "mymaster" {
+		t.Errorf("Expected --redis-sentinel-master-name=mymaster, got value=%v", cfg.RedisSentinelMasterName)
+	}
+}
+
+func TestConfigEnvRedisSentinelMasterName(t *testing.T) {
 	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_PROTOCOL": "tcp6",
+		"GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME": "mymaster",
 	})
 	defer closer()
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.RedisProtocolW.Get() != "tcp6" {
-		t.Errorf("Expected --redis-writer-protocol=tcp6, got value=%v", cfg.RedisProtocolW)
-	}
-}
-
-func TestConfigEnvRedisWriterProtocolUNIX(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_WRITER_PROTOCOL": "unix",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisProtocolW.Get() != "unix" {
-		t.Errorf("Expected --redis-writer-protocol=unix, got value=%v", cfg.RedisProtocolW)
+	if cfg.RedisSentinelMasterName != "mymaster" {
+		t.Errorf("Expected --redis-sentinel-master-name=mymaster, got value=%v", cfg.RedisSentinelMasterName)
 	}
 }
 
