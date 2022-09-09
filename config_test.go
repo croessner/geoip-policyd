@@ -428,7 +428,7 @@ func TestConfigEnvRedisReplicaPassword(t *testing.T) {
 
 func TestConfigRedisSentinels(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-sentinels", "10.0.0.1:26379 10.0.0.2:26379"})
+	cfg.Init([]string{"app", "server", "--redis-sentinels", "10.0.0.1:26379", "--redis-sentinels", "10.0.0.2:26379"})
 
 	if cfg.RedisSentinels[0] != "10.0.0.1:26379" && cfg.RedisSentinels[1] != "10.0.0.2:26379" {
 		t.Errorf("Expected --redis-sentinels='10.0.0.1:26379 10.0.0.2:26379', got value=%v", cfg.RedisSentinels)
