@@ -39,7 +39,6 @@ var (
 	errMaxIPs             = errors.New("argument must be an unsigned integer and not 0")
 	errPoolSize           = errors.New("argument must be an unsigned integer and not 0")
 	errLDAPScope          = errors.New("argument must be one of: 'one', 'base' or 'sub'")
-	errWrongProtocol      = errors.New("wrong protocol")
 )
 
 // ldap.

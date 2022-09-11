@@ -68,33 +68,6 @@ const (
 	SUB  = "sub"
 )
 
-type ConnProtocol struct {
-	name string
-}
-
-func (c *ConnProtocol) String() string {
-	return c.name
-}
-
-func (c *ConnProtocol) Set(value string) error {
-	switch value {
-	case "tcp", "tcp6", "unix":
-		c.name = value
-	default:
-		return errWrongProtocol
-	}
-
-	return nil
-}
-
-func (c *ConnProtocol) Type() string {
-	return "ConnProtocol"
-}
-
-func (c *ConnProtocol) Get() string {
-	return c.name
-}
-
 type CmdLineConfig struct {
 	// Listen address for the policy service
 	ServerAddress string
@@ -116,18 +89,18 @@ type CmdLineConfig struct {
 	RedisDB       int
 	RedisUsername string
 	RedisPassword string
-	RedisProtocol ConnProtocol
 
-	// Redis for a writing server pool
-	RedisAddressW  string
-	RedisPortW     int
-	RedisDBW       int
-	RedisUsernameW string
-	RedisPasswordW string
-	RedisProtocolW ConnProtocol
+	// Redis for a replica (read-only) server pool
+	RedisAddressRO  string
+	RedisPortRO     int
+	RedisDBRO       int
+	RedisUsernameRO string
+	RedisPasswordRO string
 
-	RedisPrefix string
-	RedisTTL    int
+	RedisSentinels          []string
+	RedisSentinelMasterName string
+	RedisPrefix             string
+	RedisTTL                int
 
 	GeoipPath       string
 	MaxCountries    int
@@ -316,18 +289,12 @@ func (c *CmdLineConfig) Init(args []string) {
 			Default:  "",
 			Help:     "Redis password",
 		})
-	argServerRedisProtocol := commandServer.String(
-		"", "redis-protocol", &argparse.Options{
-			Required: false,
-			Default:  "tcp",
-			Help:     "Redis connection protocol; one of 'tcp', 'tcp6' or 'unix'",
-		})
 
 	/*
-	 * Redis options for write requests
+	 * Redis options for replica (read-only) requests
 	 */
-	argServerRedisAddressW := commandServer.String(
-		"", "redis-writer-address", &argparse.Options{
+	argServerRedisAddressRO := commandServer.String(
+		"", "redis-replica-address", &argparse.Options{
 			Required: false,
 			Default:  redisAddress,
 			Validate: func(opt []string) error {
@@ -339,10 +306,10 @@ func (c *CmdLineConfig) Init(args []string) {
 
 				return nil
 			},
-			Help: "IPv4 or IPv6 address for a Redis service (writer)",
+			Help: "IPv4 or IPv6 address for a Redis service (replica)",
 		})
-	argServerRedisPortW := commandServer.Int(
-		"", "redis-writer-port", &argparse.Options{
+	argServerRedisPortRO := commandServer.Int(
+		"", "redis-replica-port", &argparse.Options{
 			Required: false,
 			Default:  redisPort,
 			Validate: func(opt []string) error {
@@ -354,36 +321,42 @@ func (c *CmdLineConfig) Init(args []string) {
 
 				return nil
 			},
-			Help: "Port for a Redis service (writer)",
+			Help: "Port for a Redis service (replica)",
 		})
-	argServerRedisDBW := commandServer.Int(
-		"", "redis-writer-database-number", &argparse.Options{
+	argServerRedisDBRO := commandServer.Int(
+		"", "redis-replica-database-number", &argparse.Options{
 			Required: false,
 			Default:  0,
-			Help:     "Redis database number (writer)",
+			Help:     "Redis database number (replica)",
 		})
-	argServerRedisUsernameW := commandServer.String(
-		"", "redis-writer-username", &argparse.Options{
+	argServerRedisUsernameRO := commandServer.String(
+		"", "redis-replica-username", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Redis username (writer)",
+			Help:     "Redis username (replica)",
 		})
-	argServerRedisPasswordW := commandServer.String(
-		"", "redis-writer-password", &argparse.Options{
+	argServerRedisPasswordRO := commandServer.String(
+		"", "redis-replica-password", &argparse.Options{
 			Required: false,
 			Default:  "",
-			Help:     "Redis password (writer)",
-		})
-	argServerRedisProtocolW := commandServer.String(
-		"", "redis-writer-protocol", &argparse.Options{
-			Required: false,
-			Default:  "tcp",
-			Help:     "Redis connection protocol (writer); one of 'tcp', 'tcp6' or 'unix'",
+			Help:     "Redis password (replica)",
 		})
 
 	/*
 	 * Common Redis options
 	 */
+	argServerRedisSentinels := commandServer.StringList(
+		"", "redis-sentinels", &argparse.Options{
+			Required: false,
+			Default:  []string{},
+			Help:     "List of space separated sentinel servers",
+		})
+	argServerRedisSentinelMasterName := commandServer.String(
+		"", "redis-sentinel-master-name", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "Sentinel master name",
+		})
 	argServerRedisPrefix := commandServer.String(
 		"", "redis-prefix", &argparse.Options{
 			Required: false,
@@ -859,61 +832,57 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.RedisPassword = *argServerRedisPassword
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_PROTOCOL"); val != "" {
-			if err := c.RedisProtocol.Set(val); err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
-			}
-		} else if err := c.RedisProtocol.Set(*argServerRedisProtocol); err != nil {
-			log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_ADDRESS"); val != "" {
-			c.RedisAddressW = val
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_ADDRESS"); val != "" {
+			c.RedisAddressRO = val
 		} else {
-			c.RedisAddressW = *argServerRedisAddressW
+			c.RedisAddressRO = *argServerRedisAddressRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PORT"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_PORT"); val != "" {
 			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_PORT can not be used:", parser.Usage(err.Error()))
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_REPLICA_PORT can not be used:", parser.Usage(err.Error()))
 			}
 
-			c.RedisPortW = param
+			c.RedisPortRO = param
 		} else {
-			c.RedisPortW = *argServerRedisPortW
+			c.RedisPortRO = *argServerRedisPortRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER"); val != "" {
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER"); val != "" {
 			param, err := strconv.Atoi(val)
 			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_DATABASE_NUMBER can not be used:",
+				log.Fatalln("Error: GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER can not be used:",
 					parser.Usage(err.Error()))
 			}
 
-			c.RedisDBW = param
+			c.RedisDBRO = param
 		} else {
-			c.RedisDBW = *argServerRedisDBW
+			c.RedisDBRO = *argServerRedisDBRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_USERNAME"); val != "" {
-			c.RedisUsernameW = val
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_USERNAME"); val != "" {
+			c.RedisUsernameRO = val
 		} else {
-			c.RedisUsernameW = *argServerRedisUsernameW
+			c.RedisUsernameRO = *argServerRedisUsernameRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PASSWORD"); val != "" {
-			c.RedisPasswordW = val
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_PASSWORD"); val != "" {
+			c.RedisPasswordRO = val
 		} else {
-			c.RedisPasswordW = *argServerRedisPasswordW
+			c.RedisPasswordRO = *argServerRedisPasswordRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_WRITER_PROTOCOL"); val != "" {
-			if err := c.RedisProtocolW.Set(val); err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PROTOCOL can not be used:", parser.Usage(err.Error()))
-			}
-		} else if err := c.RedisProtocolW.Set(*argServerRedisProtocolW); err != nil {
-			log.Fatalln("Error: GEOIPPOLICYD_REDIS_WRITER_PROTOCOL can not be used:", parser.Usage(err.Error()))
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINELS"); val != "" {
+			c.RedisSentinels = strings.Split(val, " ")
+		} else {
+			c.RedisSentinels = *argServerRedisSentinels
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME"); val != "" {
+			c.RedisSentinelMasterName = val
+		} else {
+			c.RedisSentinelMasterName = *argServerRedisSentinelMasterName
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_REDIS_PREFIX"); val != "" {

@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
-	"github.com/gomodule/redigo/redis"
 	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
 )
@@ -233,11 +232,6 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 					return
 				}
 
-				redisConnW := redisRWPool.NewWriteConn()
-
-				//goland:noinspection GoUnhandledErrorResult
-				defer redisConnW.Close()
-
 				if config.UseLDAP {
 					var (
 						err         error
@@ -266,9 +260,7 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 				}
 
 				key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
-				if _, err := redisConnW.Do("DEL", redis.Args{}.Add(key)...); err != nil {
-					level.Error(logger).Log("guid", guid, "error", err.Error())
-				}
+				redisHandle.Del(ctx, key).Err()
 
 				level.Info(logger).Log(
 					"guid", guid,

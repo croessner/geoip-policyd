@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,20 +32,29 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/go-redis/redis/v8"
 	"github.com/oschwald/maxminddb-golang"
 )
 
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	config              *CmdLineConfig   //nolint:gochecknoglobals // System wide configuration
-	customSettingsStore atomic.Value     //nolint:gochecknoglobals // System wide configuration from custom.yml file
-	geoIPStore          atomic.Value     //nolint:gochecknoglobals // System wide GeoIP handler
-	ldapRequestChan     chan LdapRequest //nolint:gochecknoglobals // Needed for LDAP pooling
-	ldapEnd             chan bool        //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
-	redisRWPool         RedisPool        //nolint:gochecknoglobals // System wide redis pool
-	logger              log.Logger       //nolint:gochecknoglobals // System wide logger
+	config              *CmdLineConfig         //nolint:gochecknoglobals // System wide configuration
+	customSettingsStore atomic.Value           //nolint:gochecknoglobals // System wide configuration from custom.yml file
+	geoIPStore          atomic.Value           //nolint:gochecknoglobals // System wide GeoIP handler
+	ldapRequestChan     chan LdapRequest       //nolint:gochecknoglobals // Needed for LDAP pooling
+	ldapEnd             chan bool              //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
+	redisHandle         redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
+	redisHandleReplica  redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
+	logger              log.Logger             //nolint:gochecknoglobals // System wide logger
+	ctx                 = context.Background() //nolint:gochecknoglobals // System wide context
 )
+
+type RedisLogger struct{}
+
+func (r *RedisLogger) Printf(_ context.Context, format string, values ...any) {
+	level.Info(logger).Log("redis", fmt.Sprintf(format, values...))
+}
 
 func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
 	customSettings := &CustomSettings{}
@@ -65,6 +75,56 @@ func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
 		}
 
 		return customSettings
+	}
+
+	return nil
+}
+
+func NewRedisClient() redis.UniversalClient {
+	var (
+		redisAddresses          []string
+		redisSentinelMasterName string
+	)
+
+	// If two or more sentinels are defined and a master name is set, switch to a FailoverClient.
+	if len(config.RedisSentinels) > 1 && config.RedisSentinelMasterName != "" {
+		redisAddresses = config.RedisSentinels
+		redisSentinelMasterName = config.RedisSentinelMasterName
+
+		redisHandle = redis.NewFailoverClient(&redis.FailoverOptions{
+			MasterName:    redisSentinelMasterName,
+			SentinelAddrs: redisAddresses,
+		})
+	} else {
+		redisAddresses = []string{fmt.Sprintf("%s:%d", config.RedisAddress, config.RedisPort)}
+
+		redisHandle = redis.NewClient(&redis.Options{
+			Addr:     redisAddresses[0],
+			Username: config.RedisUsername,
+			Password: config.RedisPassword,
+			DB:       config.RedisDB,
+		})
+	}
+
+	return redisHandle
+}
+
+func NewRedisReplicaClient() redis.UniversalClient {
+	if len(config.RedisSentinels) > 1 && config.RedisSentinelMasterName != "" {
+		return redis.NewFailoverClient(&redis.FailoverOptions{
+			MasterName:    config.RedisSentinelMasterName,
+			SentinelAddrs: config.RedisSentinels,
+			SlaveOnly:     true,
+		})
+	}
+
+	if config.RedisAddressRO != config.RedisAddress || config.RedisPortRO != config.RedisPort {
+		return redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%d", config.RedisAddressRO, config.RedisPortRO),
+			Username: config.RedisUsernameRO,
+			Password: config.RedisPasswordRO,
+			DB:       config.RedisDBRO,
+		})
 	}
 
 	return nil
@@ -102,7 +162,12 @@ func main() {
 	}
 
 	logger = level.NewFilter(logger, logLevel)
-	logger = log.With(logger, "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)
+
+	if config.VerboseLevel == logLevelDebug {
+		logger = log.With(logger, "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)
+	} else {
+		logger = log.With(logger, "ts", log.DefaultTimestamp)
+	}
 
 	// Manually set time zone
 	if tz := os.Getenv("TZ"); tz != "" {
@@ -145,8 +210,15 @@ func main() {
 		// REST interface
 		go httpApp()
 
-		// Initialize global redis pools
-		redisRWPool = NewRedisPool()
+		redisLogger := &RedisLogger{}
+		redis.SetLogger(redisLogger)
+
+		redisHandle = NewRedisClient()
+		redisHandleReplica = NewRedisReplicaClient()
+
+		if redisHandleReplica == nil {
+			redisHandleReplica = redisHandle
+		}
 
 		server, err = net.Listen("tcp", fmt.Sprintf("%s:%d", config.ServerAddress, config.ServerPort))
 		if server == nil {
