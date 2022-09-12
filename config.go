@@ -86,21 +86,21 @@ type CmdLineConfig struct {
 	// Redis settings for a reading and/or writing server pool
 	RedisAddress  string
 	RedisPort     int
-	RedisDB       int
 	RedisUsername string
 	RedisPassword string
 
 	// Redis for a replica (read-only) server pool
-	RedisAddressRO  string
-	RedisPortRO     int
-	RedisDBRO       int
-	RedisUsernameRO string
-	RedisPasswordRO string
+	RedisAddressRO string
+	RedisPortRO    int
 
 	RedisSentinels          []string
 	RedisSentinelMasterName string
-	RedisPrefix             string
-	RedisTTL                int
+	RedisSentinelUsername   string
+	RedisSentinelPassword   string
+
+	RedisPrefix string
+	RedisDB     int
+	RedisTTL    int
 
 	GeoipPath       string
 	MaxCountries    int
@@ -323,24 +323,6 @@ func (c *CmdLineConfig) Init(args []string) {
 			},
 			Help: "Port for a Redis service (replica)",
 		})
-	argServerRedisDBRO := commandServer.Int(
-		"", "redis-replica-database-number", &argparse.Options{
-			Required: false,
-			Default:  0,
-			Help:     "Redis database number (replica)",
-		})
-	argServerRedisUsernameRO := commandServer.String(
-		"", "redis-replica-username", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis username (replica)",
-		})
-	argServerRedisPasswordRO := commandServer.String(
-		"", "redis-replica-password", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis password (replica)",
-		})
 
 	/*
 	 * Common Redis options
@@ -356,6 +338,18 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  "",
 			Help:     "Sentinel master name",
+		})
+	argServerRedisSentinelUsername := commandServer.String(
+		"", "redis-sentinel-username", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "Redis sentinel username",
+		})
+	argServerRedisSentinelPassword := commandServer.String(
+		"", "redis-sentinel-password", &argparse.Options{
+			Required: false,
+			Default:  "",
+			Help:     "Redis sentinel password",
 		})
 	argServerRedisPrefix := commandServer.String(
 		"", "redis-prefix", &argparse.Options{
@@ -849,30 +843,6 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.RedisPortRO = *argServerRedisPortRO
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER can not be used:",
-					parser.Usage(err.Error()))
-			}
-
-			c.RedisDBRO = param
-		} else {
-			c.RedisDBRO = *argServerRedisDBRO
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_USERNAME"); val != "" {
-			c.RedisUsernameRO = val
-		} else {
-			c.RedisUsernameRO = *argServerRedisUsernameRO
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_PASSWORD"); val != "" {
-			c.RedisPasswordRO = val
-		} else {
-			c.RedisPasswordRO = *argServerRedisPasswordRO
-		}
-
 		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINELS"); val != "" {
 			c.RedisSentinels = strings.Split(val, " ")
 		} else {
@@ -883,6 +853,18 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.RedisSentinelMasterName = val
 		} else {
 			c.RedisSentinelMasterName = *argServerRedisSentinelMasterName
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_USERNAME"); val != "" {
+			c.RedisSentinelUsername = val
+		} else {
+			c.RedisSentinelUsername = *argServerRedisSentinelUsername
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD"); val != "" {
+			c.RedisSentinelPassword = val
+		} else {
+			c.RedisSentinelPassword = *argServerRedisSentinelPassword
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_REDIS_PREFIX"); val != "" {

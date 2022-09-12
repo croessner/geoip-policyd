@@ -294,6 +294,28 @@ func TestConfigEnvRedisUsername(t *testing.T) {
 	}
 }
 
+func TestConfigRedisSentinelUsername(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--redis-sentinel-username", "username"})
+
+	if cfg.RedisSentinelUsername != "username" {
+		t.Errorf("Expected --redis-sentinel-username=username, got value=%v", cfg.RedisSentinelUsername)
+	}
+}
+
+func TestConfigEnvRedisSentinelUsername(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_REDIS_SENTINEL_USERNAME": "username",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.RedisSentinelUsername != "username" {
+		t.Errorf("Expected --redis-sentinel-username=username, got value=%v", cfg.RedisSentinelUsername)
+	}
+}
+
 func TestConfigRedisPassword(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--redis-password", "password"})
@@ -313,6 +335,28 @@ func TestConfigEnvRedisPassword(t *testing.T) {
 
 	if cfg.RedisPassword != "password" {
 		t.Errorf("Expected --redis-password=password, got value=%v", cfg.RedisPassword)
+	}
+}
+
+func TestConfigRedisSentinelPassword(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--redis-sentinel-password", "password"})
+
+	if cfg.RedisSentinelPassword != "password" {
+		t.Errorf("Expected --redis-sentinel-password=password, got value=%v", cfg.RedisSentinelPassword)
+	}
+}
+
+func TestConfigEnvRedisSentinelPassword(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD": "password",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.RedisSentinelPassword != "password" {
+		t.Errorf("Expected --redis-sentinel-password=password, got value=%v", cfg.RedisSentinelPassword)
 	}
 }
 
@@ -357,72 +401,6 @@ func TestConfigEnvRedisReplicaPort(t *testing.T) {
 
 	if cfg.RedisPortRO != 6333 {
 		t.Errorf("Expected --redis-replica-port=6333, got value=%v", cfg.RedisPortRO)
-	}
-}
-
-func TestConfigRedisReplicaDatabaseNumber(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-replica-database-number", "4"})
-
-	if cfg.RedisDBRO != 4 {
-		t.Errorf("Expected --redis-replica-database-number=4, got value=%v", cfg.RedisDBRO)
-	}
-}
-
-func TestConfigEnvRedisReplicaDatabaseNumber(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_REPLICA_DATABASE_NUMBER": "4",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisDBRO != 4 {
-		t.Errorf("Expected --redis-replica-database-number=4, got value=%v", cfg.RedisDBRO)
-	}
-}
-
-func TestConfigRedisReplicaUsername(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-replica-username", "username"})
-
-	if cfg.RedisUsernameRO != "username" {
-		t.Errorf("Expected --redis-replica-username=username, got value=%v", cfg.RedisUsernameRO)
-	}
-}
-
-func TestConfigEnvRedisReplicaUsername(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_REPLICA_USERNAME": "username",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisUsernameRO != "username" {
-		t.Errorf("Expected --redis-replica-username=username, got value=%v", cfg.RedisUsernameRO)
-	}
-}
-
-func TestConfigRedisReplicaPassword(t *testing.T) {
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server", "--redis-replica-password", "password"})
-
-	if cfg.RedisPasswordRO != "password" {
-		t.Errorf("Expected --redis-replica-password=password, got value=%v", cfg.RedisPasswordRO)
-	}
-}
-
-func TestConfigEnvRedisReplicaPassword(t *testing.T) {
-	closer := envSetter(map[string]string{
-		"GEOIPPOLICYD_REDIS_REPLICA_PASSWORD": "password",
-	})
-	defer closer()
-	cfg := &CmdLineConfig{}
-	cfg.Init([]string{"app", "server"})
-
-	if cfg.RedisPasswordRO != "password" {
-		t.Errorf("Expected --redis-replica-password=password, got value=%v", cfg.RedisPasswordRO)
 	}
 }
 
