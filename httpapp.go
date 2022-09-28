@@ -44,7 +44,10 @@ const (
 	DELETE = "DELETE"
 )
 
-const Sender = "sender"
+const (
+	Sender = "sender"
+	Client = "client"
+)
 
 // HTTPApp Basic auth for the HTTP service.
 type HTTPApp struct {
@@ -63,6 +66,13 @@ type HTTPApp struct {
 type Body struct {
 	Key   string      `json:"key"`
 	Value interface{} `json:"value"`
+}
+
+type RESTResult struct {
+	GUID      string `json:"guid"`
+	Object    string `json:"object"`
+	Operation string `json:"operation"`
+	Result    any    `json:"result"`
 }
 
 func HasContentType(request *http.Request, mimetype string) bool {
@@ -277,6 +287,111 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", "unknown key")
 			}
 
+		case "/query":
+			var (
+				requestData  *Body
+				policyResult string
+				result       bool
+			)
+
+			if !HasContentType(request, "application/json") {
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid,
+					"client", client,
+					"request", method,
+					"path", uri.Path,
+					"error", "wrong Content-Type header")
+
+				return
+			}
+
+			body, err := io.ReadAll(request.Body)
+			if err != nil {
+				responseWriter.WriteHeader(http.StatusInternalServerError)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
+				return
+			}
+
+			requestData = &Body{}
+			if err := json.Unmarshal(body, requestData); err != nil {
+				responseWriter.WriteHeader(http.StatusBadRequest)
+				level.Error(logger).Log(
+					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
+
+				return
+			}
+
+			if requestData.Key == Client {
+				clientRequest, ok := requestData.Value.(map[string]any)
+				if !ok {
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "wrong value format",
+						"value", fmt.Sprintf("%+v", requestData.Value),
+						"value_type", fmt.Sprintf("%T", requestData.Value))
+
+					return
+				}
+
+				userAttribute := "sender"
+				if config.UseSASLUsername {
+					userAttribute = "sasl_username"
+				}
+
+				requiredFieldsFound := false
+
+				if _, addressFound := clientRequest["address"].(string); addressFound {
+					if _, senderFound := clientRequest["sender"]; senderFound {
+						requiredFieldsFound = true
+
+						policyRequest := map[string]string{
+							"request":        "smtpd_access_policy",
+							"client_address": clientRequest["address"].(string),
+							userAttribute:    clientRequest["sender"].(string),
+						}
+
+						policyResult = getPolicyResponse(config, policyRequest)
+					}
+				}
+
+				if !requiredFieldsFound {
+					responseWriter.WriteHeader(http.StatusBadRequest)
+					level.Error(logger).Log(
+						"guid", guid,
+						"client", client,
+						"request", method,
+						"path", uri.Path,
+						"error", "value does not contain 'address' and 'sender' fields",
+						"value", fmt.Sprintf("%+v", requestData.Value),
+						"value_type", fmt.Sprintf("%T", requestData.Value))
+
+					return
+				}
+			}
+
+			if policyResult != "action=DUNNO" {
+				result = false
+			} else {
+				result = true
+			}
+
+			respone, _ := json.Marshal(&RESTResult{
+				GUID:      guid,
+				Object:    Client,
+				Operation: "query",
+				Result:    result,
+			})
+
+			responseWriter.Header().Set("Content-Type", "application/json")
+			responseWriter.WriteHeader(http.StatusAccepted)
+			responseWriter.Write(respone)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
