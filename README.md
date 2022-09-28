@@ -338,13 +338,13 @@ Response: JSON formatted policy decision
 Example request:
 ```shell
 # Plain http without basic auth
-curl -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove"
+curl -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "http://localhost:8080/query"
 
 # Plain with basic auth
-curl -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "http://localhost:8080/query" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{ "key": "client", "value": { "address": "1.2.3.4", "sender": "user@example.com" } }' -H "Content-Type: application/json" -X POST "https://localhost:8443/query" -u testuser:testsecret
 ```
 
 Allowed policy response example:
