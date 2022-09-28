@@ -29,7 +29,6 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/go-redis/redis/v8"
-	"github.com/segmentio/ksuid"
 )
 
 const (
@@ -92,13 +91,12 @@ func (r *RemoteClient) AddIPAddress(ipAddress string) bool {
 }
 
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
-func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]string) string {
+func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]string, guid string) string {
 	var (
 		mapKeyFound      bool
 		request          string
 		sender           string
 		clientIP         string
-		guid             string
 		trustedCountries []string
 		trustedIPs       []string
 		err              error
@@ -107,8 +105,6 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 		usedMaxCountries = cmdLineConfig.MaxCountries
 		actionText       = "DUNNO"
 	)
-
-	guid = ksuid.New().String()
 
 	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
 		if request == "smtpd_access_policy" {

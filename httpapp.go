@@ -357,7 +357,7 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 							userAttribute:    clientRequest["sender"].(string),
 						}
 
-						policyResult = getPolicyResponse(config, policyRequest)
+						policyResult = getPolicyResponse(config, policyRequest, guid)
 					}
 				}
 
