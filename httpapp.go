@@ -21,10 +21,7 @@ package main
 import (
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -32,7 +29,6 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
-	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
 )
 
@@ -44,7 +40,10 @@ const (
 	DELETE = "DELETE"
 )
 
-const Sender = "sender"
+const (
+	Sender = "sender"
+	Client = "client"
+)
 
 // HTTPApp Basic auth for the HTTP service.
 type HTTPApp struct {
@@ -65,6 +64,19 @@ type Body struct {
 	Value interface{} `json:"value"`
 }
 
+type RESTResult struct {
+	GUID      string `json:"guid"`
+	Object    string `json:"object"`
+	Operation string `json:"operation"`
+	Result    any    `json:"result"`
+}
+
+type HTTPFuncArgs struct {
+	guid           string
+	responseWriter http.ResponseWriter
+	request        *http.Request
+}
+
 func HasContentType(request *http.Request, mimetype string) bool {
 	contentType := request.Header.Get("Content-type")
 
@@ -82,559 +94,52 @@ func HasContentType(request *http.Request, mimetype string) bool {
 	return false
 }
 
-//nolint:gocognit,gocyclo,maintidx // Ignore complexity
 func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http.Request) {
-	method := request.Method
-	uri := request.URL
-	client := request.RemoteAddr
 	guid := ksuid.New().String()
 
-	switch method {
+	httpFuncArgs := &HTTPFuncArgs{guid: guid, responseWriter: responseWriter, request: request}
+
+	switch request.Method {
 	case GET:
-		switch uri.Path {
+		switch request.URL.Path {
 		case "/reload":
-			var (
-				err               error
-				customSettings    *CustomSettings
-				newCustomSettings *CustomSettings
-			)
-
-			geoip := &GeoIP{}
-			geoip.Reader, err = maxminddb.Open(config.GeoipPath)
-
-			if err != nil {
-				responseWriter.WriteHeader(http.StatusInternalServerError)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", err.Error())
-
-				return
-			}
-
-			geoIPStore.Store(geoip)
-
-			level.Info(logger).Log(
-				"guid", guid,
-				"client", client,
-				"request", method,
-				"path", uri.Path,
-				"file", config.GeoipPath,
-				"result", "reloaded")
-
-			//nolint:forcetypeassert // Global variable
-			if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
-				newCustomSettings = initCustomSettings(config)
-				if newCustomSettings != nil {
-					customSettingsStore.Store(newCustomSettings)
-
-					level.Info(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"file", config.CustomSettingsPath,
-						"result", "reloaded")
-				}
-			}
-
-			responseWriter.WriteHeader(http.StatusAccepted)
-
+			httpGETReload(httpFuncArgs)
 		case "/custom-settings":
-			responseWriter.Header().Set("Content-Type", "application/json")
-
-			//nolint:forcetypeassert // Global variable
-			if customSettings := customSettingsStore.Load().(*CustomSettings); customSettings != nil {
-				if err := json.NewEncoder(responseWriter).Encode(customSettings.Data); err != nil {
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", err.Error())
-
-					return
-				}
-
-				level.Info(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path)
-			} else {
-				responseWriter.WriteHeader(http.StatusNoContent)
-
-				level.Info(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path)
-			}
-
+			httpGETCustomSettings(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case POST:
-		switch uri.Path {
+		switch request.URL.Path {
 		case "/remove":
-			var requestData *Body
-
-			if !HasContentType(request, "application/json") {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", "wrong Content-Type header")
-
-				return
-			}
-
-			body, err := io.ReadAll(request.Body)
-			if err != nil {
-				responseWriter.WriteHeader(http.StatusInternalServerError)
-				level.Error(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-
-				return
-			}
-
-			requestData = &Body{}
-			if err := json.Unmarshal(body, requestData); err != nil {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-
-				return
-			}
-
-			if requestData.Key == Sender {
-				sender, ok := requestData.Value.(string)
-				if !ok {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "value must be string")
-
-					return
-				}
-
-				if sender == "" {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "value must not be empty")
-
-					return
-				}
-
-				if config.UseLDAP {
-					var (
-						err         error
-						ldapReply   LdapReply
-						ldapRequest LdapRequest
-					)
-
-					ldapReplyChan := make(chan LdapReply)
-
-					ldapRequest.username = sender
-					ldapRequest.filter = config.LDAP.Filter
-					ldapRequest.guid = guid
-					ldapRequest.attributes = config.LDAP.ResultAttr
-					ldapRequest.replyChan = ldapReplyChan
-
-					ldapRequestChan <- ldapRequest
-
-					ldapReply = <-ldapReplyChan
-
-					if ldapReply.err != nil {
-						level.Error(logger).Log("guid", guid, "error", err.Error())
-					} else if resultAttr, ok := ldapReply.result[config.LDAP.ResultAttr[0]]; ok {
-						// LDAP single value
-						sender = resultAttr[0]
-					}
-				}
-
-				key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
-				redisHandle.Del(ctx, key).Err()
-
-				level.Info(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"sender", sender,
-					"result", "unlocked")
-
-				responseWriter.WriteHeader(http.StatusAccepted)
-			} else {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", "unknown key")
-			}
-
+			httpPOSTRemove(httpFuncArgs)
+		case "/query":
+			httpPOSTQuery(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case PUT:
-		switch uri.Path {
+		switch request.URL.Path {
 		case "/update":
-			if !HasContentType(request, "application/json") {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", "wrong Content-Type header")
-
-				return
-			}
-
-			body, err := io.ReadAll(request.Body)
-			if err != nil {
-				responseWriter.WriteHeader(http.StatusInternalServerError)
-				level.Error(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-			} else {
-				customSettings := &CustomSettings{}
-				if err := json.Unmarshal(body, customSettings); err != nil {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-				} else {
-					responseWriter.WriteHeader(http.StatusAccepted)
-					customSettingsStore.Store(customSettings)
-
-					level.Info(logger).Log(
-						"guid", guid, "client", client, "request", method, "path", uri.Path, "result", "success")
-				}
-			}
-
+			httpPUTUpdate(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case PATCH:
-		switch uri.Path {
+		switch request.URL.Path {
 		case "/modify":
-			var requestData *Body
-
-			if !HasContentType(request, "application/json") {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", "wrong Content-Type header")
-
-				return
-			}
-
-			body, err := io.ReadAll(request.Body)
-			if err != nil {
-				responseWriter.WriteHeader(http.StatusInternalServerError)
-				level.Error(logger).Log(
-					"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-			} else {
-				requestData = &Body{}
-				//nolint:govet // Ignore
-				if err := json.Unmarshal(body, requestData); err != nil {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-
-					return
-				}
-			}
-
-			if requestData.Key == Sender {
-				account, ok := requestData.Value.(map[string]any)
-				if !ok {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-
-					return
-				}
-
-				var (
-					comment   string
-					countries int
-					ips       int
-					sender    string
-					tempFloat float64
-				)
-
-				if val, ok := account["comment"]; ok {
-					if comment, ok = val.(string); !ok {
-						responseWriter.WriteHeader(http.StatusBadRequest)
-						level.Error(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"error", "'comment' is not a string")
-
-						return
-					}
-				}
-
-				if val, ok := account["countries"]; ok {
-					if tempFloat, ok = val.(float64); !ok {
-						log.Printf("%T: %v\n", account["countries"], account["countries"])
-						responseWriter.WriteHeader(http.StatusBadRequest)
-						level.Error(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"error", "'countries' is not a float64")
-
-						return
-					}
-
-					countries = int(tempFloat)
-				}
-
-				if val, ok := account["ips"]; ok {
-					if tempFloat, ok = val.(float64); !ok {
-						responseWriter.WriteHeader(http.StatusBadRequest)
-						level.Error(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"error", "'ips' is not a float64")
-
-						return
-					}
-
-					ips = int(tempFloat)
-				}
-
-				if val, ok := account[Sender]; ok {
-					if sender, ok = val.(string); !ok {
-						responseWriter.WriteHeader(http.StatusBadRequest)
-						level.Error(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"error", "'sender' is not a string")
-
-						return
-					}
-				}
-
-				if countries <= 0 {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "'countries' lower than zero",
-						"countries", countries)
-
-					return
-				}
-
-				if ips <= 0 {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "'ips' lower than zero",
-						"ips", ips)
-
-					return
-				}
-
-				if sender == "" {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "'sender' is empty")
-
-					return
-				}
-
-				if val := os.Getenv("GO_TESTING"); val == "" {
-					customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
-					if customSettings != nil {
-						for index, record := range customSettings.Data {
-							if record.Sender != sender {
-								continue
-							}
-
-							// Update record
-							customSettings.Data[index].IPs = ips
-							customSettings.Data[index].Countries = countries
-							customSettings.Data[index].Comment = comment
-
-							customSettingsStore.Store(customSettings)
-							responseWriter.WriteHeader(http.StatusAccepted)
-
-							level.Info(logger).Log(
-								"guid", guid,
-								"client", client,
-								"request", method,
-								"path", uri.Path,
-								"result", "success")
-
-							return
-						}
-
-						// Add record
-						account := Account{Comment: comment, Sender: sender, IPs: ips, Countries: countries}
-						customSettings.Data = append(customSettings.Data, account)
-
-						customSettingsStore.Store(customSettings)
-						responseWriter.WriteHeader(http.StatusAccepted)
-
-						level.Info(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"result", "success")
-					} else {
-						account := Account{Comment: comment, Sender: sender, IPs: ips, Countries: countries}
-						customSettings = &CustomSettings{Data: []Account{account}}
-
-						customSettingsStore.Store(customSettings)
-						responseWriter.WriteHeader(http.StatusAccepted)
-
-						level.Info(logger).Log(
-							"guid", guid,
-							"client", client,
-							"request", method,
-							"path", uri.Path,
-							"result", "success")
-					}
-				}
-			}
-
+			httpPATCHModify(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
 
 	case DELETE:
-		switch uri.Path {
+		switch request.URL.Path {
 		case "/remove":
-			var requestData *Body
-
-			if !HasContentType(request, "application/json") {
-				responseWriter.WriteHeader(http.StatusBadRequest)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", "wrong Content-Type header")
-
-				return
-			}
-
-			body, err := io.ReadAll(request.Body)
-			if err != nil {
-				responseWriter.WriteHeader(http.StatusInternalServerError)
-				level.Error(logger).Log(
-					"guid", guid,
-					"client", client,
-					"request", method,
-					"path", uri.Path,
-					"error", err.Error())
-			} else {
-				requestData = &Body{}
-				if err := json.Unmarshal(body, requestData); err != nil {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid, "client", client, "request", method, "path", uri.Path, "error", err.Error())
-
-					return
-				}
-			}
-
-			if requestData.Key == Sender {
-				sender, ok := requestData.Value.(string)
-				if !ok {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "value must be string")
-
-					return
-				}
-
-				if sender == "" {
-					responseWriter.WriteHeader(http.StatusBadRequest)
-					level.Error(logger).Log(
-						"guid", guid,
-						"client", client,
-						"request", method,
-						"path", uri.Path,
-						"error", "value must not be empty")
-
-					return
-				}
-
-				if val := os.Getenv("GO_TESTING"); val == "" {
-					customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
-					if customSettings != nil {
-						if len(customSettings.Data) > 0 {
-							for index, record := range customSettings.Data {
-								if record.Sender != sender {
-									continue
-								}
-
-								customSettings.Data = func(s []Account, i int) []Account {
-									s[i] = s[len(s)-1]
-
-									return s[:len(s)-1]
-								}(customSettings.Data, index)
-
-								customSettingsStore.Store(customSettings)
-								responseWriter.WriteHeader(http.StatusAccepted)
-
-								level.Info(logger).Log(
-									"guid", guid,
-									"client", client,
-									"request", method,
-									"path", uri.Path,
-									"result", "success")
-
-								return
-							}
-
-							responseWriter.WriteHeader(http.StatusBadRequest)
-							level.Error(logger).Log(
-								"guid", guid,
-								"client", client,
-								"request", method,
-								"path", uri.Path,
-								"error", "sender not found",
-								"sender", sender)
-						}
-					}
-				}
-			}
-
+			httpDELETERemove(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
