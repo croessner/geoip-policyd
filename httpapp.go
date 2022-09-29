@@ -71,7 +71,7 @@ type RESTResult struct {
 	Result    any    `json:"result"`
 }
 
-type httpFunctionParameters struct {
+type HTTPFuncArgs struct {
 	guid           string
 	responseWriter http.ResponseWriter
 	request        *http.Request
@@ -97,15 +97,15 @@ func HasContentType(request *http.Request, mimetype string) bool {
 func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http.Request) {
 	guid := ksuid.New().String()
 
-	parameters := &httpFunctionParameters{guid: guid, responseWriter: responseWriter, request: request}
+	httpFuncArgs := &HTTPFuncArgs{guid: guid, responseWriter: responseWriter, request: request}
 
 	switch request.Method {
 	case GET:
 		switch request.URL.Path {
 		case "/reload":
-			httpGETReload(parameters)
+			httpGETReload(httpFuncArgs)
 		case "/custom-settings":
-			httpGETCustomSettings(parameters)
+			httpGETCustomSettings(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
@@ -113,9 +113,9 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 	case POST:
 		switch request.URL.Path {
 		case "/remove":
-			httpPOSTRemove(parameters)
+			httpPOSTRemove(httpFuncArgs)
 		case "/query":
-			httpPOSTQuery(parameters)
+			httpPOSTQuery(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
@@ -123,7 +123,7 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 	case PUT:
 		switch request.URL.Path {
 		case "/update":
-			httpPUTUpdate(parameters)
+			httpPUTUpdate(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
@@ -131,7 +131,7 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 	case PATCH:
 		switch request.URL.Path {
 		case "/modify":
-			httpPATCHModify(parameters)
+			httpPATCHModify(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
@@ -139,7 +139,7 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 	case DELETE:
 		switch request.URL.Path {
 		case "/remove":
-			httpDELETERemove(parameters)
+			httpDELETERemove(httpFuncArgs)
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}

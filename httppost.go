@@ -26,12 +26,12 @@ import (
 	"net/http"
 )
 
-func httpPOSTRemove(parameters *httpFunctionParameters) {
+func httpPOSTRemove(httpFuncArgs *HTTPFuncArgs) {
 	var requestData *Body
 
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 
@@ -137,16 +137,16 @@ func httpPOSTRemove(parameters *httpFunctionParameters) {
 	}
 }
 
-func httpPOSTQuery(parameters *httpFunctionParameters) {
+func httpPOSTQuery(httpFuncArgs *HTTPFuncArgs) {
 	var (
 		requestData  *Body
 		policyResult string
 		result       bool
 	)
 
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 

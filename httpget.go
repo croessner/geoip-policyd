@@ -26,16 +26,16 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 )
 
-func httpGETReload(parameters *httpFunctionParameters) {
+func httpGETReload(httpFuncArgs *HTTPFuncArgs) {
 	var (
 		err               error
 		customSettings    *CustomSettings
 		newCustomSettings *CustomSettings
 	)
 
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 
@@ -83,10 +83,10 @@ func httpGETReload(parameters *httpFunctionParameters) {
 	responseWriter.WriteHeader(http.StatusAccepted)
 }
 
-func httpGETCustomSettings(parameters *httpFunctionParameters) {
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+func httpGETCustomSettings(httpFuncArgs *HTTPFuncArgs) {
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 

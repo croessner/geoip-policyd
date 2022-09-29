@@ -26,12 +26,12 @@ import (
 	"os"
 )
 
-func httpDELETERemove(parameters *httpFunctionParameters) {
+func httpDELETERemove(httpFuncArgs *HTTPFuncArgs) {
 	var requestData *Body
 
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 

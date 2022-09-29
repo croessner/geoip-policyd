@@ -27,12 +27,12 @@ import (
 	"os"
 )
 
-func httpPATCHModify(parameters *httpFunctionParameters) {
+func httpPATCHModify(httpFuncArgs *HTTPFuncArgs) {
 	var requestData *Body
 
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 

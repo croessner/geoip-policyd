@@ -25,10 +25,10 @@ import (
 	"net/http"
 )
 
-func httpPUTUpdate(parameters *httpFunctionParameters) {
-	guid := parameters.guid
-	responseWriter := parameters.responseWriter
-	request := parameters.request
+func httpPUTUpdate(httpFuncArgs *HTTPFuncArgs) {
+	guid := httpFuncArgs.guid
+	responseWriter := httpFuncArgs.responseWriter
+	request := httpFuncArgs.request
 	method := request.Method
 	client := request.RemoteAddr
 
