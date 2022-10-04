@@ -36,58 +36,97 @@ const (
 	rejectText = "REJECT Your account seems to be compromised. Please contact your support"
 )
 
+type TTLString map[string]int64
+
 type RemoteClient struct {
-	IPs       []string `redis:"ips"`       // All known IP addresses
-	Countries []string `redis:"countries"` // All known country codes
-	Actions   []string `redis:"actions"`   // All actions that may have run
+	IPs       []TTLString `redis:"ips"`       // All known IP addresses
+	Countries []TTLString `redis:"countries"` // All known country codes
+	Actions   []string    `redis:"actions"`   // All actions that may have run
+	Locked    bool        `redis:"locked"`    // Account is permanentley locked
+}
+
+func (r *RemoteClient) HaveCountryCode(countryCode string) bool {
+	for _, ttlString := range r.Countries {
+		if _, okay := ttlString[countryCode]; okay {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *RemoteClient) HaveIP(ipAddress string) bool {
+	for _, ttlString := range r.IPs {
+		if _, okay := ttlString[ipAddress]; okay {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *RemoteClient) CleanUpCountries() {
+	var countryCodes []TTLString
+
+	for _, country := range r.Countries {
+		for _, created := range country {
+			ttl := time.Duration(config.RedisTTL) * time.Second
+			if time.Now().UnixNano()-ttl.Nanoseconds() < created {
+				countryCodes = append(countryCodes, country)
+			}
+		}
+	}
+
+	r.Countries = countryCodes
+}
+
+func (r *RemoteClient) CleanUpIPs() {
+	var ips []TTLString
+
+	for _, ipAddress := range r.IPs {
+		for _, created := range ipAddress {
+			ttl := time.Duration(config.RedisTTL) * time.Second
+			if time.Now().UnixNano()-ttl.Nanoseconds() < created {
+				ips = append(ips, ipAddress)
+			}
+		}
+	}
+
+	r.IPs = ips
 }
 
 func (r *RemoteClient) AddCountryCode(countryCode string) bool {
-	updated := false
-
-	if len(r.Countries) == 0 {
-		r.Countries = append(r.Countries, countryCode)
-		updated = true
-	} else {
-		haveCC := false
-
-		for _, value := range r.Countries {
-			if value == countryCode {
-				haveCC = true
-			}
-		}
-
-		if !haveCC {
-			r.Countries = append(r.Countries, countryCode)
-			updated = true
-		}
+	if !r.Locked {
+		r.CleanUpCountries()
 	}
 
-	return updated
+	if len(r.Countries) == 0 || !r.HaveCountryCode(countryCode) {
+		newCountry := make(TTLString)
+
+		newCountry[countryCode] = time.Now().UnixNano()
+		r.Countries = append(r.Countries, newCountry)
+
+		return true
+	}
+
+	return false
 }
 
 func (r *RemoteClient) AddIPAddress(ipAddress string) bool {
-	updated := false
-
-	if len(r.IPs) == 0 {
-		r.IPs = append(r.IPs, ipAddress)
-		updated = true
-	} else {
-		haveIP := false
-
-		for _, value := range r.IPs {
-			if value == ipAddress {
-				haveIP = true
-			}
-		}
-
-		if !haveIP {
-			r.IPs = append(r.IPs, ipAddress)
-			updated = true
-		}
+	if !r.Locked {
+		r.CleanUpIPs()
 	}
 
-	return updated
+	if len(r.IPs) == 0 || !r.HaveIP(ipAddress) {
+		newIP := make(TTLString)
+
+		newIP[ipAddress] = time.Now().UnixNano()
+		r.IPs = append(r.IPs, newIP)
+
+		return true
+	}
+
+	return false
 }
 
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
@@ -231,10 +270,18 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 							if !matchCountry {
 								actionText = rejectText
 								requireActions = true
+
+								if config.BlockPermanent {
+									remoteClient.Locked = true
+								}
 							}
 						} else if len(remoteClient.Countries) > allowedMaxCountries {
 							actionText = rejectText
 							requireActions = true
+
+							if config.BlockPermanent {
+								remoteClient.Locked = true
+							}
 						}
 
 						if len(trustedIPs) > 0 {
@@ -292,10 +339,18 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 							if !matchIP {
 								actionText = rejectText
 								requireActions = true
+
+								if config.BlockPermanent {
+									remoteClient.Locked = true
+								}
 							}
 						} else if len(remoteClient.IPs) > allowedMaxIPs {
 							actionText = rejectText
 							requireActions = true
+
+							if config.BlockPermanent {
+								remoteClient.Locked = true
+							}
 						}
 
 						if config.RunActions && requireActions {
@@ -340,7 +395,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 						}
 
 						// For each request update the expiry timestamp
-						if config.BlockPermanent {
+						if remoteClient.Locked {
 							if err = redisHandle.Persist(ctx, key).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
@@ -368,7 +423,15 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		"guid", guid,
 		senderKey, sender,
 		"countries", func() string {
-			return strings.Join(remoteClient.Countries, ",")
+			var countries []string
+
+			for _, ttlString := range remoteClient.Countries {
+				for country := range ttlString {
+					countries = append(countries, country)
+				}
+			}
+
+			return strings.Join(countries, ",")
 		}(),
 		"trusted_countries", func() string {
 			if len(trustedCountries) > 0 {
@@ -380,7 +443,15 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		"total_countries", len(remoteClient.Countries),
 		"allowed_max_countries", allowedMaxCountries,
 		"ips", func() string {
-			return strings.Join(remoteClient.IPs, ",")
+			var ips []string
+
+			for _, ttlString := range remoteClient.IPs {
+				for ipAddress := range ttlString {
+					ips = append(ips, ipAddress)
+				}
+			}
+
+			return strings.Join(ips, ",")
 		}(),
 		"trusted_ips", func() string {
 			if len(trustedIPs) > 0 {
