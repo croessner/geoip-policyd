@@ -562,8 +562,8 @@ func TestConfigBlockedNoExpire(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--block-permanent"})
 
-	if cfg.BlockedNoExpire != true {
-		t.Errorf("Expected --block-permanent, got value=%v", cfg.BlockedNoExpire)
+	if cfg.BlockPermanent != true {
+		t.Errorf("Expected --block-permanent, got value=%v", cfg.BlockPermanent)
 	}
 }
 
@@ -575,8 +575,8 @@ func TestConfigEnvBlockedNoExpire(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.BlockedNoExpire != true {
-		t.Errorf("Expected --block-permanent, got value=%v", cfg.BlockedNoExpire)
+	if cfg.BlockPermanent != true {
+		t.Errorf("Expected --block-permanent, got value=%v", cfg.BlockPermanent)
 	}
 }
 

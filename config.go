@@ -102,11 +102,11 @@ type CmdLineConfig struct {
 	RedisDB     int
 	RedisTTL    int
 
-	GeoipPath       string
-	MaxCountries    int
-	MaxIPs          int
-	BlockedNoExpire bool
-	VerboseLevel    int
+	GeoipPath      string
+	MaxCountries   int
+	MaxIPs         int
+	BlockPermanent bool
+	VerboseLevel   int
 
 	// Flag that indicates which command was called
 	CommandServer bool
@@ -918,9 +918,9 @@ func (c *CmdLineConfig) Init(args []string) {
 				log.Fatalln("Error:", err.Error())
 			}
 
-			c.BlockedNoExpire = param
+			c.BlockPermanent = param
 		} else {
-			c.BlockedNoExpire = *argServerBlockedNoExpire
+			c.BlockPermanent = *argServerBlockedNoExpire
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_CUSTOM_SETTINGS_PATH"); val != "" {

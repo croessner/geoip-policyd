@@ -57,7 +57,7 @@ Back to [table of contents](#table-of-contents)
 
 You can specify custom settings, which must be written in valid JSON. The format is:
 
-```json
+```
 {
   "data": [
     {
@@ -430,13 +430,13 @@ Example:
 
 ````shell
 # Plain http without basic auth
-curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove"
+curl -d '{"key":"sender","value":"christian@roessner.email"}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove"
 
 # Plain with basic auth
-curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove" -u testuser:testsecret
+curl -d '{"key":"sender","value":"christian@roessner.email"}' -H "Content-Type: application/json" -X DELETE "http://localhost:8080/remove" -u testuser:testsecret
 
 # Secured with basic auth
-curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X DELETE "https://localhost:8443/remove" -u testuser:testsecret
+curl -k -d '{"key":"sender","value":"christian@roessner.email"}"' -H "Content-Type: application/json" -X DELETE "https://localhost:8443/remove" -u testuser:testsecret
 ````
 
 Back to [table of contents](#table-of-contents)
@@ -476,10 +476,10 @@ requests.
 
 Example:
 
-virtual alias | real account
-----|----
-user1@example.com | unique@account.net
-foo@bar.org | unique@account.net
+| virtual alias     | real account       |
+|-------------------|--------------------|
+| user1@example.com | unique@account.net |
+| foo@bar.org       | unique@account.net |
 
 Both belong to one and the same account. Without LDAP this would result in two records in Redis. With LDAP it results
 into the real unique account.

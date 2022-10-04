@@ -43,3 +43,23 @@ var (
 
 // ldap.
 var errLDAPConnect = errors.New("could not connect to any LDAP servers")
+
+// httpapp.
+var (
+	errWrongCT                 = errors.New("wrong Content-Type header")
+	errValueMustBeString       = errors.New("value must be string")
+	errValueMustNotBeEmpty     = errors.New("value must not be empty")
+	errUnknownKey              = errors.New("unknown key")
+	errValueFormat             = errors.New("wrong value format")
+	errNoAddressNORSender      = errors.New("value does not contain 'address' and 'sender' fields")
+	errCommentNotString        = errors.New("'comment' is not a string")
+	errCountriesNotFloat64     = errors.New("'countries' is not a float64")
+	errIPsNotFloat64           = errors.New("'ips' is not a float64")
+	errSenderNotString         = errors.New("'sender' is not a string")
+	errCountriesLowerThantZero = errors.New("'countries' lower than zero")
+	errIPsLowerThanZero        = errors.New("'ips' lower than zero")
+	errSenderEmpty             = errors.New("'sender' is empty")
+	errValueNotString          = errors.New("value must be string")
+	errValueEmpty              = errors.New("value must not be empty")
+	errSenderNotFound          = errors.New("'sender' not found")
+)

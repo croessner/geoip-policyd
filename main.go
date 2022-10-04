@@ -228,7 +228,7 @@ func main() {
 		clientChan := clientConnections(server)
 
 		for {
-			go handleConnection(<-clientChan, config)
+			go handleConnection(<-clientChan)
 		}
 	}
 }

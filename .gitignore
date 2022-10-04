@@ -95,3 +95,5 @@ fabric.properties
 ldap.secret
 mail.secret
 GeoLite2-City.mmdb
+GeoIP2-Country.mmdb
+tests.http
