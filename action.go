@@ -29,37 +29,32 @@ import (
 
 type Action interface {
 	// Call an action with 'sender' and a configuration as arguments. Report errors
-	Call(string, interface{}) error
+	Call(string) error
 }
 
 type EmailOperator struct{}
 
-func (a *EmailOperator) Call(sender string, cmdLineConfig any) error {
+func (a *EmailOperator) Call(sender string) error {
 	var (
 		messageTextRaw []byte
 		err            error
 	)
 
-	cfg, ok := cmdLineConfig.(*CmdLineConfig)
-	if !ok {
-		return errCmdLineConfig
-	}
-
-	if cfg.EmailOperatorFrom == "" {
+	if config.EmailOperatorFrom == "" {
 		return errOperatorFromEmpty
 	}
 
-	if cfg.EmailOperatorTo == "" {
+	if config.EmailOperatorTo == "" {
 		return errOperatorToEmpty
 	}
 
 	message := gomail.NewMessage()
 
-	message.SetHeader("From", cfg.EmailOperatorFrom)
-	message.SetHeader("To", cfg.EmailOperatorTo)
-	message.SetHeader("Subject", cfg.EmailOperatorSubject)
+	message.SetHeader("From", config.EmailOperatorFrom)
+	message.SetHeader("To", config.EmailOperatorTo)
+	message.SetHeader("Subject", config.EmailOperatorSubject)
 
-	if messageTextRaw, err = os.ReadFile(cfg.EmailOperatorMessagePath); err != nil {
+	if messageTextRaw, err = os.ReadFile(config.EmailOperatorMessagePath); err != nil {
 		return err
 	}
 
@@ -73,30 +68,32 @@ func (a *EmailOperator) Call(sender string, cmdLineConfig any) error {
 	}
 
 	messageText = fmt.Sprintf(messageText, sender)
-	message.SetBody(cfg.EmailOperatorMessageCT, messageText)
+	message.SetBody(config.EmailOperatorMessageCT, messageText)
 
-	dialer := &gomail.Dialer{Host: cfg.MailServer, Port: cfg.MailPort}
-	dialer.SSL = cfg.MailSSL
+	dialer := &gomail.Dialer{Host: config.MailServer, Port: config.MailPort, SSL: config.MailSSL}
+	dialer.SSL = config.MailSSL
 
-	if cfg.MailUsername != "" {
-		dialer.Username = cfg.MailUsername
+	if config.MailUsername != "" {
+		dialer.Username = config.MailUsername
 	}
 
-	if cfg.MailPassword != "" {
-		dialer.Password = cfg.MailPassword
+	if config.MailPassword != "" {
+		dialer.Password = config.MailPassword
 	}
 
-	if cfg.MailHelo != "" {
-		dialer.LocalName = cfg.MailHelo
+	if config.MailHelo != "" {
+		dialer.LocalName = config.MailHelo
 	}
 
-	dialer.TLSConfig = &tls.Config{
-		ServerName:         cfg.MailServer,
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: false,
+	if config.MailSSL {
+		dialer.TLSConfig = &tls.Config{
+			ServerName:         config.MailServer,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: false,
+		}
 	}
 
-	if err := dialer.DialAndSend(message); err != nil {
+	if err = dialer.DialAndSend(message); err != nil {
 		return err
 	}
 

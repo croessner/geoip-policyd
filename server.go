@@ -49,7 +49,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 }
 
 //goland:noinspection GoUnhandledErrorResult
-func handleConnection(client net.Conn, cfg *CmdLineConfig) {
+func handleConnection(client net.Conn) {
 	b := bufio.NewReader(client)
 	policyRequest := make(map[string]string)
 
@@ -70,7 +70,7 @@ func handleConnection(client net.Conn, cfg *CmdLineConfig) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			client.Write([]byte(getPolicyResponse(cfg, policyRequest, ksuid.New().String()) + "\n\n"))
+			client.Write([]byte(getPolicyResponse(policyRequest, ksuid.New().String()) + "\n\n"))
 
 			// Clear policy request for next connection
 			policyRequest = make(map[string]string)

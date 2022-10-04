@@ -91,31 +91,31 @@ func (r *RemoteClient) AddIPAddress(ipAddress string) bool {
 }
 
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
-func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]string, guid string) string {
+func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	var (
-		mapKeyFound      bool
-		request          string
-		sender           string
-		clientIP         string
-		trustedCountries []string
-		trustedIPs       []string
-		err              error
-		remoteClient     RemoteClient
-		usedMaxIPs       = cmdLineConfig.MaxIPs
-		usedMaxCountries = cmdLineConfig.MaxCountries
-		actionText       = "DUNNO"
+		mapKeyFound         bool
+		request             string
+		sender              string
+		clientIP            string
+		trustedCountries    []string
+		trustedIPs          []string
+		err                 error
+		remoteClient        RemoteClient
+		allowedMaxIPs       = config.MaxIPs
+		allowedMaxCountries = config.MaxCountries
+		actionText          = "DUNNO"
 	)
 
 	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
 		if request == "smtpd_access_policy" {
 			userAttribute := "sender"
-			if cmdLineConfig.UseSASLUsername {
+			if config.UseSASLUsername {
 				userAttribute = "sasl_username"
 			}
 
 			if sender, mapKeyFound = policyRequest[userAttribute]; mapKeyFound {
 				if len(sender) > 0 {
-					if cmdLineConfig.UseLDAP {
+					if config.UseLDAP {
 						var (
 							ldapReply   LdapReply
 							ldapRequest LdapRequest
@@ -145,7 +145,7 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 					if clientIP, mapKeyFound = policyRequest["client_address"]; mapKeyFound {
 						var redisValue []byte
 
-						key := fmt.Sprintf("%s%s", cmdLineConfig.RedisPrefix, sender)
+						key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
 
 						// Check Redis for the current sender
 						if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
@@ -180,20 +180,24 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 											continue
 										}
 
+										// Override global max IPs setting with custom setting
 										if record.IPs > 0 {
-											usedMaxIPs = record.IPs
+											allowedMaxIPs = record.IPs
 										}
 
+										// Override global max countries setting with custom setting
 										if record.Countries > 0 {
-											usedMaxCountries = record.Countries
+											allowedMaxCountries = record.Countries
 										}
 
-										if len(record.TrustedCountries) > 0 {
-											trustedCountries = record.TrustedCountries
-										}
-
+										// Enforced IPs
 										if len(record.TrustedIPs) > 0 {
 											trustedIPs = record.TrustedIPs
+										}
+
+										// Enforced countries
+										if len(record.TrustedCountries) > 0 {
+											trustedCountries = record.TrustedCountries
 										}
 
 										break // First match wins!
@@ -202,8 +206,7 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 							}
 						}
 
-						persist := false
-						runActions := false
+						requireActions := false
 
 						// Flag indicates, if the operator action was successful
 						ranOperator := false
@@ -219,7 +222,6 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 									level.Debug(logger).Log(
 										"guid", guid, "msg", "Country matched", "trusted_country", trustedCountry)
 
-									usedMaxCountries = len(trustedCountries)
 									matchCountry = true
 
 									break
@@ -228,21 +230,11 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 
 							if !matchCountry {
 								actionText = rejectText
-
-								if cmdLineConfig.BlockedNoExpire {
-									persist = true
-								}
-
-								runActions = true
+								requireActions = true
 							}
-						} else if len(remoteClient.Countries) > usedMaxCountries {
+						} else if len(remoteClient.Countries) > allowedMaxCountries {
 							actionText = rejectText
-
-							if cmdLineConfig.BlockedNoExpire {
-								persist = true
-							}
-
-							runActions = true
+							requireActions = true
 						}
 
 						if len(trustedIPs) > 0 {
@@ -275,7 +267,6 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 										level.Debug(logger).Log(
 											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
 
-										usedMaxIPs = 0
 										matchIP = true
 
 										break
@@ -291,7 +282,6 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 										level.Debug(logger).Log(
 											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
 
-										usedMaxIPs = 0
 										matchIP = true
 
 										break
@@ -301,24 +291,14 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 
 							if !matchIP {
 								actionText = rejectText
-
-								if cmdLineConfig.BlockedNoExpire {
-									persist = true
-								}
-
-								runActions = true
+								requireActions = true
 							}
-						} else if len(remoteClient.IPs) > usedMaxIPs {
+						} else if len(remoteClient.IPs) > allowedMaxIPs {
 							actionText = rejectText
-
-							if cmdLineConfig.BlockedNoExpire {
-								persist = true
-							}
-
-							runActions = true
+							requireActions = true
 						}
 
-						if cmdLineConfig.RunActions && runActions {
+						if config.RunActions && requireActions {
 							var action Action
 
 							runOperator := true
@@ -331,9 +311,9 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 								}
 							}
 
-							if cmdLineConfig.RunActionOperator && runOperator {
+							if config.RunActionOperator && runOperator {
 								action = &EmailOperator{}
-								if err = action.Call(sender, cmdLineConfig); err != nil {
+								if err = action.Call(sender); err != nil {
 									level.Error(logger).Log("guid", guid, "error", err.Error())
 								} else {
 									level.Debug(logger).Log(
@@ -360,14 +340,14 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 						}
 
 						// For each request update the expiry timestamp
-						if persist {
+						if config.BlockPermanent {
 							if err = redisHandle.Persist(ctx, key).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
 								return fmt.Sprintf("action=%s", deferText)
 							}
 						} else {
-							if err = redisHandle.Expire(ctx, key, time.Duration(cmdLineConfig.RedisTTL)*time.Second).Err(); err != nil {
+							if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
 								level.Error(logger).Log("guid", guid, "error", err.Error())
 
 								return fmt.Sprintf("action=%s", deferText)
@@ -380,19 +360,37 @@ func getPolicyResponse(cmdLineConfig *CmdLineConfig, policyRequest map[string]st
 	}
 
 	senderKey := "sender"
-	if cmdLineConfig.UseSASLUsername {
+	if config.UseSASLUsername {
 		senderKey = "sasl_username"
 	}
 
 	level.Info(logger).Log(
 		"guid", guid,
 		senderKey, sender,
-		"countries", func() string { return strings.Join(remoteClient.Countries, ",") }(),
+		"countries", func() string {
+			return strings.Join(remoteClient.Countries, ",")
+		}(),
+		"trusted_countries", func() string {
+			if len(trustedCountries) > 0 {
+				return strings.Join(trustedCountries, ",")
+			}
+
+			return "N/A"
+		}(),
 		"total_countries", len(remoteClient.Countries),
-		"allowed_max_countries", usedMaxCountries,
-		"ips", func() string { return strings.Join(remoteClient.IPs, ",") }(),
+		"allowed_max_countries", allowedMaxCountries,
+		"ips", func() string {
+			return strings.Join(remoteClient.IPs, ",")
+		}(),
+		"trusted_ips", func() string {
+			if len(trustedIPs) > 0 {
+				return strings.Join(trustedIPs, ",")
+			}
+
+			return "N/A"
+		}(),
 		"total_ips", len(remoteClient.IPs),
-		"allowed_max_ips", usedMaxIPs,
+		"allowed_max_ips", allowedMaxIPs,
 		"action", actionText)
 
 	return fmt.Sprintf("action=%s", actionText)

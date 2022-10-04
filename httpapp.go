@@ -304,7 +304,7 @@ func (h *HTTP) POSTQuery() {
 					userAttribute:    clientRequest["sender"].(string),
 				}
 
-				policyResult = getPolicyResponse(config, policyRequest, h.guid)
+				policyResult = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 
