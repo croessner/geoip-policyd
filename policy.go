@@ -179,7 +179,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 									level.Debug(logger).Log(
 										"guid", guid,
 										"ip_address", ipAddress,
-										"timestamp_local", func() string {
+										"timestamp", func() string {
 											unixtime := time.Unix(0, date)
 
 											return time.Date(
@@ -211,7 +211,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 										level.Debug(logger).Log(
 											"guid", guid,
 											"country_code", country,
-											"timestamp_local", func() string {
+											"timestamp", func() string {
 												unixtime := time.Unix(0, date)
 
 												return time.Date(
