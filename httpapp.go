@@ -45,8 +45,9 @@ const (
 )
 
 const (
-	Sender = "sender"
-	Client = "client"
+	Sender       = "sender"
+	Client       = "client"
+	SASLUsername = "sasl_username"
 )
 
 // HTTPApp Basic auth for the HTTP service.
@@ -240,7 +241,7 @@ func (h *HTTP) POSTRemove() {
 		key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
 		redisHandle.Del(ctx, key).Err()
 
-		h.LogInfo("sender", sender, "result", "unlocked")
+		h.LogInfo(Sender, sender, "result", "unlocked")
 		h.responseWriter.WriteHeader(http.StatusAccepted)
 	} else {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
@@ -287,21 +288,21 @@ func (h *HTTP) POSTQuery() {
 			return
 		}
 
-		userAttribute := "sender"
+		userAttribute := Sender
 		if config.UseSASLUsername {
-			userAttribute = "sasl_username"
+			userAttribute = SASLUsername
 		}
 
 		requiredFieldsFound := false
 
 		if _, addressFound := clientRequest["address"].(string); addressFound {
-			if _, senderFound := clientRequest["sender"]; senderFound {
+			if _, senderFound := clientRequest[Sender]; senderFound {
 				requiredFieldsFound = true
 
 				policyRequest := map[string]string{
 					"request":        "smtpd_access_policy",
 					"client_address": clientRequest["address"].(string),
-					userAttribute:    clientRequest["sender"].(string),
+					userAttribute:    clientRequest[Sender].(string),
 				}
 
 				policyResult = getPolicyResponse(policyRequest, h.guid)

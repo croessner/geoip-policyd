@@ -123,9 +123,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 
 	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
 		if request == "smtpd_access_policy" {
-			userAttribute := "sender"
+			userAttribute := Sender
 			if config.UseSASLUsername {
-				userAttribute = "sasl_username"
+				userAttribute = SASLUsername
 			}
 
 			if sender, mapKeyFound = policyRequest[userAttribute]; mapKeyFound {
@@ -430,9 +430,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		}
 	}
 
-	senderKey := "sender"
+	senderKey := Sender
 	if config.UseSASLUsername {
-		senderKey = "sasl_username"
+		senderKey = SASLUsername
 	}
 
 	level.Info(logger).Log(
