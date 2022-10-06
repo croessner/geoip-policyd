@@ -22,7 +22,6 @@ import "errors"
 
 // action.
 var (
-	errCmdLineConfig     = errors.New("config argument must be of type *CmdLineConfig")
 	errOperatorFromEmpty = errors.New("operator 'from' must not be empty")
 	errOperatorToEmpty   = errors.New("operator 'to' must not be empty")
 	errMacroPercentS     = errors.New("email message file must contain a macro '%%s' for the sender")
