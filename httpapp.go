@@ -23,7 +23,6 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
-	"github.com/oschwald/maxminddb-golang"
 	"io"
 	"log"
 	"mime"
@@ -33,6 +32,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
 )
 
