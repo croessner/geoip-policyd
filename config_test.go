@@ -558,6 +558,72 @@ func TestConfigEnvMaxIPs(t *testing.T) {
 	}
 }
 
+func TestConfigHomeCountries(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--home-countries", "DE", "--home-countries", "AT"})
+
+	if cfg.HomeCountries[0] != "DE" && cfg.HomeCountries[1] != "AT" {
+		t.Errorf("Expected --home-countries='DE AT', got value=%v", cfg.HomeCountries)
+	}
+}
+
+func TestConfigEnvHomeCountries(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_HOME_COUNTRIES": "DE AT",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.HomeCountries[0] != "DE" && cfg.HomeCountries[1] != "AT" {
+		t.Errorf("Expected --home-countries='DE AT', got value=%v", cfg.HomeCountries)
+	}
+}
+
+func TestConfigMaxHomeCountries(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-home-countries", "10"})
+
+	if cfg.MaxHomeCountries != 10 {
+		t.Errorf("Expected --max-home-countries=10, got value=%v", cfg.MaxHomeCountries)
+	}
+}
+
+func TestConfigEnvMaxHomeCountries(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_HOME_COUNTRIES": "10",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxHomeCountries != 10 {
+		t.Errorf("Expected --max-home-countries=10, got value=%v", cfg.MaxHomeCountries)
+	}
+}
+
+func TestConfigMaxHomeIPs(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-home-ips", "100"})
+
+	if cfg.MaxHomeIPs != 100 {
+		t.Errorf("Expected --max-home-ips=100, got value=%v", cfg.MaxHomeIPs)
+	}
+}
+
+func TestConfigEnvMaxHomeIPs(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_HOME_IPS": "100",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxHomeIPs != 100 {
+		t.Errorf("Expected --max-home-ips=100, got value=%v", cfg.MaxHomeIPs)
+	}
+}
+
 func TestConfigBlockedNoExpire(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--block-permanent"})

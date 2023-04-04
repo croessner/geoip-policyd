@@ -129,6 +129,9 @@ Arguments:
   -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
+      --home-countries                List of known home country codes. Default:
+      --max-home-countries            Maximum number of home countries before rejecting e-mails. Default: 3
+      --max-home-ips                  Maximum number of home IP addresses before rejecting e-mails. Default: 10
       --block-permanent               Do not expire senders from Redis, if they were blocked in the past. Default: false
   -c  --custom-settings-path          Custom settings with different IP and country limits. Default: 
       --http-use-basic-auth           Enable basic HTTP auth. Default: false
@@ -202,6 +205,9 @@ on running the service as a docker service.
 | GEOIPPOLICYD_GEOIP_PATH                 | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)                        |
 | GEOIPPOLICYD_MAX_COUNTRIES              | Maximum number of countries before rejecting e-mails; default(3)                                          |
 | GEOIPPOLICYD_MAX_IPS                    | Maximum number of IP addresses before rejecting e-mails; default(10)                                      |
+| GEOIPPOLICYD_HOME_COUNTRIES             | List of known home country codes                                                                          |
+| GEOIPPOLICYD_MAX_HOME_COUNTRIES         | Maximum number of home countries before rejecting e-mails; default(3)                                     |
+| GEOIPPOLICYD_MAX_HOME_IPS               | Maximum number of home IP addresses before rejecting e-mails; default(10)                                 |
 | GEOIPPOLICYD_BLOCK_PERMANENT            | Do not expire senders from Redis, if they were blocked in the past                                        |
 | GEOIPPOLICYD_CUSTOM_SETTINGS_PATH       | Custom settings with different IP and country limits                                                      |
 | GEOIPPOLICYD_HTTP_USE_BASIC_AUTH        | Enable basic HTTP auth; default(false)                                                                    |
@@ -418,6 +424,10 @@ curl -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.
 # Secured with basic auth
 curl -k -d '{"key":"sender","value":{"comment":"Test","sender":"christian@roessner.email","ips":100,"countries":100}}"' -H "Content-Type: application/json" -X PATCH "https://localhost:8443/modify" -u testuser:testsecret
 ````
+
+> Note:
+> 
+> This endpoint is not yet implemented nor tested for home countries!
 
 Back to [table of contents](#table-of-contents)
 

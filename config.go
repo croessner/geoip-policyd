@@ -102,11 +102,14 @@ type CmdLineConfig struct {
 	RedisDB     int
 	RedisTTL    int
 
-	GeoipPath      string
-	MaxCountries   int
-	MaxIPs         int
-	BlockPermanent bool
-	VerboseLevel   int
+	GeoipPath        string
+	MaxCountries     int
+	MaxIPs           int
+	HomeCountries    []string
+	MaxHomeCountries int
+	MaxHomeIPs       int
+	BlockPermanent   bool
+	VerboseLevel     int
 
 	// Flag that indicates which command was called
 	CommandServer bool
@@ -143,6 +146,12 @@ type CustomSettings struct {
 	Data []Account `json:"data"`
 }
 
+type HomeCountries struct {
+	Codes     []string `json:"codes"`
+	IPs       int      `json:"ips"`
+	Countries int      `json:"countries"`
+}
+
 type Account struct {
 	Comment          string   `json:"comment"`
 	Sender           string   `json:"sender"`
@@ -150,6 +159,7 @@ type Account struct {
 	Countries        int      `json:"countries"`
 	TrustedCountries []string `json:"trusted_countries"` //nolint:tagliatelle // No camel case
 	TrustedIPs       []string `json:"trusted_ips"`       //nolint:tagliatelle // No camel case
+	*HomeCountries   `json:"home_countries"`
 }
 
 func (c *CmdLineConfig) String() string {
@@ -418,6 +428,42 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Maximum number of IP addresses before rejecting e-mails",
+		})
+	argServerHomeCountries := commandServer.StringList(
+		"", "home-countries", &argparse.Options{
+			Required: false,
+			Default:  []string{},
+			Help:     "List of known home country codes",
+		})
+	argServerMaxHomeCountries := commandServer.Int(
+		"", "max-home-countries", &argparse.Options{
+			Required: false,
+			Default:  maxCountries,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if arg < 2 { //nolint:gomnd // Threshold value
+					return errMaxCountries
+				}
+
+				return nil
+			},
+			Help: "Maximum number home of countries before rejecting e-mails",
+		})
+	argServerMaxHomeIPs := commandServer.Int(
+		"", "max-home-ips", &argparse.Options{
+			Required: false,
+			Default:  maxIPs,
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if arg < 1 {
+					return errMaxIPs
+				}
+
+				return nil
+			},
+			Help: "Maximum number of home IP addresses before rejecting e-mails",
 		})
 	argServerBlockedNoExpire := commandServer.Flag(
 		"", "block-permanent", &argparse.Options{
@@ -910,6 +956,34 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.MaxIPs = param
 		} else {
 			c.MaxIPs = *argServerMaxIPs
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_HOME_COUNTRIES"); val != "" {
+			c.HomeCountries = strings.Split(val, " ")
+		} else {
+			c.HomeCountries = *argServerHomeCountries
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_MAX_HOME_COUNTRIES"); val != "" {
+			param, err := strconv.Atoi(val)
+			if err != nil {
+				log.Fatalln("Error: GEOIPPOLICYD_MAX_HOME_COUNTRIES can not be used:", parser.Usage(err.Error()))
+			}
+
+			c.MaxHomeCountries = param
+		} else {
+			c.MaxHomeCountries = *argServerMaxHomeCountries
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_MAX_HOME_IPS"); val != "" {
+			param, err := strconv.Atoi(val)
+			if err != nil {
+				log.Fatalln("Error: GEOIPPOLICYD_MAX_HOME_IPS can not be used:", parser.Usage(err.Error()))
+			}
+
+			c.MaxHomeIPs = param
+		} else {
+			c.MaxHomeIPs = *argServerMaxHomeIPs
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_BLOCK_PERMANENT"); val != "" {
