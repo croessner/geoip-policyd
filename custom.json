@@ -3,14 +3,8 @@
     {
       "comment": "Allow only two countries and a maximum of 5 IP addresses",
       "sender": "christian@roessner.email",
-      "trusted_countries": [
-        "DE",
-        "AU"
-      ],
-      "trusted_ips": [
-        "127.0.0.0/8",
-        "a:b:c:d::/64"
-      ]
+      "trusted_countries": ["DE", "AU"],
+      "trusted_ips": ["127.0.0.0/8", "a:b:c:d::/64"]
     },
     {
       "comment": "Allow at least 4 countries and go with the default IP address limit",
@@ -21,6 +15,14 @@
       "comment": "Go with the default country limit, but allow up to 30 IP addresses",
       "sender": "test2@example.com",
       "ips": 30
+    },
+    {
+      "comment": "Home countries with different limits",
+      "home_countries": {
+        "codes": ["DE", "AU", "FR", "NL", "PL"],
+        "countries": 2,
+        "ips": 30
+      }
     }
   ]
 }
