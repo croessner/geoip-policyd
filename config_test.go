@@ -523,6 +523,15 @@ func TestConfigMaxCountries(t *testing.T) {
 	}
 }
 
+func TestConfigMaxCountriesZero(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-countries", "0"})
+
+	if cfg.MaxCountries != 0 {
+		t.Errorf("Expected --max-countries=0, got value=%v", cfg.MaxCountries)
+	}
+}
+
 func TestConfigEnvMaxCountries(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_MAX_COUNTRIES": "10",
@@ -536,12 +545,34 @@ func TestConfigEnvMaxCountries(t *testing.T) {
 	}
 }
 
+func TestConfigEnvMaxCountriesZero(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_COUNTRIES": "0",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxCountries != 0 {
+		t.Errorf("Expected --max-countries=0, got value=%v", cfg.MaxCountries)
+	}
+}
+
 func TestConfigMaxIPs(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--max-ips", "100"})
 
 	if cfg.MaxIPs != 100 {
 		t.Errorf("Expected --max-ips=100, got value=%v", cfg.MaxIPs)
+	}
+}
+
+func TestConfigMaxIPsZero(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-ips", "0"})
+
+	if cfg.MaxIPs != 0 {
+		t.Errorf("Expected --max-ips=0, got value=%v", cfg.MaxIPs)
 	}
 }
 
@@ -555,6 +586,19 @@ func TestConfigEnvMaxIPs(t *testing.T) {
 
 	if cfg.MaxIPs != 100 {
 		t.Errorf("Expected --max-ips=100, got value=%v", cfg.MaxIPs)
+	}
+}
+
+func TestConfigEnvMaxIPsZero(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_IPS": "0",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxIPs != 0 {
+		t.Errorf("Expected --max-ips=0, got value=%v", cfg.MaxIPs)
 	}
 }
 
@@ -589,6 +633,15 @@ func TestConfigMaxHomeCountries(t *testing.T) {
 	}
 }
 
+func TestConfigMaxHomeCountriesZero(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-home-countries", "0"})
+
+	if cfg.MaxHomeCountries != 0 {
+		t.Errorf("Expected --max-home-countries=0, got value=%v", cfg.MaxHomeCountries)
+	}
+}
+
 func TestConfigEnvMaxHomeCountries(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_MAX_HOME_COUNTRIES": "10",
@@ -602,12 +655,34 @@ func TestConfigEnvMaxHomeCountries(t *testing.T) {
 	}
 }
 
+func TestConfigEnvMaxHomeCountriesZero(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_HOME_COUNTRIES": "0",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxHomeCountries != 0 {
+		t.Errorf("Expected --max-home-countries=0, got value=%v", cfg.MaxHomeCountries)
+	}
+}
+
 func TestConfigMaxHomeIPs(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--max-home-ips", "100"})
 
 	if cfg.MaxHomeIPs != 100 {
 		t.Errorf("Expected --max-home-ips=100, got value=%v", cfg.MaxHomeIPs)
+	}
+}
+
+func TestConfigMaxHomeIPsZero(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--max-home-ips", "0"})
+
+	if cfg.MaxHomeIPs != 0 {
+		t.Errorf("Expected --max-home-ips=0, got value=%v", cfg.MaxHomeIPs)
 	}
 }
 
@@ -621,6 +696,19 @@ func TestConfigEnvMaxHomeIPs(t *testing.T) {
 
 	if cfg.MaxHomeIPs != 100 {
 		t.Errorf("Expected --max-home-ips=100, got value=%v", cfg.MaxHomeIPs)
+	}
+}
+
+func TestConfigEnvMaxHomeIPsZero(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_MAX_HOME_IPS": "0",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.MaxHomeIPs != 0 {
+		t.Errorf("Expected --max-home-ips=0, got value=%v", cfg.MaxHomeIPs)
 	}
 }
 
