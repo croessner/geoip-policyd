@@ -62,3 +62,8 @@ var (
 	errValueEmpty              = errors.New("value must not be empty")
 	errSenderNotFound          = errors.New("'sender' not found")
 )
+
+// policy.
+var (
+	errPolicyProtocol = errors.New("protocol error")
+)

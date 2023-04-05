@@ -1,0 +1,956 @@
+POST https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 54
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "de10000@srvint.net"
+}
+
+###
+
+GET https://localhost:8443/custom-settings
+Content-Type: application/json
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+<> 2023-04-05T162924.200.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162905.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.17",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162855.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162849.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "165.225.200.24",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162843.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 106
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "102.129.65.37",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162839.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 127
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "2003:a:a05:a600:858:7851:547f:8aed",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162835.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162830.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162816.202.json
+
+###
+
+POST https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 54
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "de10000@srvint.net"
+}
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T162750.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T124747.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T124018.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123903.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123724.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.17",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123721.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123718.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "165.225.200.24",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123714.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 106
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "102.129.65.37",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123712.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 127
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "2003:a:a05:a600:858:7851:547f:8aed",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123708.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123706.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-05T123641.202.json
+
+###
+
+POST https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 54
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "de10000@srvint.net"
+}
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T105205.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.17",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T105006.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 104
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.0",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T104936.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "165.225.200.24",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T104703.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 106
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "102.129.65.37",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T104419.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 127
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "2003:a:a05:a600:858:7851:547f:8aed",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T104138.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T103924.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T103118.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102237.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102236.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102235.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102234.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102213.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102212.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102210.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102208.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T102022.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T101933.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-04T101322.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-03-08T133923.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-03-08T133842.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-03-08T133723.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-03-08T133643.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 100
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "8.8.8.8",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-03-08T133502.202.json
+
+###
+
+GET https://localhost:8443/custom-settings
+Content-Type: application/json
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+<> 2023-03-08T112904.200.json
+
+###
+
+DELETE https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 60
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.5)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "christian@roessner.email"
+}
+
+###
+

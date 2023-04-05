@@ -305,7 +305,7 @@ func (h *HTTP) POSTQuery() {
 					userAttribute:    clientRequest[Sender].(string),
 				}
 
-				policyResult = getPolicyResponse(policyRequest, h.guid)
+				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 
@@ -317,9 +317,16 @@ func (h *HTTP) POSTQuery() {
 		}
 	}
 
-	if policyResult == fmt.Sprintf("action=%s", rejectText) {
-		result = false
+	if err == nil {
+		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+			result = false
+		} else {
+			result = true
+		}
 	} else {
+		level.Error(logger).Log("error", err.Error())
+
+		// Do not block on errors.
 		result = true
 	}
 

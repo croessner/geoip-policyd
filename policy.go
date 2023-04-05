@@ -31,8 +31,9 @@ import (
 )
 
 const (
-	deferText  = "DEFER Service temporarily not available"
-	rejectText = "REJECT Your account seems to be compromised. Please contact your support"
+	deferText    = "DEFER Service temporarily not available"
+	rejectText   = "REJECT Your account seems to be compromised. Please contact your support"
+	protoErrText = "WARN protocol error"
 )
 
 type TTLStringMap map[string]int64
@@ -230,7 +231,7 @@ func (r *RemoteClient) AddHomeIPAddress(ipAddress string) {
 }
 
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
-func getPolicyResponse(policyRequest map[string]string, guid string) string {
+func getPolicyResponse(policyRequest map[string]string, guid string) (actionText string, err error) {
 	var (
 		isHome                  bool
 		requireActions          bool
@@ -242,7 +243,6 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		redisValue              []byte
 		trustedCountries        []string
 		trustedIPs              []string
-		err                     error
 		network                 *net.IPNet
 		remoteClient            *RemoteClient
 		allowedMaxIPs           = config.MaxIPs
@@ -250,10 +250,11 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		homeCountries           = config.HomeCountries
 		allowedMaxHomeIPs       = config.MaxHomeIPs
 		allowedMaxHomeCountries = config.MaxHomeCountries
-		actionText              = "DUNNO"
-		actionTextErr           = "WARN protocol error"
 		actionTextIgnoreNets    = "INFO client IP address <%s> is defined in ignore-networks"
 	)
+
+	// Default
+	actionText = "DUNNO"
 
 	userAttribute := Sender
 	if config.UseSASLUsername {
@@ -261,27 +262,45 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	}
 
 	if request, mapKeyFound = policyRequest["request"]; !mapKeyFound {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	if request != "smtpd_access_policy" {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	if sender, mapKeyFound = policyRequest[userAttribute]; !mapKeyFound {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	if len(sender) == 0 {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	if clientIP, mapKeyFound = policyRequest["client_address"]; !mapKeyFound {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	if clientIP == "" {
-		return fmt.Sprintf("action=%s", actionTextErr)
+		actionText = protoErrText
+		err = errPolicyProtocol
+
+		return
 	}
 
 	for index := range config.IgnoreNets {
@@ -289,6 +308,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 			_, network, err = net.ParseCIDR(config.IgnoreNets[index])
 			if err != nil {
 				level.Error(logger).Log("guid", guid, "msg", "%s is not a network", config.IgnoreNets[index], "error", err)
+
+				// Reset error
+				err = nil
 
 				continue
 			}
@@ -329,7 +351,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	}
 
 	if matchIP {
-		return fmt.Sprintf("action=%s", fmt.Sprintf(actionTextIgnoreNets, clientIP))
+		return fmt.Sprintf(actionTextIgnoreNets, clientIP), err
 	}
 
 	if config.UseLDAP {
@@ -352,7 +374,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		ldapReply = <-ldapReplyChan
 
 		if ldapReply.err != nil {
-			level.Error(logger).Log("guid", guid, "error", err.Error())
+			level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
 		} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
 			// LDAP single value
 			sender = resultAttr[0]
@@ -365,12 +387,14 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	// Check Redis for the current sender
 	if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
 		if !errors.Is(err, redis.Nil) {
-			level.Error(logger).Log("guid", guid, "error", err.Error())
+			actionText = deferText
 
-			return fmt.Sprintf("action=%s", deferText)
+			return
 		}
 	} else if err = json.Unmarshal(redisValue, remoteClient); err != nil {
-		level.Error(logger).Log("guid", guid, "error", err.Error())
+		actionText = deferText
+
+		return
 	}
 
 	if remoteClient.haveIPs() {
@@ -533,7 +557,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	}
 
 	if len(trustedIPs) > 0 {
-		matchIP := false
+		matchIP = false
 		ipAddress := net.ParseIP(clientIP)
 
 		for _, trustedIPOrNet := range trustedIPs {
@@ -545,6 +569,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 				if err != nil {
 					level.Error(logger).Log(
 						"guid", guid, "msg", "Not a trusted network", "network", trustedIP, "error", err.Error())
+
+					// Reset error
+					err = nil
 
 					continue
 				}
@@ -629,27 +656,29 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 
 	redisValue, err = json.Marshal(remoteClient)
 	if err != nil {
-		return fmt.Sprintf("action=%s", deferText)
+		actionText = deferText
+
+		return
 	}
 
 	if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
-		level.Error(logger).Log("guid", guid, "error", err.Error())
+		actionText = deferText
 
-		return fmt.Sprintf("action=%s", deferText)
+		return
 	}
 
 	// For each request update the expiry timestamp
 	if remoteClient.Locked {
 		if err = redisHandle.Persist(ctx, key).Err(); err != nil {
-			level.Error(logger).Log("guid", guid, "error", err.Error())
+			actionText = deferText
 
-			return fmt.Sprintf("action=%s", deferText)
+			return
 		}
 	} else {
 		if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
-			level.Error(logger).Log("guid", guid, "error", err.Error())
+			actionText = deferText
 
-			return fmt.Sprintf("action=%s", deferText)
+			return
 		}
 	}
 
@@ -761,5 +790,5 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		"allowed_max_home_ips", allowedMaxHomeIPs,
 		"action", actionText)
 
-	return fmt.Sprintf("action=%s", actionText)
+	return
 }
