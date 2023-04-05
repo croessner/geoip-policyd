@@ -738,7 +738,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 			return sum
 		}(),
-		"allowed_max_countries", allowedMaxCountries,
+		"allowed_max_foreign_countries", allowedMaxCountries,
 		"allowed_max_home_countries", allowedMaxHomeCountries,
 		"foreign_ips_seen", func() string {
 			if remoteClient.haveIPs() {
@@ -786,7 +786,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 			return sum
 		}(),
-		"allowed_max_ips", allowedMaxIPs,
+		"allowed_max_foreign_ips", allowedMaxIPs,
 		"allowed_max_home_ips", allowedMaxHomeIPs,
 		"action", actionText)
 
