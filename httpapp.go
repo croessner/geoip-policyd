@@ -317,7 +317,7 @@ func (h *HTTP) POSTQuery() {
 		}
 	}
 
-	if policyResult != "action=DUNNO" {
+	if policyResult == fmt.Sprintf("action=%s", rejectText) {
 		result = false
 	} else {
 		result = true

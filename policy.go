@@ -233,382 +233,432 @@ func (r *RemoteClient) AddHomeIPAddress(ipAddress string) {
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
 func getPolicyResponse(policyRequest map[string]string, guid string) string {
 	var (
+		isHome                  bool
+		requireActions          bool
 		mapKeyFound             bool
+		matchIP                 bool
 		request                 string
 		sender                  string
 		clientIP                string
+		redisValue              []byte
 		trustedCountries        []string
 		trustedIPs              []string
 		err                     error
-		remoteClient            RemoteClient
+		network                 *net.IPNet
+		remoteClient            *RemoteClient
 		allowedMaxIPs           = config.MaxIPs
 		allowedMaxCountries     = config.MaxCountries
 		homeCountries           = config.HomeCountries
 		allowedMaxHomeIPs       = config.MaxHomeIPs
 		allowedMaxHomeCountries = config.MaxHomeCountries
 		actionText              = "DUNNO"
+		actionTextErr           = "WARN protocol error"
+		actionTextIgnoreNets    = "INFO client IP address <%s> is defined in ignore-networks"
 	)
 
-	if request, mapKeyFound = policyRequest["request"]; mapKeyFound {
-		if request == "smtpd_access_policy" {
-			userAttribute := Sender
-			if config.UseSASLUsername {
-				userAttribute = SASLUsername
+	userAttribute := Sender
+	if config.UseSASLUsername {
+		userAttribute = SASLUsername
+	}
+
+	if request, mapKeyFound = policyRequest["request"]; !mapKeyFound {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	if request != "smtpd_access_policy" {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	if sender, mapKeyFound = policyRequest[userAttribute]; !mapKeyFound {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	if len(sender) == 0 {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	if config.UseLDAP {
+		var (
+			ldapReply   LdapReply
+			ldapRequest LdapRequest
+			resultAttr  []string
+		)
+
+		ldapReplyChan := make(chan LdapReply)
+
+		ldapRequest.username = sender
+		ldapRequest.filter = config.LDAP.Filter
+		ldapRequest.guid = guid
+		ldapRequest.attributes = config.LDAP.ResultAttr
+		ldapRequest.replyChan = ldapReplyChan
+
+		ldapRequestChan <- ldapRequest
+
+		ldapReply = <-ldapReplyChan
+
+		if ldapReply.err != nil {
+			level.Error(logger).Log("guid", guid, "error", err.Error())
+		} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
+			// LDAP single value
+			sender = resultAttr[0]
+		}
+	}
+
+	if clientIP, mapKeyFound = policyRequest["client_address"]; !mapKeyFound {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	if clientIP == "" {
+		return fmt.Sprintf("action=%s", actionTextErr)
+	}
+
+	for index := range config.IgnoreNets {
+		if net.ParseIP(config.IgnoreNets[index]) == nil {
+			_, network, err = net.ParseCIDR(config.IgnoreNets[index])
+			if err != nil {
+				level.Error(logger).Log("guid", guid, "msg", "%s is not a network", config.IgnoreNets[index], "error", err)
+
+				continue
 			}
 
-			if sender, mapKeyFound = policyRequest[userAttribute]; mapKeyFound {
-				if len(sender) > 0 {
-					if config.UseLDAP {
-						var (
-							ldapReply   LdapReply
-							ldapRequest LdapRequest
-							resultAttr  []string
-						)
+			level.Debug(logger).Log(
+				"guid", guid, "msg", fmt.Sprintf("Checking: %s -> %s", clientIP, network.String()),
+			)
 
-						ldapReplyChan := make(chan LdapReply)
+			if network.Contains(net.ParseIP(clientIP)) {
+				level.Info(logger).Log(
+					"guid", guid,
+					"msg", "IP address found in ignore-networks",
+					"client_address", clientIP,
+					"ignore_networks", config.IgnoreNets[index],
+				)
 
-						ldapRequest.username = sender
-						ldapRequest.filter = config.LDAP.Filter
-						ldapRequest.guid = guid
-						ldapRequest.attributes = config.LDAP.ResultAttr
-						ldapRequest.replyChan = ldapReplyChan
+				matchIP = true
 
-						ldapRequestChan <- ldapRequest
+				break
+			}
+		} else {
+			level.Debug(logger).Log(
+				"guid", guid, "msg", fmt.Sprintf("Checking: %s -> %s", clientIP, config.IgnoreNets[index]))
 
-						ldapReply = <-ldapReplyChan
+			if clientIP == config.IgnoreNets[index] {
+				level.Info(logger).Log(
+					"guid", guid,
+					"msg", "IP address found in ignore-networks",
+					"client_address", clientIP,
+					"ignore_networks", config.IgnoreNets[index],
+				)
 
-						if ldapReply.err != nil {
-							level.Error(logger).Log("guid", guid, "error", err.Error())
-						} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
-							// LDAP single value
-							sender = resultAttr[0]
+				matchIP = true
+
+				break
+			}
+		}
+	}
+
+	if matchIP {
+		return fmt.Sprintf("action=%s", fmt.Sprintf(actionTextIgnoreNets, clientIP))
+	}
+
+	key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
+	remoteClient = &RemoteClient{}
+
+	// Check Redis for the current sender
+	if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
+		if !errors.Is(err, redis.Nil) {
+			level.Error(logger).Log("guid", guid, "error", err.Error())
+
+			return fmt.Sprintf("action=%s", deferText)
+		}
+	} else if err = json.Unmarshal(redisValue, remoteClient); err != nil {
+		level.Error(logger).Log("guid", guid, "error", err.Error())
+	}
+
+	if remoteClient.haveIPs() {
+		for ipAddress, date := range remoteClient.IPs {
+			level.Debug(logger).Log(
+				"guid", guid, "ip_address", ipAddress, "timestamp", date2String(date))
+		}
+	}
+
+	if remoteClient.haveHomeIPs() {
+		for ipAddress, date := range remoteClient.HomeCountries.IPs {
+			level.Debug(logger).Log(
+				"guid", guid, "home_ip_address", ipAddress, "timestamp", date2String(date))
+		}
+	}
+
+	// Check current IP address country code
+	countryCode := strings.ToUpper(getCountryCode(clientIP))
+
+	if countryCode == "" {
+		level.Debug(logger).Log(
+			"guid", guid, "msg", "No country code present", "client_address", clientIP)
+	} else {
+		if remoteClient.haveCountries() {
+			for country, date := range remoteClient.Countries {
+				level.Debug(logger).Log(
+					"guid", guid, "country_code", country, "timestamp", date2String(date))
+			}
+		}
+
+		if remoteClient.haveHomeCountries() {
+			for country, date := range remoteClient.HomeCountries.Countries {
+				level.Debug(logger).Log(
+					"guid", guid, "home_country_code", country, "timestamp", date2String(date))
+			}
+		}
+	}
+
+	if val := os.Getenv("GO_TESTING"); val == "" {
+		//nolint:forcetypeassert // Global variable
+		customSettings := customSettingsStore.Load().(*CustomSettings)
+
+		if customSettings != nil {
+			if len(customSettings.Data) > 0 {
+				for index := range customSettings.Data {
+					if customSettings.Data[index].Sender != sender {
+						continue
+					}
+
+					// Override global max IPs setting with custom setting
+					if customSettings.Data[index].IPs > 0 {
+						allowedMaxIPs = customSettings.Data[index].IPs
+					}
+
+					// Override global max countries setting with custom setting
+					if customSettings.Data[index].Countries > 0 {
+						allowedMaxCountries = customSettings.Data[index].Countries
+					}
+
+					// Enforced IPs
+					if len(customSettings.Data[index].TrustedIPs) > 0 {
+						trustedIPs = customSettings.Data[index].TrustedIPs
+					}
+
+					// Enforced countries
+					if len(customSettings.Data[index].TrustedCountries) > 0 {
+						trustedCountries = customSettings.Data[index].TrustedCountries
+					}
+
+					if customSettings.Data[index].HomeCountries != nil {
+						if customSettings.Data[index].HomeCountries.Codes != nil && len(customSettings.Data[index].HomeCountries.Codes) > 0 {
+							// Override global home country codes setting with custom setting
+							homeCountries = customSettings.Data[index].HomeCountries.Codes
+
+							// Override global max home IPs setting with custom setting
+							if customSettings.Data[index].HomeCountries.IPs > 0 {
+								allowedMaxHomeIPs = customSettings.Data[index].HomeCountries.IPs
+							}
+
+							// Override global max home countries setting with custom setting
+							if customSettings.Data[index].HomeCountries.Countries > 0 {
+								allowedMaxHomeCountries = customSettings.Data[index].HomeCountries.Countries
+							}
 						}
 					}
 
-					if clientIP, mapKeyFound = policyRequest["client_address"]; mapKeyFound {
-						var redisValue []byte
-
-						key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
-
-						// Check Redis for the current sender
-						if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
-							if !errors.Is(err, redis.Nil) {
-								level.Error(logger).Log("guid", guid, "error", err.Error())
-
-								return fmt.Sprintf("action=%s", deferText)
-							}
-						} else if err = json.Unmarshal(redisValue, &remoteClient); err != nil {
-							level.Error(logger).Log("guid", guid, "error", err.Error())
-						}
-
-						if remoteClient.haveIPs() {
-							for ipAddress, date := range remoteClient.IPs {
-								level.Debug(logger).Log(
-									"guid", guid, "ip_address", ipAddress, "timestamp", date2String(date))
-							}
-						}
-
-						if remoteClient.haveHomeIPs() {
-							for ipAddress, date := range remoteClient.HomeCountries.IPs {
-								level.Debug(logger).Log(
-									"guid", guid, "home_ip_address", ipAddress, "timestamp", date2String(date))
-							}
-						}
-
-						// Check current IP address country code
-						countryCode := strings.ToUpper(getCountryCode(clientIP))
-
-						if countryCode == "" {
-							level.Debug(logger).Log(
-								"guid", guid, "msg", "No country code present", "client_address", clientIP)
-						} else {
-							if remoteClient.haveCountries() {
-								for country, date := range remoteClient.Countries {
-									level.Debug(logger).Log(
-										"guid", guid, "country_code", country, "timestamp", date2String(date))
-								}
-							}
-
-							if remoteClient.haveHomeCountries() {
-								for country, date := range remoteClient.HomeCountries.Countries {
-									level.Debug(logger).Log(
-										"guid", guid, "home_country_code", country, "timestamp", date2String(date))
-								}
-							}
-						}
-
-						if val := os.Getenv("GO_TESTING"); val == "" {
-							//nolint:forcetypeassert // Global variable
-							customSettings := customSettingsStore.Load().(*CustomSettings)
-
-							if customSettings != nil {
-								if len(customSettings.Data) > 0 {
-									for index := range customSettings.Data {
-										if customSettings.Data[index].Sender != sender {
-											continue
-										}
-
-										// Override global max IPs setting with custom setting
-										if customSettings.Data[index].IPs > 0 {
-											allowedMaxIPs = customSettings.Data[index].IPs
-										}
-
-										// Override global max countries setting with custom setting
-										if customSettings.Data[index].Countries > 0 {
-											allowedMaxCountries = customSettings.Data[index].Countries
-										}
-
-										// Enforced IPs
-										if len(customSettings.Data[index].TrustedIPs) > 0 {
-											trustedIPs = customSettings.Data[index].TrustedIPs
-										}
-
-										// Enforced countries
-										if len(customSettings.Data[index].TrustedCountries) > 0 {
-											trustedCountries = customSettings.Data[index].TrustedCountries
-										}
-
-										if customSettings.Data[index].HomeCountries != nil {
-											if customSettings.Data[index].HomeCountries.Codes != nil && len(customSettings.Data[index].HomeCountries.Codes) > 0 {
-												// Override global home country codes setting with custom setting
-												homeCountries = customSettings.Data[index].HomeCountries.Codes
-
-												// Override global max home IPs setting with custom setting
-												if customSettings.Data[index].HomeCountries.IPs > 0 {
-													allowedMaxHomeIPs = customSettings.Data[index].HomeCountries.IPs
-												}
-
-												// Override global max home countries setting with custom setting
-												if customSettings.Data[index].HomeCountries.Countries > 0 {
-													allowedMaxHomeCountries = customSettings.Data[index].HomeCountries.Countries
-												}
-											}
-										}
-
-										break // First match wins!
-									}
-								}
-							}
-						}
-
-						isHome := false
-
-						if len(homeCountries) > 0 {
-							for index := range homeCountries {
-								level.Debug(logger).Log(
-									"guid", guid, "msg", "Checking", "home_country", homeCountries[index])
-
-								if strings.ToUpper(homeCountries[index]) != countryCode {
-									continue
-								}
-
-								level.Debug(logger).Log(
-									"guid", guid, "msg", "Country matched", "home_country", homeCountries[index])
-
-								isHome = true
-
-								remoteClient.AddHomeIPAddress(clientIP)
-								remoteClient.AddHomeCountryCode(countryCode)
-
-								break
-							}
-						}
-
-						if !isHome {
-							remoteClient.AddIPAddress(clientIP)
-							remoteClient.AddCountryCode(countryCode)
-						}
-
-						requireActions := false
-
-						if len(trustedCountries) > 0 {
-							matchCountry := false
-
-							for index := range trustedCountries {
-								level.Debug(logger).Log(
-									"guid", guid, "msg", "Checking", "trusted_country", trustedCountries[index])
-
-								if strings.ToUpper(trustedCountries[index]) != countryCode {
-									continue
-								}
-
-								level.Debug(logger).Log(
-									"guid", guid, "msg", "Country matched", "trusted_country", trustedCountries[index])
-
-								matchCountry = true
-
-								break
-							}
-
-							if !matchCountry {
-								actionText = rejectText
-								requireActions = true
-
-								if config.BlockPermanent {
-									remoteClient.Locked = true
-								}
-							}
-						} else if len(remoteClient.Countries) > allowedMaxCountries {
-							actionText = rejectText
-							requireActions = true
-
-							if config.BlockPermanent {
-								remoteClient.Locked = true
-							}
-						} else if remoteClient.haveHomeCountries() {
-							if len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries {
-								actionText = rejectText
-								requireActions = true
-
-								if config.BlockPermanent {
-									remoteClient.Locked = true
-								}
-							}
-						}
-
-						if len(trustedIPs) > 0 {
-							matchIP := false
-							ipAddress := net.ParseIP(clientIP)
-
-							for _, trustedIPOrNet := range trustedIPs {
-								trustedIP := net.ParseIP(trustedIPOrNet)
-								if trustedIP == nil {
-									var network *net.IPNet
-
-									_, network, err = net.ParseCIDR(trustedIPOrNet)
-									if err != nil {
-										level.Error(logger).Log(
-											"guid", guid,
-											"msg", "Not a trusted network",
-											"network", trustedIP,
-											"error", err.Error())
-
-										continue
-									}
-
-									level.Debug(logger).Log(
-										"guid", guid,
-										"msg", "Checking",
-										"ip_address", ipAddress.String(),
-										"trusted_network", network.String())
-
-									if network.Contains(ipAddress) {
-										level.Debug(logger).Log(
-											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
-
-										matchIP = true
-
-										break
-									}
-								} else {
-									level.Debug(logger).Log(
-										"guid", guid,
-										"msg", "Checking",
-										"ip_address", ipAddress.String(),
-										"trusted_ip_address", trustedIP.String())
-
-									if trustedIP.String() == ipAddress.String() {
-										level.Debug(logger).Log(
-											"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
-
-										matchIP = true
-
-										break
-									}
-								}
-							}
-
-							if !matchIP {
-								actionText = rejectText
-								requireActions = true
-
-								if config.BlockPermanent {
-									remoteClient.Locked = true
-								}
-							}
-						} else if len(remoteClient.IPs) > allowedMaxIPs {
-							actionText = rejectText
-							requireActions = true
-
-							if config.BlockPermanent {
-								remoteClient.Locked = true
-							}
-						} else if remoteClient.haveHomeIPs() {
-							if len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs {
-								actionText = rejectText
-								requireActions = true
-
-								if config.BlockPermanent {
-									remoteClient.Locked = true
-								}
-							}
-						}
-
-						if config.RunActions && requireActions {
-							var action Action
-
-							runOperator := true
-
-							for _, actionItem := range remoteClient.Actions {
-								if actionItem == "operator" {
-									runOperator = false
-
-									break
-								}
-							}
-
-							if config.RunActionOperator && runOperator {
-								action = &EmailOperator{}
-								if err = action.Call(sender); err != nil {
-									level.Error(logger).Log("guid", guid, "error", err.Error())
-								} else {
-									level.Debug(logger).Log(
-										"guid", guid, "msg", "Action 'operator' finished successfully")
-
-									remoteClient.Actions = append(remoteClient.Actions, "operator")
-								}
-							}
-						}
-
-						redisValue, err = json.Marshal(remoteClient)
-						if err != nil {
-							return fmt.Sprintf("action=%s", deferText)
-						}
-
-						if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
-							level.Error(logger).Log("guid", guid, "error", err.Error())
-
-							return fmt.Sprintf("action=%s", deferText)
-						}
-
-						// For each request update the expiry timestamp
-						if remoteClient.Locked {
-							if err = redisHandle.Persist(ctx, key).Err(); err != nil {
-								level.Error(logger).Log("guid", guid, "error", err.Error())
-
-								return fmt.Sprintf("action=%s", deferText)
-							}
-						} else {
-							if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
-								level.Error(logger).Log("guid", guid, "error", err.Error())
-
-								return fmt.Sprintf("action=%s", deferText)
-							}
-						}
-					}
+					break // First match wins!
 				}
 			}
 		}
 	}
 
-	senderKey := Sender
-	if config.UseSASLUsername {
-		senderKey = SASLUsername
+	if len(homeCountries) > 0 {
+		for index := range homeCountries {
+			level.Debug(logger).Log(
+				"guid", guid, "msg", "Checking", "home_country", homeCountries[index])
+
+			if strings.ToUpper(homeCountries[index]) != countryCode {
+				continue
+			}
+
+			level.Debug(logger).Log(
+				"guid", guid, "msg", "Country matched", "home_country", homeCountries[index])
+
+			isHome = true
+
+			remoteClient.AddHomeIPAddress(clientIP)
+			remoteClient.AddHomeCountryCode(countryCode)
+
+			break
+		}
+	}
+
+	if !isHome {
+		remoteClient.AddIPAddress(clientIP)
+		remoteClient.AddCountryCode(countryCode)
+	}
+
+	if len(trustedCountries) > 0 {
+		matchCountry := false
+
+		for index := range trustedCountries {
+			level.Debug(logger).Log(
+				"guid", guid, "msg", "Checking", "trusted_country", trustedCountries[index])
+
+			if strings.ToUpper(trustedCountries[index]) != countryCode {
+				continue
+			}
+
+			level.Debug(logger).Log(
+				"guid", guid, "msg", "Country matched", "trusted_country", trustedCountries[index])
+
+			matchCountry = true
+
+			break
+		}
+
+		if !matchCountry {
+			actionText = rejectText
+			requireActions = true
+
+			if config.BlockPermanent {
+				remoteClient.Locked = true
+			}
+		}
+	} else if len(remoteClient.Countries) > allowedMaxCountries {
+		actionText = rejectText
+		requireActions = true
+
+		if config.BlockPermanent {
+			remoteClient.Locked = true
+		}
+	} else if remoteClient.haveHomeCountries() {
+		if len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries {
+			actionText = rejectText
+			requireActions = true
+
+			if config.BlockPermanent {
+				remoteClient.Locked = true
+			}
+		}
+	}
+
+	if len(trustedIPs) > 0 {
+		matchIP := false
+		ipAddress := net.ParseIP(clientIP)
+
+		for _, trustedIPOrNet := range trustedIPs {
+			trustedIP := net.ParseIP(trustedIPOrNet)
+			if trustedIP == nil {
+				var network *net.IPNet
+
+				_, network, err = net.ParseCIDR(trustedIPOrNet)
+				if err != nil {
+					level.Error(logger).Log(
+						"guid", guid, "msg", "Not a trusted network", "network", trustedIP, "error", err.Error())
+
+					continue
+				}
+
+				level.Debug(logger).Log(
+					"guid", guid, "msg", "Checking", "ip_address", ipAddress.String(), "trusted_network", network.String())
+
+				if network.Contains(ipAddress) {
+					level.Debug(logger).Log(
+						"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+
+					matchIP = true
+
+					break
+				}
+			} else {
+				level.Debug(logger).Log(
+					"guid", guid, "msg", "Checking", "ip_address", ipAddress.String(), "trusted_ip_address", trustedIP.String())
+
+				if trustedIP.String() == ipAddress.String() {
+					level.Debug(logger).Log(
+						"guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+
+					matchIP = true
+
+					break
+				}
+			}
+		}
+
+		if !matchIP {
+			actionText = rejectText
+			requireActions = true
+
+			if config.BlockPermanent {
+				remoteClient.Locked = true
+			}
+		}
+	} else if len(remoteClient.IPs) > allowedMaxIPs {
+		actionText = rejectText
+		requireActions = true
+
+		if config.BlockPermanent {
+			remoteClient.Locked = true
+		}
+	} else if remoteClient.haveHomeIPs() {
+		if len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs {
+			actionText = rejectText
+			requireActions = true
+
+			if config.BlockPermanent {
+				remoteClient.Locked = true
+			}
+		}
+	}
+
+	if config.RunActions && requireActions {
+		var action Action
+
+		runOperator := true
+
+		for _, actionItem := range remoteClient.Actions {
+			if actionItem == "operator" {
+				runOperator = false
+
+				break
+			}
+		}
+
+		if config.RunActionOperator && runOperator {
+			action = &EmailOperator{}
+			if err = action.Call(sender); err != nil {
+				level.Error(logger).Log("guid", guid, "error", err.Error())
+			} else {
+				level.Debug(logger).Log(
+					"guid", guid, "msg", "Action 'operator' finished successfully")
+
+				remoteClient.Actions = append(remoteClient.Actions, "operator")
+			}
+		}
+	}
+
+	redisValue, err = json.Marshal(remoteClient)
+	if err != nil {
+		return fmt.Sprintf("action=%s", deferText)
+	}
+
+	if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
+		level.Error(logger).Log("guid", guid, "error", err.Error())
+
+		return fmt.Sprintf("action=%s", deferText)
+	}
+
+	// For each request update the expiry timestamp
+	if remoteClient.Locked {
+		if err = redisHandle.Persist(ctx, key).Err(); err != nil {
+			level.Error(logger).Log("guid", guid, "error", err.Error())
+
+			return fmt.Sprintf("action=%s", deferText)
+		}
+	} else {
+		if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
+			level.Error(logger).Log("guid", guid, "error", err.Error())
+
+			return fmt.Sprintf("action=%s", deferText)
+		}
 	}
 
 	level.Info(logger).Log(
 		"guid", guid,
-		senderKey, sender,
+		userAttribute, sender,
 		"foreign_countries_seen", func() string {
 			if remoteClient.haveCountries() {
 				var countries []string

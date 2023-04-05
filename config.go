@@ -108,6 +108,7 @@ type CmdLineConfig struct {
 	HomeCountries    []string
 	MaxHomeCountries int
 	MaxHomeIPs       int
+	IgnoreNets       []string
 	BlockPermanent   bool
 	VerboseLevel     int
 
@@ -464,6 +465,12 @@ func (c *CmdLineConfig) Init(args []string) {
 				return nil
 			},
 			Help: "Maximum number of home IP addresses before rejecting e-mails",
+		})
+	argServerIgnoreNets := commandServer.StringList(
+		"", "ignore-network", &argparse.Options{
+			Required: false,
+			Default:  []string{},
+			Help:     "List of IP addresses and networks to ignore",
 		})
 	argServerBlockedNoExpire := commandServer.Flag(
 		"", "block-permanent", &argparse.Options{
@@ -995,6 +1002,12 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.BlockPermanent = param
 		} else {
 			c.BlockPermanent = *argServerBlockedNoExpire
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_IGNORE_NETWORKS"); val != "" {
+			c.IgnoreNets = strings.Split(val, " ")
+		} else {
+			c.IgnoreNets = *argServerIgnoreNets
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_CUSTOM_SETTINGS_PATH"); val != "" {
