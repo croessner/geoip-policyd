@@ -276,33 +276,6 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		return fmt.Sprintf("action=%s", actionTextErr)
 	}
 
-	if config.UseLDAP {
-		var (
-			ldapReply   LdapReply
-			ldapRequest LdapRequest
-			resultAttr  []string
-		)
-
-		ldapReplyChan := make(chan LdapReply)
-
-		ldapRequest.username = sender
-		ldapRequest.filter = config.LDAP.Filter
-		ldapRequest.guid = guid
-		ldapRequest.attributes = config.LDAP.ResultAttr
-		ldapRequest.replyChan = ldapReplyChan
-
-		ldapRequestChan <- ldapRequest
-
-		ldapReply = <-ldapReplyChan
-
-		if ldapReply.err != nil {
-			level.Error(logger).Log("guid", guid, "error", err.Error())
-		} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
-			// LDAP single value
-			sender = resultAttr[0]
-		}
-	}
-
 	if clientIP, mapKeyFound = policyRequest["client_address"]; !mapKeyFound {
 		return fmt.Sprintf("action=%s", actionTextErr)
 	}
@@ -357,6 +330,33 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 
 	if matchIP {
 		return fmt.Sprintf("action=%s", fmt.Sprintf(actionTextIgnoreNets, clientIP))
+	}
+
+	if config.UseLDAP {
+		var (
+			ldapReply   LdapReply
+			ldapRequest LdapRequest
+			resultAttr  []string
+		)
+
+		ldapReplyChan := make(chan LdapReply)
+
+		ldapRequest.username = sender
+		ldapRequest.filter = config.LDAP.Filter
+		ldapRequest.guid = guid
+		ldapRequest.attributes = config.LDAP.ResultAttr
+		ldapRequest.replyChan = ldapReplyChan
+
+		ldapRequestChan <- ldapRequest
+
+		ldapReply = <-ldapReplyChan
+
+		if ldapReply.err != nil {
+			level.Error(logger).Log("guid", guid, "error", err.Error())
+		} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
+			// LDAP single value
+			sender = resultAttr[0]
+		}
 	}
 
 	key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
