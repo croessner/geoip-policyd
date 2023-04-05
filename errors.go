@@ -34,8 +34,8 @@ var (
 	errNotInteger         = errors.New("argument is not an integer")
 	errNotValidPortNumber = errors.New("argument is not a valid port number")
 	errFileNotFound       = errors.New("file not found")
-	errMaxCountries       = errors.New("argument must be an unsigned integer and greater or equal than 2")
-	errMaxIPs             = errors.New("argument must be an unsigned integer and not 0")
+	errMaxCountries       = errors.New("argument must be an unsigned integer and greater or equal than 0")
+	errMaxIPs             = errors.New("argument must be an unsigned integer")
 	errPoolSize           = errors.New("argument must be an unsigned integer and not 0")
 	errLDAPScope          = errors.New("argument must be one of: 'one', 'base' or 'sub'")
 )
@@ -61,4 +61,9 @@ var (
 	errValueNotString          = errors.New("value must be string")
 	errValueEmpty              = errors.New("value must not be empty")
 	errSenderNotFound          = errors.New("'sender' not found")
+)
+
+// policy.
+var (
+	errPolicyProtocol = errors.New("protocol error")
 )
