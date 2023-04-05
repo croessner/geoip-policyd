@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -410,56 +409,54 @@ func getPolicyResponse(policyRequest map[string]string, guid string) string {
 		}
 	}
 
-	if val := os.Getenv("GO_TESTING"); val == "" {
-		//nolint:forcetypeassert // Global variable
-		customSettings := customSettingsStore.Load().(*CustomSettings)
+	//nolint:forcetypeassert // Global variable
+	customSettings := customSettingsStore.Load().(*CustomSettings)
 
-		if customSettings != nil {
-			if len(customSettings.Data) > 0 {
-				for index := range customSettings.Data {
-					if customSettings.Data[index].Sender != sender {
-						continue
-					}
+	if customSettings != nil {
+		if len(customSettings.Data) > 0 {
+			for index := range customSettings.Data {
+				if customSettings.Data[index].Sender != sender {
+					continue
+				}
 
-					// Override global max IPs setting with custom setting
-					if customSettings.Data[index].IPs > 0 {
-						allowedMaxIPs = customSettings.Data[index].IPs
-					}
+				// Override global max IPs setting with custom setting
+				if customSettings.Data[index].IPs > 0 {
+					allowedMaxIPs = customSettings.Data[index].IPs
+				}
 
-					// Override global max countries setting with custom setting
-					if customSettings.Data[index].Countries > 0 {
-						allowedMaxCountries = customSettings.Data[index].Countries
-					}
+				// Override global max countries setting with custom setting
+				if customSettings.Data[index].Countries > 0 {
+					allowedMaxCountries = customSettings.Data[index].Countries
+				}
 
-					// Enforced IPs
-					if len(customSettings.Data[index].TrustedIPs) > 0 {
-						trustedIPs = customSettings.Data[index].TrustedIPs
-					}
+				// Enforced IPs
+				if len(customSettings.Data[index].TrustedIPs) > 0 {
+					trustedIPs = customSettings.Data[index].TrustedIPs
+				}
 
-					// Enforced countries
-					if len(customSettings.Data[index].TrustedCountries) > 0 {
-						trustedCountries = customSettings.Data[index].TrustedCountries
-					}
+				// Enforced countries
+				if len(customSettings.Data[index].TrustedCountries) > 0 {
+					trustedCountries = customSettings.Data[index].TrustedCountries
+				}
 
-					if customSettings.Data[index].HomeCountries != nil {
-						if customSettings.Data[index].HomeCountries.Codes != nil && len(customSettings.Data[index].HomeCountries.Codes) > 0 {
-							// Override global home country codes setting with custom setting
-							homeCountries = customSettings.Data[index].HomeCountries.Codes
+				if customSettings.Data[index].HomeCountries != nil {
+					if customSettings.Data[index].HomeCountries.Codes != nil && len(customSettings.Data[index].HomeCountries.Codes) > 0 {
+						// Override global home country codes setting with custom setting
+						homeCountries = customSettings.Data[index].HomeCountries.Codes
 
-							// Override global max home IPs setting with custom setting
-							if customSettings.Data[index].HomeCountries.IPs > 0 {
-								allowedMaxHomeIPs = customSettings.Data[index].HomeCountries.IPs
-							}
+						// Override global max home IPs setting with custom setting
+						if customSettings.Data[index].HomeCountries.IPs > 0 {
+							allowedMaxHomeIPs = customSettings.Data[index].HomeCountries.IPs
+						}
 
-							// Override global max home countries setting with custom setting
-							if customSettings.Data[index].HomeCountries.Countries > 0 {
-								allowedMaxHomeCountries = customSettings.Data[index].HomeCountries.Countries
-							}
+						// Override global max home countries setting with custom setting
+						if customSettings.Data[index].HomeCountries.Countries > 0 {
+							allowedMaxHomeCountries = customSettings.Data[index].HomeCountries.Countries
 						}
 					}
-
-					break // First match wins!
 				}
+
+				break // First match wins!
 			}
 		}
 	}
