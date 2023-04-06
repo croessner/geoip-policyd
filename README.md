@@ -154,7 +154,8 @@ Arguments:
       --ldap-tls-client-key           File containing a TLS client key. Default: 
       --ldap-sasl-external            Use SASL/EXTERNAL instead of a simple bind. Default: false
       --ldap-scope                    LDAP search scope [base, one, sub]. Default: sub
-      --ldap-pool-size                LDAP pre-forked pool size. Default: 10
+      --ldap-idle-pool-size           LDAP pre-forked (idle) pool size. Default 3
+      --ldap-pool-size                LDAP max pool size. Default: 10
       --run-actions                   Run actions, if a sender is over limits. Default: false
       --run-action-operator           Run the operator action. Default: false
       --operator-to                   E-Mail To-header for the operator action. Default: 
@@ -187,7 +188,7 @@ on running the service as a docker service.
 | GEOIPPOLICYD_SERVER_ADDRESS             | IPv4 or IPv6 address for the policy service; default(127.0.0.1)                                           |
 | GEOIPPOLICYD_SERVER_PORT                | Port for the policy service; default(4646)                                                                |
 | GEOIPPOLICYD_HTTP_ADDRESS               | HTTP address for incoming requests; default(127.0.0.1:8080)                                               |
- | GEOIPPOLICYD_HTTP_PORT                  | HTTP port for incoming requests; default(8080)                                                            |
+| GEOIPPOLICYD_HTTP_PORT                  | HTTP port for incoming requests; default(8080)                                                            |
 | GEOIPPOLICYD_USE_SASL_USERNAME          | Use 'sasl_username' instead of the 'sender' attribute; default(false)                                     |
 | GEOIPPOLICYD_REDIS_ADDRESS              | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)                                            |
 | GEOIPPOLICYD_REDIS_PORT                 | Port for the Redis service; default(6379)                                                                 |
@@ -198,7 +199,7 @@ on running the service as a docker service.
 | GEOIPPOLICYD_REDIS_SENTINELS            | List of space seperated sentinel servers                                                                  |
 | GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME | Sentinel master name                                                                                      |
 | GEOIPPOLICYD_REDIS_SENTINEL_USERNAME    | Redis sentinel username                                                                                   |
- | GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD    | Redis sentinel password                                                                                   |
+| GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD    | Redis sentinel password                                                                                   |
 | GEOIPPOLICYD_REDIS_PREFIX               | Redis prefix; default(geopol_)                                                                            |
 | GEOIPPOLICYD_REDIS_DATABASE_NUMBER      | Redis database number                                                                                     |
 | GEOIPPOLICYD_REDIS_TTL                  | Redis TTL; default(3600)                                                                                  |
@@ -229,7 +230,8 @@ on running the service as a docker service.
 | GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY        | File containing a TLS client key                                                                          |
 | GEOIPPOLICYD_LDAP_SASL_EXTERNAL         | Use SASL/EXTERNAL instead of a simple bind; default(false)                                                |
 | GEOIPPOLICYD_LDAP_SCOPE                 | LDAP search scope [base, one, sub]; default(sub)                                                          |
-| GEOIPPOLICYD_LDAP_POOL_SIZE             | LDAP pre-forked pool size; default(10)                                                                    |
+| GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE        | LDAP pre-forked (idle) pool size; default(3)                                                              |
+| GEOIPPOLICYD_LDAP_POOL_SIZE             | LDAP max pool size; default(10)                                                                           |
 | GEOIPPOLICYD_RUN_ACTIONS                | Run actions, if a sender is over limits; default(false)                                                   |
 | GEOIPPOLICYD_RUN_ACTION_OPERATOR        | Run the operator action; default(false)                                                                   |
 | GEOIPPOLICYD_OPERATOR_TO                | E-Mail To-header for the operator action                                                                  |

@@ -37,6 +37,7 @@ var (
 	errMaxCountries       = errors.New("argument must be an unsigned integer and greater or equal than 0")
 	errMaxIPs             = errors.New("argument must be an unsigned integer")
 	errPoolSize           = errors.New("argument must be an unsigned integer and not 0")
+	errIdlePoolSize       = errors.New("argument must be an unsigned integer")
 	errLDAPScope          = errors.New("argument must be one of: 'one', 'base' or 'sub'")
 )
 

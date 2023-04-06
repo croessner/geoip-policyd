@@ -914,7 +914,7 @@ func TestConfigEnvUseLDAP(t *testing.T) {
 	}
 }
 
-func TestConfigLDAPServerUris(t *testing.T) {
+func TestConfigLdapConfServerUris(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	u1 := "ldap://localhost:389/"
 	u2 := "ldap://example.com:389/"
@@ -922,7 +922,7 @@ func TestConfigLDAPServerUris(t *testing.T) {
 	f2 := false
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-server-uri", u1, "--ldap-server-uri", u2})
 
-	for _, v := range cfg.LDAP.ServerURIs {
+	for _, v := range cfg.LdapConf.ServerURIs {
 		if v == u1 {
 			f1 = true
 
@@ -930,7 +930,7 @@ func TestConfigLDAPServerUris(t *testing.T) {
 		}
 	}
 
-	for _, v := range cfg.LDAP.ServerURIs {
+	for _, v := range cfg.LdapConf.ServerURIs {
 		if v == u2 {
 			f2 = true
 
@@ -939,11 +939,11 @@ func TestConfigLDAPServerUris(t *testing.T) {
 	}
 
 	if f1 != true && f2 != true {
-		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.LDAP.ServerURIs)
+		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.LdapConf.ServerURIs)
 	}
 }
 
-func TestConfigEnvLDAPServerUris(t *testing.T) {
+func TestConfigEnvLdapConfServerUris(t *testing.T) {
 	u1 := "ldap://localhost:389/"
 	u2 := "ldap://example.com:389/"
 	closer := envSetter(map[string]string{
@@ -956,7 +956,7 @@ func TestConfigEnvLDAPServerUris(t *testing.T) {
 	f2 := false
 	cfg.Init([]string{"app", "server"})
 
-	for _, v := range cfg.LDAP.ServerURIs {
+	for _, v := range cfg.LdapConf.ServerURIs {
 		if v == u1 {
 			f1 = true
 
@@ -964,7 +964,7 @@ func TestConfigEnvLDAPServerUris(t *testing.T) {
 		}
 	}
 
-	for _, v := range cfg.LDAP.ServerURIs {
+	for _, v := range cfg.LdapConf.ServerURIs {
 		if v == u2 {
 			f2 = true
 
@@ -973,20 +973,20 @@ func TestConfigEnvLDAPServerUris(t *testing.T) {
 	}
 
 	if f1 != true && f2 != true {
-		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.LDAP.ServerURIs)
+		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.LdapConf.ServerURIs)
 	}
 }
 
-func TestConfigLDAPBaseDN(t *testing.T) {
+func TestConfigLdapConfBaseDN(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-basedn", "o=org"})
 
-	if cfg.LDAP.BaseDN != "o=org" {
-		t.Errorf("Expected --ldap-basedn=o=org, got value=%v", cfg.LDAP.BaseDN)
+	if cfg.LdapConf.BaseDN != "o=org" {
+		t.Errorf("Expected --ldap-basedn=o=org, got value=%v", cfg.LdapConf.BaseDN)
 	}
 }
 
-func TestConfigEnvLDAPBaseDN(t *testing.T) {
+func TestConfigEnvLdapConfBaseDN(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":    "true",
 		"GEOIPPOLICYD_LDAP_BASEDN": "o=org",
@@ -995,21 +995,21 @@ func TestConfigEnvLDAPBaseDN(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.BaseDN != "o=org" {
-		t.Errorf("Expected --ldap-basedn=o=org, got value=%v", cfg.LDAP.BaseDN)
+	if cfg.LdapConf.BaseDN != "o=org" {
+		t.Errorf("Expected --ldap-basedn=o=org, got value=%v", cfg.LdapConf.BaseDN)
 	}
 }
 
-func TestConfigLDAPBindDN(t *testing.T) {
+func TestConfigLdapConfBindDN(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-binddn", "cn=admin,o=org"})
 
-	if cfg.LDAP.BindDN != "cn=admin,o=org" {
-		t.Errorf("Expected --ldap-binddn=cn=admin,o=org, got value=%v", cfg.LDAP.BindDN)
+	if cfg.LdapConf.BindDN != "cn=admin,o=org" {
+		t.Errorf("Expected --ldap-binddn=cn=admin,o=org, got value=%v", cfg.LdapConf.BindDN)
 	}
 }
 
-func TestConfigEnvLDAPBindDN(t *testing.T) {
+func TestConfigEnvLdapConfBindDN(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":    "true",
 		"GEOIPPOLICYD_LDAP_BINDDN": "cn=admin,o=org",
@@ -1018,21 +1018,21 @@ func TestConfigEnvLDAPBindDN(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.BindDN != "cn=admin,o=org" {
-		t.Errorf("Expected --ldap-binddn=cn=admin,o=org, got value=%v", cfg.LDAP.BindDN)
+	if cfg.LdapConf.BindDN != "cn=admin,o=org" {
+		t.Errorf("Expected --ldap-binddn=cn=admin,o=org, got value=%v", cfg.LdapConf.BindDN)
 	}
 }
 
-func TestConfigLDAPBindPW(t *testing.T) {
+func TestConfigLdapConfBindPW(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-bindpw", "password"})
 
-	if cfg.LDAP.BindPW != "password" {
-		t.Errorf("Expected --ldap-bindpw=password, got value=%v", cfg.LDAP.BindPW)
+	if cfg.LdapConf.BindPW != "password" {
+		t.Errorf("Expected --ldap-bindpw=password, got value=%v", cfg.LdapConf.BindPW)
 	}
 }
 
-func TestConfigEnvLDAPBindPW(t *testing.T) {
+func TestConfigEnvLdapConfBindPW(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":    "true",
 		"GEOIPPOLICYD_LDAP_BINDPW": "password",
@@ -1041,21 +1041,21 @@ func TestConfigEnvLDAPBindPW(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.BindPW != "password" {
-		t.Errorf("Expected --ldap-bindpw=password, got value=%v", cfg.LDAP.BindPW)
+	if cfg.LdapConf.BindPW != "password" {
+		t.Errorf("Expected --ldap-bindpw=password, got value=%v", cfg.LdapConf.BindPW)
 	}
 }
 
-func TestConfigLDAPFilter(t *testing.T) {
+func TestConfigLdapConfFilter(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-filter", "(objectClass=*)"})
 
-	if cfg.LDAP.Filter != "(objectClass=*)" {
-		t.Errorf("Expected --ldap-filter=(objectClass=*), got value=%v", cfg.LDAP.Filter)
+	if cfg.LdapConf.Filter != "(objectClass=*)" {
+		t.Errorf("Expected --ldap-filter=(objectClass=*), got value=%v", cfg.LdapConf.Filter)
 	}
 }
 
-func TestConfigEnvLDAPFilter(t *testing.T) {
+func TestConfigEnvLdapConfFilter(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":    "true",
 		"GEOIPPOLICYD_LDAP_FILTER": "(objectClass=*)",
@@ -1064,21 +1064,21 @@ func TestConfigEnvLDAPFilter(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.Filter != "(objectClass=*)" {
-		t.Errorf("Expected --ldap-filter=(objectClass=*), got value=%v", cfg.LDAP.Filter)
+	if cfg.LdapConf.Filter != "(objectClass=*)" {
+		t.Errorf("Expected --ldap-filter=(objectClass=*), got value=%v", cfg.LdapConf.Filter)
 	}
 }
 
-func TestConfigLDAPResultAttribute(t *testing.T) {
+func TestConfigLdapConfResultAttribute(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-result-attribute", "mail"})
 
-	if cfg.LDAP.ResultAttr[0] != "mail" {
-		t.Errorf("Expected --ldap-result-attribute=mail, got value=%v", cfg.LDAP.ResultAttr)
+	if cfg.LdapConf.SearchAttributes[0] != "mail" {
+		t.Errorf("Expected --ldap-result-attribute=mail, got value=%v", cfg.LdapConf.SearchAttributes)
 	}
 }
 
-func TestConfigEnvLDAPResultAttribute(t *testing.T) {
+func TestConfigEnvLdapConfResultAttribute(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":              "true",
 		"GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE": "mail",
@@ -1087,30 +1087,53 @@ func TestConfigEnvLDAPResultAttribute(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.ResultAttr[0] != "mail" {
-		t.Errorf("Expected --ldap-result-attribute=mail, got value=%v", cfg.LDAP.ResultAttr)
+	if cfg.LdapConf.SearchAttributes[0] != "mail" {
+		t.Errorf("Expected --ldap-result-attribute=mail, got value=%v", cfg.LdapConf.SearchAttributes)
 	}
 }
 
-func TestConfigLDAPStartTLS(t *testing.T) {
+func TestConfigLdapConfStartTLS(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-starttls"})
 
-	if cfg.LDAP.StartTLS != true {
-		t.Errorf("Expected --ldap-starttls, got value=%v", cfg.LDAP.StartTLS)
+	if cfg.LdapConf.StartTLS != true {
+		t.Errorf("Expected --ldap-starttls, got value=%v", cfg.LdapConf.StartTLS)
 	}
 }
 
-func TestConfigLDAPPoolSize(t *testing.T) {
+func TestConfigLdapConfIdlePoolSize(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-idle-pool-size", "4"})
+
+	if cfg.LdapConf.IdlePoolSize != 4 {
+		t.Errorf("Expected --ldap-idle-pool-size=4, got value=%v", cfg.LdapConf.IdlePoolSize)
+	}
+}
+
+func TestConfigEnvLdapConfIdlePoolSize(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_USE_LDAP":            "true",
+		"GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE": "4",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.LdapConf.IdlePoolSize != 4 {
+		t.Errorf("Expected --ldap-idle-pool-size=4, got value=%v", cfg.LdapConf.IdlePoolSize)
+	}
+}
+
+func TestConfigLdapConfPoolSize(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-pool-size", "100"})
 
-	if cfg.LDAP.PoolSize != 100 {
-		t.Errorf("Expected --ldap-pool-size, got value=%v", cfg.LDAP.PoolSize)
+	if cfg.LdapConf.PoolSize != 100 {
+		t.Errorf("Expected --ldap-pool-size=100, got value=%v", cfg.LdapConf.PoolSize)
 	}
 }
 
-func TestConfigEnvLDAPPoolSize(t *testing.T) {
+func TestConfigEnvLdapConfPoolSize(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":       "true",
 		"GEOIPPOLICYD_LDAP_POOL_SIZE": "100",
@@ -1119,12 +1142,12 @@ func TestConfigEnvLDAPPoolSize(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.PoolSize != 100 {
-		t.Errorf("Expected --ldap-pool-size=100, got value=%v", cfg.LDAP.PoolSize)
+	if cfg.LdapConf.PoolSize != 100 {
+		t.Errorf("Expected --ldap-pool-size=100, got value=%v", cfg.LdapConf.PoolSize)
 	}
 }
 
-func TestConfigEnvLDAPStartTLS(t *testing.T) {
+func TestConfigEnvLdapConfStartTLS(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":      "true",
 		"GEOIPPOLICYD_LDAP_STARTTLS": "true",
@@ -1133,21 +1156,21 @@ func TestConfigEnvLDAPStartTLS(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.StartTLS != true {
-		t.Errorf("Expected --ldap-starttls, got value=%v", cfg.LDAP.StartTLS)
+	if cfg.LdapConf.StartTLS != true {
+		t.Errorf("Expected --ldap-starttls, got value=%v", cfg.LdapConf.StartTLS)
 	}
 }
 
-func TestConfigLDAPTLSSkipVerify(t *testing.T) {
+func TestConfigLdapConfTLSSkipVerify(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-tls-skip-verify"})
 
-	if cfg.LDAP.TLSSkipVerify != true {
-		t.Errorf("Expected --ldap-tls-skip-verify, got value=%v", cfg.LDAP.TLSSkipVerify)
+	if cfg.LdapConf.TLSSkipVerify != true {
+		t.Errorf("Expected --ldap-tls-skip-verify, got value=%v", cfg.LdapConf.TLSSkipVerify)
 	}
 }
 
-func TestConfigEnvLDAPTLSSkipVerify(t *testing.T) {
+func TestConfigEnvLdapConfTLSSkipVerify(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":             "true",
 		"GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY": "true",
@@ -1156,21 +1179,21 @@ func TestConfigEnvLDAPTLSSkipVerify(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.TLSSkipVerify != true {
-		t.Errorf("Expected --ldap-tls-skip-verify, got value=%v", cfg.LDAP.TLSSkipVerify)
+	if cfg.LdapConf.TLSSkipVerify != true {
+		t.Errorf("Expected --ldap-tls-skip-verify, got value=%v", cfg.LdapConf.TLSSkipVerify)
 	}
 }
 
-func TestConfigLDAPTLSClientCert(t *testing.T) {
+func TestConfigLdapConfTLSClientCert(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-tls-client-cert", "/tmp"})
 
-	if cfg.LDAP.TLSClientCert != "/tmp" {
-		t.Errorf("Expected --ldap-tls-client-cert=/tmp, got value=%v", cfg.LDAP.TLSClientCert)
+	if cfg.LdapConf.TLSClientCert != "/tmp" {
+		t.Errorf("Expected --ldap-tls-client-cert=/tmp, got value=%v", cfg.LdapConf.TLSClientCert)
 	}
 }
 
-func TestConfigEnvLDAPTLSClientCert(t *testing.T) {
+func TestConfigEnvLdapConfTLSClientCert(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":             "true",
 		"GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT": "/tmp",
@@ -1179,21 +1202,21 @@ func TestConfigEnvLDAPTLSClientCert(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.TLSClientCert != "/tmp" {
-		t.Errorf("Expected --ldap-tls-client-cert=/tmp, got value=%v", cfg.LDAP.TLSClientCert)
+	if cfg.LdapConf.TLSClientCert != "/tmp" {
+		t.Errorf("Expected --ldap-tls-client-cert=/tmp, got value=%v", cfg.LdapConf.TLSClientCert)
 	}
 }
 
-func TestConfigLDAPTLSClientKey(t *testing.T) {
+func TestConfigLdapConfTLSClientKey(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-tls-client-key", "/tmp"})
 
-	if cfg.LDAP.TLSClientKey != "/tmp" {
-		t.Errorf("Expected --ldap-tls-client-key=/tmp, got value=%v", cfg.LDAP.TLSClientKey)
+	if cfg.LdapConf.TLSClientKey != "/tmp" {
+		t.Errorf("Expected --ldap-tls-client-key=/tmp, got value=%v", cfg.LdapConf.TLSClientKey)
 	}
 }
 
-func TestConfigEnvLDAPTLSClientKey(t *testing.T) {
+func TestConfigEnvLdapConfTLSClientKey(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":            "true",
 		"GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY": "/tmp",
@@ -1202,21 +1225,21 @@ func TestConfigEnvLDAPTLSClientKey(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.TLSClientKey != "/tmp" {
-		t.Errorf("Expected --ldap-tls-client-key=/tmp, got value=%v", cfg.LDAP.TLSClientKey)
+	if cfg.LdapConf.TLSClientKey != "/tmp" {
+		t.Errorf("Expected --ldap-tls-client-key=/tmp, got value=%v", cfg.LdapConf.TLSClientKey)
 	}
 }
 
-func TestConfigLDAPSASLExternal(t *testing.T) {
+func TestConfigLdapConfSASLExternal(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-sasl-external"})
 
-	if cfg.LDAP.SASLExternal != true {
-		t.Errorf("Expected --ldap-sasl-external, got value=%v", cfg.LDAP.SASLExternal)
+	if cfg.LdapConf.SASLExternal != true {
+		t.Errorf("Expected --ldap-sasl-external, got value=%v", cfg.LdapConf.SASLExternal)
 	}
 }
 
-func TestConfigEnvLDAPSASLExternal(t *testing.T) {
+func TestConfigEnvLdapConfSASLExternal(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":           "true",
 		"GEOIPPOLICYD_LDAP_SASL_EXTERNAL": "true",
@@ -1225,21 +1248,21 @@ func TestConfigEnvLDAPSASLExternal(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.SASLExternal != true {
-		t.Errorf("Expected --ldap-sasl-external, got value=%v", cfg.LDAP.SASLExternal)
+	if cfg.LdapConf.SASLExternal != true {
+		t.Errorf("Expected --ldap-sasl-external, got value=%v", cfg.LdapConf.SASLExternal)
 	}
 }
 
-func TestConfigLDAPScopeBase(t *testing.T) {
+func TestConfigLdapConfScopeBase(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-scope", BASE})
 
-	if cfg.LDAP.Scope != ldap.ScopeBaseObject {
-		t.Errorf("Expected --ldap-scope=base (%d), got value=%v", ldap.ScopeBaseObject, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeBaseObject {
+		t.Errorf("Expected --ldap-scope=base (%d), got value=%v", ldap.ScopeBaseObject, cfg.LdapConf.Scope)
 	}
 }
 
-func TestConfigEnvLDAPScopeBase(t *testing.T) {
+func TestConfigEnvLdapConfScopeBase(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":   "true",
 		"GEOIPPOLICYD_LDAP_SCOPE": "base",
@@ -1248,21 +1271,21 @@ func TestConfigEnvLDAPScopeBase(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.Scope != ldap.ScopeBaseObject {
-		t.Errorf("Expected --ldap-scope=base (%d), got value=%v", ldap.ScopeBaseObject, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeBaseObject {
+		t.Errorf("Expected --ldap-scope=base (%d), got value=%v", ldap.ScopeBaseObject, cfg.LdapConf.Scope)
 	}
 }
 
-func TestConfigLDAPScopeOne(t *testing.T) {
+func TestConfigLdapConfScopeOne(t *testing.T) {
 	cfg := CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-scope", ONE})
 
-	if cfg.LDAP.Scope != ldap.ScopeSingleLevel {
-		t.Errorf("Expected --ldap-scope=one (%d), got value=%v", ldap.ScopeSingleLevel, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeSingleLevel {
+		t.Errorf("Expected --ldap-scope=one (%d), got value=%v", ldap.ScopeSingleLevel, cfg.LdapConf.Scope)
 	}
 }
 
-func TestConfigEnvLDAPScopeOne(t *testing.T) {
+func TestConfigEnvLdapConfScopeOne(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":   "true",
 		"GEOIPPOLICYD_LDAP_SCOPE": "one",
@@ -1271,21 +1294,21 @@ func TestConfigEnvLDAPScopeOne(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.Scope != ldap.ScopeSingleLevel {
-		t.Errorf("Expected --ldap-scope=one (%d), got value=%v", ldap.ScopeSingleLevel, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeSingleLevel {
+		t.Errorf("Expected --ldap-scope=one (%d), got value=%v", ldap.ScopeSingleLevel, cfg.LdapConf.Scope)
 	}
 }
 
-func TestConfigLDAPScopeSub(t *testing.T) {
+func TestConfigLdapConfScopeSub(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-scope", SUB})
 
-	if cfg.LDAP.Scope != ldap.ScopeWholeSubtree {
-		t.Errorf("Expected --ldap-scope=sub (%d), got value=%v", ldap.ScopeWholeSubtree, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeWholeSubtree {
+		t.Errorf("Expected --ldap-scope=sub (%d), got value=%v", ldap.ScopeWholeSubtree, cfg.LdapConf.Scope)
 	}
 }
 
-func TestConfigEnvLDAPScopeSub(t *testing.T) {
+func TestConfigEnvLdapConfScopeSub(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_USE_LDAP":   "true",
 		"GEOIPPOLICYD_LDAP_SCOPE": "sub",
@@ -1294,8 +1317,8 @@ func TestConfigEnvLDAPScopeSub(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{"app", "server"})
 
-	if cfg.LDAP.Scope != ldap.ScopeWholeSubtree {
-		t.Errorf("Expected --ldap-scope=sub (%d), got value=%v", ldap.ScopeWholeSubtree, cfg.LDAP.Scope)
+	if cfg.LdapConf.Scope != ldap.ScopeWholeSubtree {
+		t.Errorf("Expected --ldap-scope=sub (%d), got value=%v", ldap.ScopeWholeSubtree, cfg.LdapConf.Scope)
 	}
 }
 

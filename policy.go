@@ -356,17 +356,17 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 	if config.UseLDAP {
 		var (
-			ldapReply   LdapReply
-			ldapRequest LdapRequest
-			resultAttr  []string
+			ldapReply   *LdapReply
+			ldapRequest *LdapRequest
+			resultAttr  []any
 		)
 
-		ldapReplyChan := make(chan LdapReply)
+		ldapReplyChan := make(chan *LdapReply)
+
+		ldapRequest = &LdapRequest{}
 
 		ldapRequest.username = sender
-		ldapRequest.filter = config.LDAP.Filter
-		ldapRequest.guid = guid
-		ldapRequest.attributes = config.LDAP.ResultAttr
+		ldapRequest.guid = &guid
 		ldapRequest.replyChan = ldapReplyChan
 
 		ldapRequestChan <- ldapRequest
@@ -375,9 +375,11 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 		if ldapReply.err != nil {
 			level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
-		} else if resultAttr, mapKeyFound = ldapReply.result[config.LDAP.ResultAttr[0]]; mapKeyFound {
-			// LDAP single value
-			sender = resultAttr[0]
+		} else {
+			if resultAttr, mapKeyFound = ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+				// LDAP single value
+				sender = resultAttr[ldapSingleValue].(string)
+			}
 		}
 	}
 

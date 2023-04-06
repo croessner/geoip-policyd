@@ -116,7 +116,7 @@ type CmdLineConfig struct {
 	CommandServer bool
 
 	UseLDAP bool
-	LDAP
+	*LdapConf
 
 	LogFormatJSON      bool
 	CustomSettingsPath string
@@ -612,6 +612,21 @@ func (c *CmdLineConfig) Init(args []string) {
 			},
 			Help: "LDAP search scope [base, one, sub]",
 		})
+	argServerLDAPIdlePoolSize := commandServer.Int(
+		"", "ldap-idle-pool-size", &argparse.Options{
+			Required: false,
+			Default:  int(ldapPoolSize * 0.3),
+			Validate: func(opt []string) error {
+				if arg, err := strconv.Atoi(opt[0]); err != nil {
+					return errNotInteger
+				} else if arg < 0 {
+					return errIdlePoolSize
+				}
+
+				return nil
+			},
+			Help: "LDAP pre-forked (idle) pool size",
+		})
 	argServerLDAPPoolSize := commandServer.Int(
 		"", "ldap-pool-size", &argparse.Options{
 			Required: false,
@@ -625,8 +640,12 @@ func (c *CmdLineConfig) Init(args []string) {
 
 				return nil
 			},
-			Help: "LDAP pre-forked pool size",
+			Help: "LDAP max pool size",
 		})
+
+	if *argServerLDAPIdlePoolSize > *argServerLDAPPoolSize {
+		*argServerLDAPIdlePoolSize = *argServerLDAPPoolSize
+	}
 
 	argVerbose := parser.FlagCounter(
 		"v", "verbose", &argparse.Options{
@@ -1078,45 +1097,47 @@ func (c *CmdLineConfig) Init(args []string) {
 		}
 
 		if c.UseLDAP {
+			c.LdapConf = &LdapConf{}
+
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_SERVER_URIS"); val != "" {
 				param := strings.Split(val, ",")
 				for i, uri := range param {
 					param[i] = strings.TrimSpace(uri)
 				}
 
-				c.LDAP.ServerURIs = param
+				c.LdapConf.ServerURIs = param
 			} else {
-				c.LDAP.ServerURIs = *argServerLDAPServerURIs
+				c.LdapConf.ServerURIs = *argServerLDAPServerURIs
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_BASEDN"); val != "" {
-				c.LDAP.BaseDN = val
+				c.LdapConf.BaseDN = val
 			} else {
-				c.LDAP.BaseDN = *argServerLDAPBaseDN
+				c.LdapConf.BaseDN = *argServerLDAPBaseDN
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDDN"); val != "" {
-				c.LDAP.BindDN = val
+				c.LdapConf.BindDN = val
 			} else {
-				c.LDAP.BindDN = *argServerLDAPBindDN
+				c.LdapConf.BindDN = *argServerLDAPBindDN
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDPW"); val != "" {
-				c.LDAP.BindPW = val
+				c.LdapConf.BindPW = val
 			} else {
-				c.LDAP.BindPW = *argServerLDAPBindPWPATH
+				c.LdapConf.BindPW = *argServerLDAPBindPWPATH
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_FILTER"); val != "" {
-				c.LDAP.Filter = val
+				c.LdapConf.Filter = val
 			} else {
-				c.LDAP.Filter = *argServerLDAPFilter
+				c.LdapConf.Filter = *argServerLDAPFilter
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE"); val != "" {
-				c.LDAP.ResultAttr = []string{val}
+				c.LdapConf.SearchAttributes = []string{val}
 			} else {
-				c.LDAP.ResultAttr = []string{*argServerLDAPResultAttr}
+				c.LdapConf.SearchAttributes = []string{*argServerLDAPResultAttr}
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_STARTTLS"); val != "" {
@@ -1125,9 +1146,9 @@ func (c *CmdLineConfig) Init(args []string) {
 					log.Fatalln("Error:", err.Error())
 				}
 
-				c.LDAP.StartTLS = param
+				c.LdapConf.StartTLS = param
 			} else {
-				c.LDAP.StartTLS = *argServerLDAPStartTLS
+				c.LdapConf.StartTLS = *argServerLDAPStartTLS
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY"); val != "" {
@@ -1136,27 +1157,27 @@ func (c *CmdLineConfig) Init(args []string) {
 					log.Fatalln("Error:", err.Error())
 				}
 
-				c.LDAP.TLSSkipVerify = param
+				c.LdapConf.TLSSkipVerify = param
 			} else {
-				c.LDAP.TLSSkipVerify = *argServerLDAPTLSVerify
+				c.LdapConf.TLSSkipVerify = *argServerLDAPTLSVerify
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CAFILE"); val != "" {
-				c.LDAP.TLSCAFile = val
+				c.LdapConf.TLSCAFile = val
 			} else {
-				c.LDAP.TLSCAFile = *argServerLDAPTLSCAFile
+				c.LdapConf.TLSCAFile = *argServerLDAPTLSCAFile
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT"); val != "" {
-				c.LDAP.TLSClientCert = val
+				c.LdapConf.TLSClientCert = val
 			} else {
-				c.LDAP.TLSClientCert = *argServerLDAPTLSClientCert
+				c.LdapConf.TLSClientCert = *argServerLDAPTLSClientCert
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY"); val != "" {
-				c.LDAP.TLSClientKey = val
+				c.LdapConf.TLSClientKey = val
 			} else {
-				c.LDAP.TLSClientKey = *argServerLDAPTLSClientKey
+				c.LdapConf.TLSClientKey = *argServerLDAPTLSClientKey
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_SASL_EXTERNAL"); val != "" {
@@ -1165,31 +1186,42 @@ func (c *CmdLineConfig) Init(args []string) {
 					log.Fatalln("Error:", err.Error())
 				}
 
-				c.LDAP.SASLExternal = param
+				c.LdapConf.SASLExternal = param
 			} else {
-				c.LDAP.SASLExternal = *argServerLDAPSASLExternal
+				c.LdapConf.SASLExternal = *argServerLDAPSASLExternal
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_SCOPE"); val != "" {
 				switch val {
 				case BASE:
-					c.LDAP.Scope = ldap.ScopeBaseObject
+					c.LdapConf.Scope = ldap.ScopeBaseObject
 				case ONE:
-					c.LDAP.Scope = ldap.ScopeSingleLevel
+					c.LdapConf.Scope = ldap.ScopeSingleLevel
 				case SUB:
-					c.LDAP.Scope = ldap.ScopeWholeSubtree
+					c.LdapConf.Scope = ldap.ScopeWholeSubtree
 				default:
 					log.Fatalln(parser.Usage(fmt.Sprintf("value '%s' must be one of: one, base or sub", val)))
 				}
 			} else {
 				switch *argServerLDAPScope {
 				case BASE:
-					c.LDAP.Scope = ldap.ScopeBaseObject
+					c.LdapConf.Scope = ldap.ScopeBaseObject
 				case ONE:
-					c.LDAP.Scope = ldap.ScopeSingleLevel
+					c.LdapConf.Scope = ldap.ScopeSingleLevel
 				case SUB:
-					c.LDAP.Scope = ldap.ScopeWholeSubtree
+					c.LdapConf.Scope = ldap.ScopeWholeSubtree
 				}
+			}
+
+			if val := os.Getenv("GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE"); val != "" {
+				param, err := strconv.Atoi(val)
+				if err != nil {
+					log.Fatalln("Error: GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE can not be used:", parser.Usage(err.Error()))
+				}
+
+				c.LdapConf.IdlePoolSize = param
+			} else {
+				c.LdapConf.IdlePoolSize = *argServerLDAPIdlePoolSize
 			}
 
 			if val := os.Getenv("GEOIPPOLICYD_LDAP_POOL_SIZE"); val != "" {
@@ -1198,9 +1230,9 @@ func (c *CmdLineConfig) Init(args []string) {
 					log.Fatalln("Error: GEOIPPOLICYD_LDAP_POOL_SIZE can not be used:", parser.Usage(err.Error()))
 				}
 
-				c.LDAP.PoolSize = param
+				c.LdapConf.PoolSize = param
 			} else {
-				c.LDAP.PoolSize = *argServerLDAPPoolSize
+				c.LdapConf.PoolSize = *argServerLDAPPoolSize
 			}
 		}
 

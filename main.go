@@ -42,8 +42,8 @@ var (
 	config              *CmdLineConfig         //nolint:gochecknoglobals // System wide configuration
 	customSettingsStore atomic.Value           //nolint:gochecknoglobals // System wide configuration from custom.yml file
 	geoIPStore          atomic.Value           //nolint:gochecknoglobals // System wide GeoIP handler
-	ldapRequestChan     chan LdapRequest       //nolint:gochecknoglobals // Needed for LDAP pooling
-	ldapEnd             chan bool              //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
+	ldapRequestChan     chan *LdapRequest      //nolint:gochecknoglobals // Needed for LDAP pooling
+	ldapEndChan         chan bool              //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
 	redisHandle         redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
 	redisHandleReplica  redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
 	logger              log.Logger             //nolint:gochecknoglobals // System wide logger
@@ -189,11 +189,11 @@ func main() {
 		level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
 
 		if config.UseLDAP {
-			ldapRequestChan = make(chan LdapRequest, ldapPoolSize)
-			ldapEnd = make(chan bool)
+			ldapRequestChan = make(chan *LdapRequest, ldapPoolSize)
+			ldapEndChan = make(chan bool)
 
 			// Start LDAP worker process
-			go ldapWorker()
+			go ldapWorker(context.Background())
 		}
 
 		geoIP := &GeoIP{}
