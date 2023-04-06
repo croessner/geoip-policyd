@@ -18,6 +18,7 @@
     },
     {
       "comment": "Home countries with different limits",
+      "sender": "test3@example.com",
       "home_countries": {
         "codes": ["DE", "AU", "FR", "NL", "PL"],
         "countries": 2,

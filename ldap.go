@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -27,6 +28,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -35,13 +37,19 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-type LDAP struct {
+const ldapSingleValue = 0
+
+const distinguishedName = "dn"
+
+type LdapConf struct {
 	StartTLS      bool
 	TLSSkipVerify bool
 	SASLExternal  bool
 
-	PoolSize int
-	Scope    int
+	Scope int
+
+	IdlePoolSize int
+	PoolSize     int
 
 	BaseDN        string
 	BindDN        string
@@ -51,28 +59,51 @@ type LDAP struct {
 	TLSClientCert string
 	TLSClientKey  string
 
-	ServerURIs []string
-	ResultAttr []string
+	SearchAttributes []string
 
-	Mu   *sync.Mutex
+	ServerURIs []string
+}
+
+type LdapPool struct {
+	ldapConnectionState
+
+	Mu   sync.Mutex
 	Conn *ldap.Conn
 }
 
+type LDAPCommand uint8
+
+const (
+	LDAPSearch LDAPCommand = iota
+)
+
 type LdapRequest struct {
-	username   string
-	filter     string
-	guid       string
-	attributes []string
-	replyChan  chan LdapReply
+	guid      *string
+	username  string
+	command   LDAPCommand
+	replyChan chan *LdapReply
 }
 
+type DatabaseResult map[string][]any
+
 type LdapReply struct {
-	dn     string
-	result map[string][]string
+	result DatabaseResult
 	err    error
 }
 
-func (l *LDAP) String() string {
+type LDAPState uint8
+
+const (
+	ldapStateClosed LDAPState = iota
+	ldapStateFree   LDAPState = iota
+	ldapStateBusy   LDAPState = iota
+)
+
+type ldapConnectionState struct {
+	state LDAPState
+}
+
+func (l *LdapConf) String() string {
 	var result string
 
 	value := reflect.ValueOf(*l)
@@ -80,10 +111,10 @@ func (l *LDAP) String() string {
 
 	for index := 0; index < value.NumField(); index++ {
 		switch typeOfValue.Field(index).Name {
-		case "Mu", "Conn":
-			continue
 		case "BindPW":
 			result += fmt.Sprintf(" %s='<hidden>'", typeOfValue.Field(index).Name)
+		case "PoolSize", "IdlePoolSize":
+			continue
 		default:
 			result += fmt.Sprintf(" %s='%v'", typeOfValue.Field(index).Name, value.Field(index).Interface())
 		}
@@ -92,11 +123,11 @@ func (l *LDAP) String() string {
 	return result[1:]
 }
 
-func (l *LDAP) isClosing() bool {
+func (l *LdapPool) isClosing() bool {
 	return l.Conn.IsClosing()
 }
 
-func (l *LDAP) connect(guid string) error {
+func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
@@ -112,18 +143,18 @@ func (l *LDAP) connect(guid string) error {
 			return errLDAPConnect
 		}
 
-		if ldapCounter > len(l.ServerURIs)-1 {
+		if ldapCounter > len(ldapConf.ServerURIs)-1 {
 			ldapCounter = 0
 		}
 
 		level.Debug(logger).Log(
 			"guid", guid,
-			"ldap_uri", l.ServerURIs[ldapCounter],
+			"ldap_uri", ldapConf.ServerURIs[ldapCounter],
 			"current_attempt", retryLimit+1,
 			"max_attempt", ldapMaxRetries+1,
 		)
 
-		l.Conn, err = ldap.DialURL(l.ServerURIs[ldapCounter])
+		l.Conn, err = ldap.DialURL(ldapConf.ServerURIs[ldapCounter])
 		if err != nil {
 			ldapCounter++
 			retryLimit++
@@ -131,10 +162,10 @@ func (l *LDAP) connect(guid string) error {
 			continue
 		}
 
-		if l.SASLExternal {
+		if ldapConf.SASLExternal {
 			// Certificates are not needed with ldapi//
-			if l.TLSClientCert != "" && l.TLSClientKey != "" {
-				cert, err := tls.LoadX509KeyPair(l.TLSClientCert, l.TLSClientKey)
+			if ldapConf.TLSClientCert != "" && ldapConf.TLSClientKey != "" {
+				cert, err := tls.LoadX509KeyPair(ldapConf.TLSClientCert, ldapConf.TLSClientKey)
 				if err != nil {
 					return err
 				}
@@ -143,9 +174,9 @@ func (l *LDAP) connect(guid string) error {
 			}
 		}
 
-		if l.StartTLS {
+		if ldapConf.StartTLS {
 			// Load CA chain
-			caCert, err := os.ReadFile(l.TLSCAFile)
+			caCert, err := os.ReadFile(ldapConf.TLSCAFile)
 			if err != nil {
 				return err
 			}
@@ -153,7 +184,7 @@ func (l *LDAP) connect(guid string) error {
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
 
-			u, _ := url.Parse(l.ServerURIs[ldapCounter])
+			u, _ := url.Parse(ldapConf.ServerURIs[ldapCounter])
 
 			host, _, err := net.SplitHostPort(u.Host)
 			if err != nil {
@@ -163,7 +194,7 @@ func (l *LDAP) connect(guid string) error {
 			tlsConfig := &tls.Config{
 				Certificates:       certificates,
 				RootCAs:            caCertPool,
-				InsecureSkipVerify: l.TLSSkipVerify, //nolint:gosec // Support self-signed certificates
+				InsecureSkipVerify: ldapConf.TLSSkipVerify, //nolint:gosec // Support self-signed certificates
 				ServerName:         host,
 			}
 
@@ -183,248 +214,442 @@ func (l *LDAP) connect(guid string) error {
 	return nil
 }
 
-func (l *LDAP) bind(guid string) error {
+func (l *LdapPool) bind(guid *string, ldapConf *LdapConf) error {
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
 	var err error
 
-	if l.SASLExternal {
+	if ldapConf.SASLExternal {
 		level.Debug(logger).Log("guid", guid, "msg", "SASL/EXTERNAL")
 
 		err = l.Conn.ExternalBind()
 		if err != nil {
 			return err
 		}
+
+		if config.VerboseLevel >= logLevelDebug {
+			res, err := l.Conn.WhoAmI(nil) //nolint:govet // Ignore
+			if err == nil {
+				level.Debug(logger).Log("guid", guid, "whoami", fmt.Sprintf("%+v", res))
+			}
+		}
 	} else {
 		level.Debug(logger).Log("guid", guid, "msg", "simple bind")
-		level.Debug(logger).Log("guid", guid, "bind_dn", l.BindDN)
+		level.Debug(logger).Log("guid", guid, "bind_dn", ldapConf.BindDN)
 
 		_, err = l.Conn.SimpleBind(&ldap.SimpleBindRequest{
-			Username: l.BindDN,
-			Password: l.BindPW,
+			Username: ldapConf.BindDN,
+			Password: ldapConf.BindPW,
 		})
 
 		if err != nil {
 			return err
 		}
+
+		if config.VerboseLevel >= logLevelDebug {
+			res, err := l.Conn.WhoAmI(nil)
+			if err == nil {
+				level.Debug(logger).Log("guid", guid, "whoami", fmt.Sprintf("%+v", res))
+			}
+		}
 	}
 
 	return nil
 }
 
-func (l *LDAP) unbind() error {
+func (l *LdapPool) unbind() (err error) {
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
-	if err := l.Conn.Unbind(); err != nil {
-		return err
-	}
+	err = l.Conn.Unbind()
 
-	return nil
+	return
 }
 
-//nolint:nonamedreturns // Making use of the names
-func (l *LDAP) search(guid, lookupValue, filter string, attributes []string) (
-	dn string, result map[string][]string, err error,
-) {
+func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result DatabaseResult, err error) {
+	var searchResult *ldap.SearchResult
+
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
-	if strings.Contains(filter, "%s") {
-		filter = strings.ReplaceAll(filter, "%s", lookupValue)
-	}
+	ldapConf.Filter = strings.ReplaceAll(ldapConf.Filter, "%s", ldapRequest.username)
 
-	re := regexp.MustCompile(`\s`)
-	filter = re.ReplaceAllString(filter, "")
+	re := regexp.MustCompile(`\s*[\r\n]+\s*`)
+	ldapConf.Filter = re.ReplaceAllString(ldapConf.Filter, "")
 
-	level.Debug(logger).Log("guid", guid, "filter", filter)
+	level.Debug(logger).Log("guid", ldapRequest.guid, "filter", ldapConf.Filter)
 
 	searchRequest := ldap.NewSearchRequest(
-		l.BaseDN, l.Scope, ldap.NeverDerefAliases, 0, 0, false, filter, attributes,
+		ldapConf.BaseDN,
+		ldapConf.Scope,
+		ldap.NeverDerefAliases,
+		0,
+		0,
+		false,
+		ldapConf.Filter,
+		ldapConf.SearchAttributes,
 		nil,
 	)
 
-	searchResult, err := l.Conn.Search(searchRequest)
+	searchResult, err = l.Conn.Search(searchRequest)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	result = make(map[string][]string)
+	result = make(DatabaseResult)
 
-	for _, entry := range searchResult.Entries {
-		for _, attrName := range attributes {
-			values := entry.GetAttributeValues(attrName)
+	for entryIndex := range searchResult.Entries {
+		for attrIndex := range ldapConf.SearchAttributes {
+			var anySlice []any
 
-			if len(result[attrName]) > 0 {
-				result[attrName] = append(result[attrName], values...)
+			values := searchResult.Entries[entryIndex].GetAttributeValues(ldapConf.SearchAttributes[attrIndex])
+
+			// Do not add empty results
+			if len(values) == 0 {
+				continue
+			}
+
+			for index := range values {
+				anySlice = append(anySlice, values[index])
+			}
+
+			if len(result[ldapConf.SearchAttributes[attrIndex]]) > 0 {
+				result[ldapConf.SearchAttributes[attrIndex]] = append(result[ldapConf.SearchAttributes[attrIndex]], anySlice...)
 			} else {
-				result[attrName] = values
+				result[ldapConf.SearchAttributes[attrIndex]] = anySlice
 			}
 		}
 
-		// Note: Only the first DN is currently stored!
-		if dn == "" {
-			dn = entry.DN
+		if _, assertOk := result[distinguishedName]; assertOk {
+			result[distinguishedName] = append(result[distinguishedName], searchResult.Entries[entryIndex].DN)
+		} else {
+			result[distinguishedName] = []any{searchResult.Entries[entryIndex].DN}
 		}
 	}
 
-	return dn, result, nil
+	return result, nil
 }
 
-//nolint:gocognit // Ignore
-func ldapWorker() {
-	var (
-		err  error
-		args LdapRequest
-	)
+func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
+	// Cleanup interval
+	timer := time.NewTicker(30 * time.Second) //nolint:gomnd // 30 seconds
 
-	ldapInstance := make([]LDAP, config.LDAP.PoolSize)
-	ldapAliveEnd := make(chan bool)
-
-	for instance := 0; instance < config.LDAP.PoolSize; instance++ {
-		ldapInstance[instance].ServerURIs = config.LDAP.ServerURIs
-		ldapInstance[instance].BaseDN = config.LDAP.BaseDN
-		ldapInstance[instance].BindDN = config.LDAP.BindDN
-		ldapInstance[instance].BindPW = config.LDAP.BindPW
-		ldapInstance[instance].StartTLS = config.LDAP.StartTLS
-		ldapInstance[instance].TLSSkipVerify = config.LDAP.TLSSkipVerify
-		ldapInstance[instance].TLSCAFile = config.LDAP.TLSCAFile
-		ldapInstance[instance].TLSClientCert = config.LDAP.TLSClientCert
-		ldapInstance[instance].TLSClientKey = config.LDAP.TLSClientKey
-		ldapInstance[instance].SASLExternal = config.LDAP.SASLExternal
-		ldapInstance[instance].Scope = config.LDAP.Scope
-		ldapInstance[instance].Mu = &sync.Mutex{}
-
-		level.Debug(logger).Log("instance", instance+1, "ldap", ldapInstance[instance].String())
-
-		err = ldapInstance[instance].connect(fmt.Sprintf("main-%d", instance))
-		if err != nil {
-			level.Error(logger).Log("instance", instance+1, "error", err.Error())
-		} else {
-			err = ldapInstance[instance].bind(fmt.Sprintf("main-%d", instance))
-			if err != nil {
-				level.Error(logger).Log("instance", instance+1, "error", err.Error())
-			}
-		}
-
-		go func(index int) {
-			searchRequest := ldap.NewSearchRequest(
-				//nolint:gomnd // These values are fine
-				"", ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 30, false, "(objectClass=*)", []string{"1.1"},
-				nil,
-			)
-
-			//nolint:gomnd // Time factor
-			ticker := time.NewTicker(30 * time.Second)
-
-			for {
-				select {
-				case <-ticker.C:
-					level.Debug(logger).Log(
-						"instance", index+1, "msg", fmt.Sprintf("Keep alive check for connection #%d", index+1),
-					)
-
-					if !(ldapInstance[index].Conn == nil || ldapInstance[index].Conn.IsClosing()) {
-						_, err := ldapInstance[index].Conn.Search(searchRequest)
-						if err != nil {
-							level.Warn(logger).Log("instance", index+1, "warn", err.Error())
-
-							ldapInstance[index].Mu.Lock()
-							ldapInstance[index].Conn = nil
-							ldapInstance[index].Mu.Unlock()
-						}
-					}
-				case <-ldapAliveEnd:
-					ticker.Stop()
-
-					return
-				}
-			}
-		}(instance)
-	}
-
-	connectionCounter := 0
+	// Make (idle) pool size thread safe!
+	poolSize := len(ldapPool)
+	idlePoolSize := config.LdapConf.IdlePoolSize
 
 	for {
 		select {
+		case <-ctx.Done():
+			timer.Stop()
+			level.Debug(logger).Log("msg", "closeUnusedConnections() terminated")
+
+			return
+
+		case <-timer.C:
+			openConnections := 0
+
+			for index := 0; index < poolSize; index++ {
+				ldapPool[index].Mu.Lock()
+
+				if ldapPool[index].state == ldapStateFree {
+					if !(ldapPool[index].Conn == nil || ldapPool[index].Conn.IsClosing()) {
+						_, err := ldapPool[index].Conn.Search(ldap.NewSearchRequest(
+							"", ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 30,
+							false, "(objectClass=*)", []string{"1.1"}, nil,
+						))
+
+						if err != nil {
+							// Lost connection
+							level.Debug(logger).Log(
+								"msg", fmt.Sprintf("LDAP free/busy state #%d has broken connection", index+1),
+							)
+
+							ldapPool[index].Conn = nil
+							ldapPool[index].state = ldapStateClosed
+						} else {
+							openConnections++
+
+							level.Debug(logger).Log(
+								"msg", fmt.Sprintf("LDAP free/busy state #%d is free", index+1),
+							)
+						}
+					} else {
+						// Fix wrong state flag
+						ldapPool[index].state = ldapStateClosed
+					}
+				} else {
+					level.Debug(logger).Log(
+						"msg", fmt.Sprintf("LDAP free/busy state #%d is busy or closed", index+1),
+					)
+				}
+
+				ldapPool[index].Mu.Unlock()
+			}
+
+			for needClosing := openConnections - idlePoolSize; needClosing > 0; needClosing-- {
+				for index := 0; index < poolSize; index++ {
+					ldapPool[index].Mu.Lock()
+
+					if ldapPool[index].state == ldapStateFree {
+						ldapPool[index].Conn.Close()
+						ldapPool[index].state = ldapStateClosed
+
+						level.Debug(logger).Log(
+							"msg", fmt.Sprintf("Connection #%d closed", index+1),
+						)
+
+						ldapPool[index].Mu.Unlock()
+
+						break
+					}
+
+					ldapPool[index].Mu.Unlock()
+				}
+			}
+		}
+	}
+}
+
+//nolint:gocognit,maintidx // Ignore
+func ldapWorker(ctx context.Context) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	var (
+		err           error
+		ldapConnIndex int
+		args          *LdapRequest
+		ldapWaitGroup sync.WaitGroup
+	)
+
+	if config.LdapConf == nil {
+		return
+	}
+
+	// Make (idle) pool size thread safe!
+	poolSize := config.LdapConf.PoolSize
+	idlePoolSize := config.LdapConf.IdlePoolSize
+
+	ldapConf := make([]LdapConf, poolSize)
+	ldapPool := make([]LdapPool, poolSize)
+
+	for index := 0; index < poolSize; index++ {
+		ldapConf[index].ServerURIs = config.LdapConf.ServerURIs
+		ldapConf[index].BaseDN = config.LdapConf.BaseDN
+		ldapConf[index].Filter = config.LdapConf.Filter
+		ldapConf[index].SearchAttributes = config.LdapConf.SearchAttributes
+		ldapConf[index].BindDN = config.LdapConf.BindDN
+		ldapConf[index].BindPW = config.LdapConf.BindPW
+		ldapConf[index].StartTLS = config.LdapConf.StartTLS
+		ldapConf[index].TLSSkipVerify = config.LdapConf.TLSSkipVerify
+		ldapConf[index].TLSCAFile = config.LdapConf.TLSCAFile
+		ldapConf[index].TLSClientCert = config.LdapConf.TLSClientCert
+		ldapConf[index].TLSClientKey = config.LdapConf.TLSClientKey
+		ldapConf[index].SASLExternal = config.LdapConf.SASLExternal
+
+		ldapPool[index].state = ldapStateClosed
+	}
+
+	// Start background cleaner process
+	go closeUnusedConnections(ctx, ldapPool)
+
+	for {
+		select {
+		case <-ctx.Done():
+			for i := 0; i < poolSize; i++ {
+				if ldapPool[i].Conn != nil {
+					_ = ldapPool[i].unbind()
+					ldapPool[i].Conn.Close()
+
+					level.Debug(logger).Log(
+						"msg", fmt.Sprintf("Connection #%d closed", i+1),
+					)
+				}
+			}
+
+			level.Debug(logger).Log("msg", "ldapWorker() terminated")
+
+			ldapEndChan <- true
+
+			return
+
 		case args = <-ldapRequestChan:
-			go func(index int, args LdapRequest) {
-				var (
-					err    error
-					ldapDN string
-					result map[string][]string
-				)
+			ldapConnIndex = -1 // Reset connection index
+			foundFreeConn := false
+			openConnections := 0
 
-				ldapReply := LdapReply{}
-				ldapReplyChan := args.replyChan
+			for index := 0; index < poolSize; index++ {
+				if ldapPool[index].state != ldapStateClosed {
+					openConnections++
+				}
+			}
 
-				if ldapInstance[index].Conn == nil || ldapInstance[index].isClosing() {
-					level.Warn(logger).Log("instance", index+1, "msg", fmt.Sprintf("Connection #%d is closed", index+1))
+			if openConnections < idlePoolSize {
+				// Initialize the idle pool
+				for index := openConnections; index < idlePoolSize; index++ {
+					level.Debug(logger).Log("ldap", ldapConf[index].String())
 
-					if ldapInstance[index].Conn != nil {
-						ldapInstance[index].Conn.Close()
+					guidStr := fmt.Sprintf("pool-#%d", index+1)
+
+					err = ldapPool[index].connect(&guidStr, &ldapConf[index])
+					if err != nil {
+						level.Error(logger).Log("error", err)
+					} else {
+						err = ldapPool[index].bind(&guidStr, &ldapConf[index])
+						if err != nil {
+							level.Error(logger).Log("error", err)
+						}
+
+						ldapPool[index].Mu.Lock()
+
+						ldapPool[index].state = ldapStateFree
+
+						ldapPool[index].Mu.Unlock()
+					}
+				}
+			}
+
+			for {
+				for index := 0; index < poolSize; index++ {
+					if ldapPool[index].state == ldapStateBusy {
+						continue
 					}
 
-					err = ldapInstance[index].connect(args.guid)
-					if err != nil {
-						ldapReply.err = err
-						ldapReplyChan <- ldapReply
+					if ldapPool[index].state == ldapStateFree {
+						ldapPool[index].Mu.Lock()
 
-						return
+						ldapPool[index].state = ldapStateBusy
+						ldapConnIndex = index
+						foundFreeConn = true
+
+						ldapPool[index].Mu.Unlock()
+
+						break
 					}
 
-					err = ldapInstance[index].bind(args.guid)
-					if err != nil {
-						ldapReply.err = err
-						ldapReplyChan <- ldapReply
+					guidStr := fmt.Sprintf("pool-#%d", index+1)
 
-						return
+					if ldapPool[index].state == ldapStateClosed {
+						err = ldapPool[index].connect(&guidStr, &ldapConf[index])
+						if err != nil {
+							level.Error(logger).Log("error", err)
+						} else {
+							err = ldapPool[index].bind(&guidStr, &ldapConf[index])
+							if err != nil {
+								level.Error(logger).Log("error", err)
+							}
+
+							ldapPool[index].Mu.Lock()
+
+							ldapPool[index].state = ldapStateFree
+
+							ldapPool[index].Mu.Unlock()
+
+							ldapConnIndex = index
+							foundFreeConn = true
+						}
+
+						break
 					}
 				}
 
-				if ldapDN, result, err = ldapInstance[index].search(
-					args.guid, args.username, args.filter, args.attributes,
-				); err != nil {
-					level.Info(logger).Log("instance", index+1, "msg", err.Error())
+				// Pool exhausted, need to wait...
+				if ldapConnIndex == -1 {
+					ldapWaitGroup.Wait()
+				}
 
-					if !strings.Contains(err.Error(), "No Such Object") {
-						if err != nil {
-							ldapReply.err = err
-							ldapReplyChan <- ldapReply
+				if foundFreeConn {
+					break
+				}
+			}
 
-							return
+			ldapWaitGroup.Add(1)
+
+			go func(index int, ldapRequest *LdapRequest) {
+				var (
+					err    error
+					result DatabaseResult
+				)
+
+				defer ldapWaitGroup.Done()
+
+				ldapReply := &LdapReply{}
+				ldapReplyChan := ldapRequest.replyChan
+
+				if ldapPool[index].Conn == nil || ldapPool[index].isClosing() {
+					level.Warn(logger).Log(
+						"msg", fmt.Sprintf("Connection #%d is closed", index+1),
+					)
+
+					if ldapPool[index].Conn != nil {
+						ldapPool[index].Conn.Close()
+					}
+
+					ldapPool[index].Mu.Lock()
+
+					ldapPool[index].state = ldapStateClosed
+
+					err = ldapPool[index].connect(ldapRequest.guid, &ldapConf[index])
+					if err != nil {
+						ldapReply.err = err
+						ldapReplyChan <- ldapReply
+
+						ldapPool[index].Mu.Unlock()
+
+						return
+					}
+
+					err = ldapPool[index].bind(ldapRequest.guid, &ldapConf[index])
+					if err != nil {
+						ldapReply.err = err
+						ldapReplyChan <- ldapReply
+
+						ldapPool[index].Conn.Close()
+
+						ldapPool[index].Mu.Unlock()
+
+						return
+					}
+
+					ldapPool[index].state = ldapStateBusy
+
+					ldapPool[index].Mu.Unlock()
+				}
+
+				if ldapRequest.command == LDAPSearch {
+					if result, err = ldapPool[index].search(ldapConf[index], ldapRequest); err != nil {
+						level.Info(logger).Log("msg", err)
+
+						if !strings.Contains(err.Error(), "No Such Object") {
+							if err != nil {
+								ldapReply.err = err
+								ldapReplyChan <- ldapReply
+
+								ldapPool[index].Mu.Lock()
+
+								ldapPool[index].state = ldapStateFree
+
+								ldapPool[index].Mu.Unlock()
+
+								return
+							}
 						}
 					}
 				}
 
+				ldapPool[index].Mu.Lock()
+
+				ldapPool[index].state = ldapStateFree
+
+				ldapPool[index].Mu.Unlock()
+
 				ldapReply.err = nil
-				ldapReply.dn = ldapDN
 				ldapReply.result = result
 
 				ldapReplyChan <- ldapReply
-			}(connectionCounter, args)
-
-		case <-ldapEnd:
-			for instance := 0; instance < config.LDAP.PoolSize; instance++ {
-				if ldapInstance[instance].Conn != nil {
-					_ = ldapInstance[instance].unbind()
-					ldapInstance[instance].Conn.Close()
-
-					level.Debug(logger).Log("instance", instance+1, "msg", fmt.Sprintf("Connection #%d closed", instance+1))
-				}
-			}
-
-			ldapAliveEnd <- true
-			ldapEnd <- true
-
-			break
-		}
-
-		connectionCounter++
-
-		if connectionCounter == config.LDAP.PoolSize {
-			connectionCounter = 0
+			}(ldapConnIndex, args)
 		}
 	}
 }

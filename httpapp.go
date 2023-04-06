@@ -214,16 +214,16 @@ func (h *HTTP) POSTRemove() {
 
 		if config.UseLDAP {
 			var (
-				ldapReply   LdapReply
-				ldapRequest LdapRequest
+				ldapReply   *LdapReply
+				ldapRequest *LdapRequest
 			)
 
-			ldapReplyChan := make(chan LdapReply)
+			ldapReplyChan := make(chan *LdapReply)
+
+			ldapRequest = &LdapRequest{}
 
 			ldapRequest.username = sender
-			ldapRequest.filter = config.LDAP.Filter
-			ldapRequest.guid = h.guid
-			ldapRequest.attributes = config.LDAP.ResultAttr
+			ldapRequest.guid = &h.guid
 			ldapRequest.replyChan = ldapReplyChan
 
 			ldapRequestChan <- ldapRequest
@@ -232,9 +232,9 @@ func (h *HTTP) POSTRemove() {
 
 			if ldapReply.err != nil {
 				h.LogError(err)
-			} else if resultAttr, ok := ldapReply.result[config.LDAP.ResultAttr[0]]; ok {
+			} else if resultAttr, ok := ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; ok {
 				// LDAP single value
-				sender = resultAttr[0]
+				sender = resultAttr[ldapSingleValue].(string)
 			}
 		}
 
