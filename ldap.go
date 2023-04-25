@@ -448,6 +448,7 @@ func ldapWorker(ctx context.Context) {
 		ldapConf[index].TLSClientCert = config.LdapConf.TLSClientCert
 		ldapConf[index].TLSClientKey = config.LdapConf.TLSClientKey
 		ldapConf[index].SASLExternal = config.LdapConf.SASLExternal
+		ldapConf[index].Scope = config.LdapConf.Scope
 
 		ldapPool[index].state = ldapStateClosed
 	}
