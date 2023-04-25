@@ -1,3 +1,57 @@
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 114
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "christian@roessner.email"
+  }
+}
+
+<> 2023-04-25T123323.202.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-04-25T123236.202.json
+
+###
+
+POST https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 54
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "de10000@srvint.net"
+}
+
+###
+
 DELETE https://localhost:8443/remove
 Content-Type: application/json
 Content-Length: 60
@@ -748,56 +802,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
   "key": "sender",
   "value": "de10000@srvint.net"
 }
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-05T162924.200.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 100
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "8.8.8.8",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-05T162905.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "103.49.80.17",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-05T162855.202.json
 
 ###
 
