@@ -128,9 +128,6 @@ func (l *LdapPool) isClosing() bool {
 }
 
 func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
-	l.Mu.Lock()
-	defer l.Mu.Unlock()
-
 	var (
 		retryLimit   = 0
 		ldapCounter  = 0
@@ -215,9 +212,6 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 }
 
 func (l *LdapPool) bind(guid *string, ldapConf *LdapConf) error {
-	l.Mu.Lock()
-	defer l.Mu.Unlock()
-
 	var err error
 
 	if ldapConf.SASLExternal {
@@ -259,9 +253,6 @@ func (l *LdapPool) bind(guid *string, ldapConf *LdapConf) error {
 }
 
 func (l *LdapPool) unbind() (err error) {
-	l.Mu.Lock()
-	defer l.Mu.Unlock()
-
 	err = l.Conn.Unbind()
 
 	return
@@ -269,9 +260,6 @@ func (l *LdapPool) unbind() (err error) {
 
 func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result DatabaseResult, err error) {
 	var searchResult *ldap.SearchResult
-
-	l.Mu.Lock()
-	defer l.Mu.Unlock()
 
 	ldapConf.Filter = strings.ReplaceAll(ldapConf.Filter, "%s", ldapRequest.username)
 
@@ -388,24 +376,36 @@ func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
 				ldapPool[index].Mu.Unlock()
 			}
 
-			for needClosing := openConnections - idlePoolSize; needClosing > 0; needClosing-- {
-				for index := 0; index < poolSize; index++ {
+			needClosing := 0
+
+			if diff := openConnections - idlePoolSize; diff > 0 {
+				needClosing = diff
+			}
+
+			level.Debug(logger).Log(
+				"msg", "State open connections",
+				"needClosing", needClosing, "openConnections", openConnections, "idlePoolSize", idlePoolSize,
+			)
+
+			for index := 0; index < poolSize && needClosing > 0; index++ {
+				func() {
 					ldapPool[index].Mu.Lock()
+					defer ldapPool[index].Mu.Unlock()
 
 					if ldapPool[index].state == ldapStateFree {
 						ldapPool[index].Conn.Close()
 						ldapPool[index].state = ldapStateClosed
 
+						needClosing--
+
 						level.Debug(logger).Log(
 							"msg", fmt.Sprintf("Connection #%d closed", index+1),
 						)
-
-						ldapPool[index].Mu.Unlock()
-
-						break
 					}
+				}()
 
-					ldapPool[index].Mu.Unlock()
+				if needClosing == 0 {
+					break
 				}
 			}
 		}
@@ -482,9 +482,13 @@ func ldapWorker(ctx context.Context) {
 			openConnections := 0
 
 			for index := 0; index < poolSize; index++ {
+				ldapPool[index].Mu.Lock()
+
 				if ldapPool[index].state != ldapStateClosed {
 					openConnections++
 				}
+
+				ldapPool[index].Mu.Unlock()
 			}
 
 			if openConnections < idlePoolSize {
@@ -514,18 +518,21 @@ func ldapWorker(ctx context.Context) {
 
 			for {
 				for index := 0; index < poolSize; index++ {
+					ldapPool[index].Mu.Lock()
+
 					if ldapPool[index].state == ldapStateBusy {
+						ldapPool[index].Mu.Unlock()
+
 						continue
 					}
 
 					if ldapPool[index].state == ldapStateFree {
-						ldapPool[index].Mu.Lock()
-
 						ldapPool[index].state = ldapStateBusy
-						ldapConnIndex = index
-						foundFreeConn = true
 
 						ldapPool[index].Mu.Unlock()
+
+						ldapConnIndex = index
+						foundFreeConn = true
 
 						break
 					}
@@ -541,18 +548,20 @@ func ldapWorker(ctx context.Context) {
 							if err != nil {
 								level.Error(logger).Log("error", err)
 							}
+						}
 
-							ldapPool[index].Mu.Lock()
-
-							ldapPool[index].state = ldapStateFree
+						if err == nil {
+							ldapPool[index].state = ldapStateBusy
 
 							ldapPool[index].Mu.Unlock()
 
 							ldapConnIndex = index
 							foundFreeConn = true
+
+							break
 						}
 
-						break
+						ldapPool[index].Mu.Unlock()
 					}
 				}
 
@@ -594,10 +603,10 @@ func ldapWorker(ctx context.Context) {
 
 					err = ldapPool[index].connect(ldapRequest.guid, &ldapConf[index])
 					if err != nil {
+						ldapPool[index].Mu.Unlock()
+
 						ldapReply.err = err
 						ldapReplyChan <- ldapReply
-
-						ldapPool[index].Mu.Unlock()
 
 						return
 					}
@@ -605,11 +614,11 @@ func ldapWorker(ctx context.Context) {
 					err = ldapPool[index].bind(ldapRequest.guid, &ldapConf[index])
 					if err != nil {
 						ldapReply.err = err
+						ldapPool[index].Mu.Unlock()
+
 						ldapReplyChan <- ldapReply
 
 						ldapPool[index].Conn.Close()
-
-						ldapPool[index].Mu.Unlock()
 
 						return
 					}
@@ -625,14 +634,14 @@ func ldapWorker(ctx context.Context) {
 
 						if !strings.Contains(err.Error(), "No Such Object") {
 							if err != nil {
-								ldapReply.err = err
-								ldapReplyChan <- ldapReply
-
 								ldapPool[index].Mu.Lock()
 
 								ldapPool[index].state = ldapStateFree
 
 								ldapPool[index].Mu.Unlock()
+
+								ldapReply.err = err
+								ldapReplyChan <- ldapReply
 
 								return
 							}
