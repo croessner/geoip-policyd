@@ -1,3 +1,25 @@
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 224
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "de10000@srvint.net",
+  "pwhash": "ignored",
+  "remote": "134.255.226.248",
+  "device_id": "Test client ignored",
+  "protocol": "imap_ignored",
+  "session_id": "session ID ignored",
+  "attrs":{"cos":"premium"}
+}
+
+<> 2023-09-26T163616.202.json
+
+###
+
 POST https://localhost:8443/query
 Accept: application/json
 Content-Type: application/json
@@ -787,16 +809,6 @@ User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 <> 2023-04-06T165042-2.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165042-1.200.json
 
 ###
 

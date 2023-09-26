@@ -50,6 +50,13 @@ const (
 	SASLUsername = "sasl_username"
 )
 
+type DovecotPolicyStatus int8
+
+const (
+	DovecotPolicyAccept DovecotPolicyStatus = 0
+	DovecotPolicyReject DovecotPolicyStatus = -1
+)
+
 // HTTPApp Basic auth for the HTTP service.
 type HTTPApp struct {
 	auth struct {
@@ -80,6 +87,25 @@ type HTTP struct {
 	guid           string
 	responseWriter http.ResponseWriter
 	request        *http.Request
+}
+
+type DovecotPolicy struct {
+	// Since Dovecot 2.3.11:
+	// login=%{requested_username} pwhash=%{hashed_password} remote=%{rip} device_id=%{client_id} protocol=%s session_id=%{session}
+
+	Login     string `json:"login"`
+	PWHash    string `json:"pwhash"`
+	Remote    string `json:"remote"`
+	DeviceID  string `json:"device_id"`
+	Protocol  string `json:"protocol"`
+	SessionID string `json:"session_id"`
+
+	Attributes any `json:"attrs"`
+}
+
+type DovecotPolicyResponse struct {
+	Status  DovecotPolicyStatus `json:"status"`
+	Message string              `json:"msg"`
 }
 
 func HasContentType(request *http.Request, mimetype string) bool {
@@ -335,6 +361,90 @@ func (h *HTTP) POSTQuery() {
 		Object:    h.request.RemoteAddr,
 		Operation: "query",
 		Result:    result,
+	})
+
+	h.responseWriter.Header().Set("Content-Type", "application/json")
+	h.responseWriter.WriteHeader(http.StatusAccepted)
+	h.responseWriter.Write(respone)
+}
+
+func (h *HTTP) POSTDovecotPolicy() {
+	var (
+		requestData  *DovecotPolicy
+		resultCode   DovecotPolicyStatus
+		result       string
+		policyResult string
+	)
+
+	if !HasContentType(h.request, "application/json") {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errWrongCT)
+
+		return
+	}
+
+	body, err := io.ReadAll(h.request.Body)
+	if err != nil {
+		h.responseWriter.WriteHeader(http.StatusInternalServerError)
+		h.LogError(err)
+
+		return
+	}
+
+	requestData = &DovecotPolicy{}
+	if err = json.Unmarshal(body, requestData); err != nil {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(err)
+
+		return
+	}
+
+	userAttribute := Sender
+	if config.UseSASLUsername {
+		userAttribute = SASLUsername
+	}
+
+	requiredFieldsFound := false
+
+	if address := requestData.Remote; address != "" {
+		if sender := requestData.Login; sender != "" {
+			requiredFieldsFound = true
+
+			policyRequest := map[string]string{
+				"request":        "smtpd_access_policy",
+				"client_address": address,
+				userAttribute:    sender,
+			}
+
+			policyResult, err = getPolicyResponse(policyRequest, h.guid)
+		}
+	}
+
+	if !requiredFieldsFound {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoAddressNORSender)
+
+		return
+	}
+
+	if err == nil {
+		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+			result = rejectText
+			resultCode = DovecotPolicyReject
+		} else {
+			result = "ok"
+			resultCode = DovecotPolicyAccept
+		}
+	} else {
+		level.Error(logger).Log("error", err.Error())
+		h.responseWriter.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	respone, _ := json.Marshal(&DovecotPolicyResponse{
+		Status:  resultCode,
+		Message: result,
 	})
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
@@ -619,6 +729,8 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 			app.POSTRemove()
 		case "/query":
 			app.POSTQuery()
+		case "/dovecotpolicy":
+			app.POSTDovecotPolicy()
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}
