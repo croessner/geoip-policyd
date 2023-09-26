@@ -391,6 +391,8 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
+	level.Debug(logger).Log("msg", "dovecot policy request", "raw", string(body))
+
 	requestData = &DovecotPolicy{}
 	if err = json.Unmarshal(body, requestData); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
