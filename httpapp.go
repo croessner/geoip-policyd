@@ -403,8 +403,6 @@ func (h *HTTP) POSTDovecotPolicy() {
 		userAttribute = SASLUsername
 	}
 
-	requiredFieldsFound := false
-
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
 		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
 			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
@@ -422,8 +420,6 @@ func (h *HTTP) POSTDovecotPolicy() {
 					return
 				}
 
-				requiredFieldsFound = true
-
 				policyRequest := map[string]string{
 					"request":        "smtpd_access_policy",
 					"client_address": address,
@@ -433,13 +429,6 @@ func (h *HTTP) POSTDovecotPolicy() {
 				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
-	}
-
-	if !requiredFieldsFound {
-		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(errNoAddressNORSender)
-
-		return
 	}
 
 	if err == nil {
