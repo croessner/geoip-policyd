@@ -89,19 +89,7 @@ type HTTP struct {
 	request        *http.Request
 }
 
-type DovecotPolicy struct {
-	// Since Dovecot 2.3.11:
-	// login=%{requested_username} pwhash=%{hashed_password} remote=%{rip} device_id=%{client_id} protocol=%s session_id=%{session}
-
-	Login     string `json:"login"`
-	PWHash    string `json:"pwhash"`
-	Remote    string `json:"remote"`
-	DeviceID  string `json:"device_id"`
-	Protocol  string `json:"protocol"`
-	SessionID string `json:"session_id"`
-
-	Attributes any `json:"attrs"`
-}
+type DovecotPolicy map[string]any
 
 type DovecotPolicyResponse struct {
 	Status  DovecotPolicyStatus `json:"status"`
@@ -370,10 +358,19 @@ func (h *HTTP) POSTQuery() {
 
 func (h *HTTP) POSTDovecotPolicy() {
 	var (
-		requestData  *DovecotPolicy
+		assertOk     bool
 		resultCode   DovecotPolicyStatus
 		result       string
 		policyResult string
+
+		address string
+		sender  string
+
+		requestI any
+		addressI any
+		senderI  any
+
+		dovecotPolicy DovecotPolicy
 	)
 
 	if !HasContentType(h.request, "application/json") {
@@ -391,15 +388,15 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
-	level.Debug(logger).Log("msg", "dovecot policy request", "raw", string(body))
-
-	requestData = &DovecotPolicy{}
-	if err = json.Unmarshal(body, requestData); err != nil {
+	dovecotPolicy = make(DovecotPolicy)
+	if err = json.Unmarshal(body, &dovecotPolicy); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
 
 		return
 	}
+
+	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
 	userAttribute := Sender
 	if config.UseSASLUsername {
@@ -408,17 +405,33 @@ func (h *HTTP) POSTDovecotPolicy() {
 
 	requiredFieldsFound := false
 
-	if address := requestData.Remote; address != "" {
-		if sender := requestData.Login; sender != "" {
-			requiredFieldsFound = true
+	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
+		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+				if address, assertOk = addressI.(string); !assertOk {
+					h.responseWriter.WriteHeader(http.StatusBadRequest)
+					h.LogError(errNoAddressNORSender)
 
-			policyRequest := map[string]string{
-				"request":        "smtpd_access_policy",
-				"client_address": address,
-				userAttribute:    sender,
+					return
+				}
+
+				if sender, assertOk = senderI.(string); !assertOk {
+					h.responseWriter.WriteHeader(http.StatusBadRequest)
+					h.LogError(errNoAddressNORSender)
+
+					return
+				}
+
+				requiredFieldsFound = true
+
+				policyRequest := map[string]string{
+					"request":        "smtpd_access_policy",
+					"client_address": address,
+					userAttribute:    sender,
+				}
+
+				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
-
-			policyResult, err = getPolicyResponse(policyRequest, h.guid)
 		}
 	}
 
