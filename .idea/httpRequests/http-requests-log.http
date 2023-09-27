@@ -36,6 +36,48 @@ Accept-Encoding: br,deflate,gzip,x-gzip
   "type": "wforce_allow"
 }
 
+<> 2023-09-27T083056.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
 <> 2023-09-26T212545.202.json
 
 ###
@@ -1120,13 +1162,6 @@ User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 <> 2023-04-06T165104.200.json
-
-###
-
-GET https://localhost:8443/reload
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
 
 ###
 
