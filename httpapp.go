@@ -50,6 +50,13 @@ const (
 	SASLUsername = "sasl_username"
 )
 
+type DovecotPolicyStatus int8
+
+const (
+	DovecotPolicyAccept DovecotPolicyStatus = 0
+	DovecotPolicyReject DovecotPolicyStatus = -1
+)
+
 // HTTPApp Basic auth for the HTTP service.
 type HTTPApp struct {
 	auth struct {
@@ -80,6 +87,13 @@ type HTTP struct {
 	guid           string
 	responseWriter http.ResponseWriter
 	request        *http.Request
+}
+
+type DovecotPolicy map[string]any
+
+type DovecotPolicyResponse struct {
+	Status  DovecotPolicyStatus `json:"status"`
+	Message string              `json:"msg"`
 }
 
 func HasContentType(request *http.Request, mimetype string) bool {
@@ -335,6 +349,137 @@ func (h *HTTP) POSTQuery() {
 		Object:    h.request.RemoteAddr,
 		Operation: "query",
 		Result:    result,
+	})
+
+	h.responseWriter.Header().Set("Content-Type", "application/json")
+	h.responseWriter.WriteHeader(http.StatusAccepted)
+	h.responseWriter.Write(respone)
+}
+
+func (h *HTTP) POSTDovecotPolicy() {
+	var (
+		assertOk     bool
+		resultCode   DovecotPolicyStatus
+		result       string
+		policyResult string
+
+		address string
+		sender  string
+
+		requestI any
+		addressI any
+		senderI  any
+
+		dovecotPolicy DovecotPolicy
+	)
+
+	if !HasContentType(h.request, "application/json") {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errWrongCT)
+
+		return
+	}
+
+	body, err := io.ReadAll(h.request.Body)
+	if err != nil {
+		h.responseWriter.WriteHeader(http.StatusInternalServerError)
+		h.LogError(err)
+
+		return
+	}
+
+	dovecotPolicy = make(DovecotPolicy)
+	if err = json.Unmarshal(body, &dovecotPolicy); err != nil {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(err)
+
+		return
+	}
+
+	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
+
+	userAttribute := Sender
+	if config.UseSASLUsername {
+		userAttribute = SASLUsername
+	}
+
+	foundRequirements := false
+
+	// Weakforce webhook
+	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
+		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+				if address, assertOk = addressI.(string); !assertOk {
+					goto assertFail
+				}
+
+				if sender, assertOk = senderI.(string); !assertOk {
+					goto assertFail
+				}
+
+				foundRequirements = true
+
+				policyRequest := map[string]string{
+					"request":        "smtpd_access_policy",
+					"client_address": address,
+					userAttribute:    sender,
+				}
+
+				policyResult, err = getPolicyResponse(policyRequest, h.guid)
+			}
+		}
+	} else {
+		// Pure dovecot
+		if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
+			if senderI, assertOk = dovecotPolicy["login"]; assertOk {
+				if address, assertOk = addressI.(string); !assertOk {
+					goto assertFail
+				}
+
+				if sender, assertOk = senderI.(string); !assertOk {
+					goto assertFail
+				}
+
+				foundRequirements = true
+
+				policyRequest := map[string]string{
+					"request":        "smtpd_access_policy",
+					"client_address": address,
+					userAttribute:    sender,
+				}
+
+				policyResult, err = getPolicyResponse(policyRequest, h.guid)
+			}
+		}
+	}
+
+assertFail:
+
+	if !foundRequirements {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoAddressNORSender)
+
+		return
+	}
+
+	if err == nil {
+		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+			result = rejectText
+			resultCode = DovecotPolicyReject
+		} else {
+			result = "ok"
+			resultCode = DovecotPolicyAccept
+		}
+	} else {
+		level.Error(logger).Log("error", err.Error())
+		h.responseWriter.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	respone, _ := json.Marshal(&DovecotPolicyResponse{
+		Status:  resultCode,
+		Message: result,
 	})
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
@@ -619,6 +764,8 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 			app.POSTRemove()
 		case "/query":
 			app.POSTQuery()
+		case "/dovecotpolicy":
+			app.POSTDovecotPolicy()
 		default:
 			responseWriter.WriteHeader(http.StatusNotFound)
 		}

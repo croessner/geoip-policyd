@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -374,7 +375,21 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		ldapReply = <-ldapReplyChan
 
 		if ldapReply.err != nil {
+			var ldapError *ldap.Error
+
+			if errors.As(ldapReply.err, &ldapError) {
+				if ldapError.ResultCode == uint16(ldap.LDAPResultNoSuchObject) {
+					level.Info(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' does not exist", sender))
+
+					return actionText, nil
+				}
+			}
+
 			level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
+
+			actionText = deferText
+
+			return actionText, ldapReply.err
 		} else {
 			if resultAttr, mapKeyFound = ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
 				// LDAP single value

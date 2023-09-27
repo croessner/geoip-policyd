@@ -1,3 +1,527 @@
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-27T091733.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-27T083056.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T212545.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T212137.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T205634.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T205001.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T204431.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T204349.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T204325.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T204232.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-26T204031.202.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 224
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "de10000@srvint.net",
+  "pwhash": "ignored",
+  "remote": "134.255.226.248",
+  "device_id": "Test client ignored",
+  "protocol": "imap_ignored",
+  "session_id": "session ID ignored",
+  "attrs":{"cos":"premium"}
+}
+
+<> 2023-09-26T163616.202.json
+
+###
+
 POST https://localhost:8443/query
 Accept: application/json
 Content-Type: application/json
@@ -670,133 +1194,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
   "key": "sender",
   "value": "de10000@srvint.net"
 }
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165104.200.json
-
-###
-
-GET https://localhost:8443/reload
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165044-1.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165044.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043-5.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043-4.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043-3.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043-2.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043-1.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165043.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165042-3.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165042-2.200.json
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-04-06T165042-1.200.json
 
 ###
 
