@@ -403,22 +403,21 @@ func (h *HTTP) POSTDovecotPolicy() {
 		userAttribute = SASLUsername
 	}
 
+	foundRequirements := false
+
+	// Weakforce webhook
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
 		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
 			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
 				if address, assertOk = addressI.(string); !assertOk {
-					h.responseWriter.WriteHeader(http.StatusBadRequest)
-					h.LogError(errNoAddressNORSender)
-
-					return
+					goto assertFail
 				}
 
 				if sender, assertOk = senderI.(string); !assertOk {
-					h.responseWriter.WriteHeader(http.StatusBadRequest)
-					h.LogError(errNoAddressNORSender)
-
-					return
+					goto assertFail
 				}
+
+				foundRequirements = true
 
 				policyRequest := map[string]string{
 					"request":        "smtpd_access_policy",
@@ -429,6 +428,38 @@ func (h *HTTP) POSTDovecotPolicy() {
 				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
+	} else {
+		// Pure dovecot
+		if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
+			if senderI, assertOk = dovecotPolicy["login"]; assertOk {
+				if address, assertOk = addressI.(string); !assertOk {
+					goto assertFail
+				}
+
+				if sender, assertOk = senderI.(string); !assertOk {
+					goto assertFail
+				}
+
+				foundRequirements = true
+
+				policyRequest := map[string]string{
+					"request":        "smtpd_access_policy",
+					"client_address": address,
+					userAttribute:    sender,
+				}
+
+				policyResult, err = getPolicyResponse(policyRequest, h.guid)
+			}
+		}
+	}
+
+assertFail:
+
+	if !foundRequirements {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoAddressNORSender)
+
+		return
 	}
 
 	if err == nil {
