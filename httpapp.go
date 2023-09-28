@@ -358,7 +358,9 @@ func (h *HTTP) POSTQuery() {
 
 func (h *HTTP) POSTDovecotPolicy() {
 	var (
-		assertOk     bool
+		assertOk bool
+		success  bool
+
 		resultCode   DovecotPolicyStatus
 		result       string
 		policyResult string
@@ -367,6 +369,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		sender  string
 
 		requestI any
+		successI any
 		addressI any
 		senderI  any
 
@@ -403,27 +406,39 @@ func (h *HTTP) POSTDovecotPolicy() {
 
 	// Weakforce webhook
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
-		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-				if address, assertOk = addressI.(string); assertOk {
-					foundAddress = true
-				}
+		if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
+			if success, assertOk = successI.(bool); assertOk {
+				if success {
+					if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+						if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+							if address, assertOk = addressI.(string); assertOk {
+								foundAddress = true
+							}
 
-				if sender, assertOk = senderI.(string); assertOk {
-					foundSender = true
+							if sender, assertOk = senderI.(string); assertOk {
+								foundSender = true
+							}
+						}
+					}
 				}
 			}
 		}
 	} else {
 		// Pure dovecot
-		if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
-			if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-				if address, assertOk = addressI.(string); assertOk {
-					foundAddress = true
-				}
+		if successI, assertOk = dovecotPolicy["success"]; assertOk {
+			if success, assertOk = successI.(bool); assertOk {
+				if success {
+					if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
+						if senderI, assertOk = dovecotPolicy["login"]; assertOk {
+							if address, assertOk = addressI.(string); assertOk {
+								foundAddress = true
+							}
 
-				if sender, assertOk = senderI.(string); !assertOk {
-					foundSender = true
+							if sender, assertOk = senderI.(string); !assertOk {
+								foundSender = true
+							}
+						}
+					}
 				}
 			}
 		}
@@ -442,7 +457,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		}
 
 		policyResult, err = getPolicyResponse(policyRequest, h.guid)
-	} else {
+	} else if success {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 

@@ -1,6 +1,130 @@
 POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
+Content-Length: 552
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-28T114736.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-28T114702.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 553
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "zabbix_mail",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
 Content-Length: 553
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
@@ -1162,66 +1286,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 }
 
 <> 2023-04-06T165104-3.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 127
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "2003:a:a05:a600:858:7851:547f:8aed",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104-2.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104-1.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104.202.json
 
 ###
 
