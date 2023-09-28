@@ -53,8 +53,9 @@ const (
 type DovecotPolicyStatus int8
 
 const (
-	DovecotPolicyAccept DovecotPolicyStatus = 0
-	DovecotPolicyReject DovecotPolicyStatus = -1
+	DovecotPolicyAccept       DovecotPolicyStatus = 0
+	DovecotPolicyReject       DovecotPolicyStatus = -1
+	DovecotPolicyTarpitFactor DovecotPolicyStatus = 1
 )
 
 // HTTPApp Basic auth for the HTTP service.
@@ -80,6 +81,7 @@ type RESTResult struct {
 	GUID      string `json:"guid"`
 	Object    string `json:"object"`
 	Operation string `json:"operation"`
+	Error     error  `json:"error"`
 	Result    any    `json:"result"`
 }
 
@@ -265,9 +267,9 @@ func (h *HTTP) POSTRemove() {
 
 func (h *HTTP) POSTQuery() {
 	var (
-		requestData  *Body
-		policyResult string
-		result       bool
+		result         bool
+		requestData    *Body
+		policyResponse *PolicyResponse
 	)
 
 	if !HasContentType(h.request, "application/json") {
@@ -319,7 +321,7 @@ func (h *HTTP) POSTQuery() {
 					userAttribute:    clientRequest[Sender].(string),
 				}
 
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
+				policyResponse, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 
@@ -332,7 +334,7 @@ func (h *HTTP) POSTQuery() {
 	}
 
 	if err == nil {
-		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+		if policyResponse.fired {
 			result = false
 		} else {
 			result = true
@@ -348,6 +350,7 @@ func (h *HTTP) POSTQuery() {
 		GUID:      h.guid,
 		Object:    h.request.RemoteAddr,
 		Operation: "query",
+		Error:     err,
 		Result:    result,
 	})
 
@@ -361,9 +364,8 @@ func (h *HTTP) POSTDovecotPolicy() {
 		assertOk bool
 		success  bool
 
-		resultCode   DovecotPolicyStatus
-		result       string
-		policyResult string
+		resultCode DovecotPolicyStatus
+		result     string
 
 		address string
 		sender  string
@@ -373,7 +375,8 @@ func (h *HTTP) POSTDovecotPolicy() {
 		addressI any
 		senderI  any
 
-		dovecotPolicy DovecotPolicy
+		policyResponse *PolicyResponse
+		dovecotPolicy  DovecotPolicy
 	)
 
 	if !HasContentType(h.request, "application/json") {
@@ -401,6 +404,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 
 	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
+	foundSuccess := false
 	foundAddress := false
 	foundSender := false
 
@@ -408,16 +412,16 @@ func (h *HTTP) POSTDovecotPolicy() {
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
 		if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
 			if success, assertOk = successI.(bool); assertOk {
-				if success {
-					if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-						if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-							if address, assertOk = addressI.(string); assertOk {
-								foundAddress = true
-							}
+				foundSuccess = true
 
-							if sender, assertOk = senderI.(string); assertOk {
-								foundSender = true
-							}
+				if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+					if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+						if address, assertOk = addressI.(string); assertOk {
+							foundAddress = true
+						}
+
+						if sender, assertOk = senderI.(string); assertOk {
+							foundSender = true
 						}
 					}
 				}
@@ -427,16 +431,16 @@ func (h *HTTP) POSTDovecotPolicy() {
 		// Pure dovecot
 		if successI, assertOk = dovecotPolicy["success"]; assertOk {
 			if success, assertOk = successI.(bool); assertOk {
-				if success {
-					if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
-						if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-							if address, assertOk = addressI.(string); assertOk {
-								foundAddress = true
-							}
+				foundSuccess = true
 
-							if sender, assertOk = senderI.(string); !assertOk {
-								foundSender = true
-							}
+				if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
+					if senderI, assertOk = dovecotPolicy["login"]; assertOk {
+						if address, assertOk = addressI.(string); assertOk {
+							foundAddress = true
+						}
+
+						if sender, assertOk = senderI.(string); !assertOk {
+							foundSender = true
 						}
 					}
 				}
@@ -444,8 +448,9 @@ func (h *HTTP) POSTDovecotPolicy() {
 		}
 	}
 
-	if foundAddress && foundSender {
+	if foundSuccess && foundAddress && foundSender {
 		userAttribute := Sender
+
 		if config.UseSASLUsername {
 			userAttribute = SASLUsername
 		}
@@ -456,8 +461,8 @@ func (h *HTTP) POSTDovecotPolicy() {
 			userAttribute:    sender,
 		}
 
-		policyResult, err = getPolicyResponse(policyRequest, h.guid)
-	} else if success {
+		policyResponse, err = getPolicyResponse(policyRequest, h.guid)
+	} else {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
@@ -465,9 +470,15 @@ func (h *HTTP) POSTDovecotPolicy() {
 	}
 
 	if err == nil {
-		if policyResult == fmt.Sprintf("action=%s", rejectText) {
-			result = "forbidden"
-			resultCode = DovecotPolicyReject
+		if policyResponse.fired {
+			result = rejectText
+			if success {
+				// User successfully authenticated, but raised the limits.
+				resultCode = DovecotPolicyTarpitFactor * DovecotPolicyStatus(policyResponse.totalCountries)
+			} else {
+				// User is known, but failed to authenticate and raised the limits.
+				resultCode = DovecotPolicyReject
+			}
 		} else {
 			result = "ok"
 			resultCode = DovecotPolicyAccept
