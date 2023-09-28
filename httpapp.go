@@ -91,8 +91,6 @@ type HTTP struct {
 	request        *http.Request
 }
 
-type DovecotPolicy map[string]any
-
 type DovecotPolicyResponse struct {
 	Status  DovecotPolicyStatus `json:"status"`
 	Message string              `json:"msg"`
@@ -376,7 +374,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		senderI  any
 
 		policyResponse *PolicyResponse
-		dovecotPolicy  DovecotPolicy
+		dovecotPolicy  map[string]any
 	)
 
 	if !HasContentType(h.request, "application/json") {
@@ -394,7 +392,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
-	dovecotPolicy = make(DovecotPolicy)
+	dovecotPolicy = make(map[string]any)
 	if err = json.Unmarshal(body, &dovecotPolicy); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
@@ -409,40 +407,23 @@ func (h *HTTP) POSTDovecotPolicy() {
 	foundSender := false
 
 	// Weakforce webhook
-	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
-		if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
-			if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-				if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-					if success, assertOk = successI.(bool); assertOk {
-						foundSuccess = true
-					}
+	if requestI, assertOk = dovecotPolicy["request"]; !assertOk {
+		requestI = dovecotPolicy
+	}
 
-					if address, assertOk = addressI.(string); assertOk {
-						foundAddress = true
-					}
-
-					if sender, assertOk = senderI.(string); assertOk {
-						foundSender = true
-					}
+	if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
+		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+				if success, assertOk = successI.(bool); assertOk {
+					foundSuccess = true
 				}
-			}
-		}
-	} else {
-		// Pure dovecot
-		if successI, assertOk = dovecotPolicy["success"]; assertOk {
-			if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
-				if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-					if success, assertOk = successI.(bool); assertOk {
-						foundSuccess = true
-					}
 
-					if address, assertOk = addressI.(string); assertOk {
-						foundAddress = true
-					}
+				if address, assertOk = addressI.(string); assertOk {
+					foundAddress = true
+				}
 
-					if sender, assertOk = senderI.(string); assertOk {
-						foundSender = true
-					}
+				if sender, assertOk = senderI.(string); assertOk {
+					foundSender = true
 				}
 			}
 		}
