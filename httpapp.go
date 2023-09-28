@@ -398,64 +398,51 @@ func (h *HTTP) POSTDovecotPolicy() {
 
 	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
-	userAttribute := Sender
-	if config.UseSASLUsername {
-		userAttribute = SASLUsername
-	}
-
-	foundRequirements := false
+	foundAddress := false
+	foundSender := false
 
 	// Weakforce webhook
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
 		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
 			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-				if address, assertOk = addressI.(string); !assertOk {
-					goto assertFail
+				if address, assertOk = addressI.(string); assertOk {
+					foundAddress = true
 				}
 
-				if sender, assertOk = senderI.(string); !assertOk {
-					goto assertFail
+				if sender, assertOk = senderI.(string); assertOk {
+					foundSender = true
 				}
-
-				foundRequirements = true
-
-				policyRequest := map[string]string{
-					"request":        "smtpd_access_policy",
-					"client_address": address,
-					userAttribute:    sender,
-				}
-
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 	} else {
 		// Pure dovecot
 		if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
 			if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-				if address, assertOk = addressI.(string); !assertOk {
-					goto assertFail
+				if address, assertOk = addressI.(string); assertOk {
+					foundAddress = true
 				}
 
 				if sender, assertOk = senderI.(string); !assertOk {
-					goto assertFail
+					foundSender = true
 				}
-
-				foundRequirements = true
-
-				policyRequest := map[string]string{
-					"request":        "smtpd_access_policy",
-					"client_address": address,
-					userAttribute:    sender,
-				}
-
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 	}
 
-assertFail:
+	if foundAddress && foundSender {
+		userAttribute := Sender
+		if config.UseSASLUsername {
+			userAttribute = SASLUsername
+		}
 
-	if !foundRequirements {
+		policyRequest := map[string]string{
+			"request":        "smtpd_access_policy",
+			"client_address": address,
+			userAttribute:    sender,
+		}
+
+		policyResult, err = getPolicyResponse(policyRequest, h.guid)
+	} else {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
@@ -464,7 +451,7 @@ assertFail:
 
 	if err == nil {
 		if policyResult == fmt.Sprintf("action=%s", rejectText) {
-			result = rejectText
+			result = "forbidden"
 			resultCode = DovecotPolicyReject
 		} else {
 			result = "ok"
@@ -483,7 +470,7 @@ assertFail:
 	})
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
-	h.responseWriter.WriteHeader(http.StatusAccepted)
+	h.responseWriter.WriteHeader(http.StatusOK)
 	h.responseWriter.Write(respone)
 }
 
