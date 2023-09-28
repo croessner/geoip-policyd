@@ -1,6 +1,195 @@
 POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "128.0.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-28T194116.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "128.0.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "128.0.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 565
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "128.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-28T182059.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 565
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
+}
+
+<> 2023-09-28T182046.200.json
+
+###
+
+POST https://localhost:8443/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2023-09-28T182019.202.json
+
+###
+
+DELETE https://localhost:8443/remove
+Content-Type: application/json
+Content-Length: 60
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "key": "sender",
+  "value": "christian@roessner.email"
+}
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
 Content-Length: 566
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
@@ -1325,117 +1514,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 }
 
 <> 2023-09-26T122208-3.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208-2.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 114
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
-}
-
-<> 2023-09-26T122208-1.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208.202.json
-
-###
-
-POST https://localhost:8443/remove
-Content-Type: application/json
-Content-Length: 54
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-09-26T122208.200.json
-
-###
-
-GET https://localhost:8443/reload
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 114
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
-}
-
-<> 2023-09-26T122101.202.json
 
 ###
 

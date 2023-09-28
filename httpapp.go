@@ -411,18 +411,18 @@ func (h *HTTP) POSTDovecotPolicy() {
 	// Weakforce webhook
 	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
 		if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
-			if success, assertOk = successI.(bool); assertOk {
-				foundSuccess = true
+			if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+				if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+					if success, assertOk = successI.(bool); assertOk {
+						foundSuccess = true
+					}
 
-				if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-					if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-						if address, assertOk = addressI.(string); assertOk {
-							foundAddress = true
-						}
+					if address, assertOk = addressI.(string); assertOk {
+						foundAddress = true
+					}
 
-						if sender, assertOk = senderI.(string); assertOk {
-							foundSender = true
-						}
+					if sender, assertOk = senderI.(string); assertOk {
+						foundSender = true
 					}
 				}
 			}
@@ -430,18 +430,18 @@ func (h *HTTP) POSTDovecotPolicy() {
 	} else {
 		// Pure dovecot
 		if successI, assertOk = dovecotPolicy["success"]; assertOk {
-			if success, assertOk = successI.(bool); assertOk {
-				foundSuccess = true
+			if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
+				if senderI, assertOk = dovecotPolicy["login"]; assertOk {
+					if success, assertOk = successI.(bool); assertOk {
+						foundSuccess = true
+					}
 
-				if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
-					if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-						if address, assertOk = addressI.(string); assertOk {
-							foundAddress = true
-						}
+					if address, assertOk = addressI.(string); assertOk {
+						foundAddress = true
+					}
 
-						if sender, assertOk = senderI.(string); !assertOk {
-							foundSender = true
-						}
+					if sender, assertOk = senderI.(string); assertOk {
+						foundSender = true
 					}
 				}
 			}
