@@ -62,6 +62,7 @@ var (
 	errValueNotString          = errors.New("value must be string")
 	errValueEmpty              = errors.New("value must not be empty")
 	errSenderNotFound          = errors.New("'sender' not found")
+	errOnlyAllow               = errors.New("only command=allow supported")
 )
 
 // policy.

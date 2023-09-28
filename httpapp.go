@@ -53,9 +53,8 @@ const (
 type DovecotPolicyStatus int8
 
 const (
-	DovecotPolicyAccept       DovecotPolicyStatus = 0
-	DovecotPolicyReject       DovecotPolicyStatus = -1
-	DovecotPolicyTarpitFactor DovecotPolicyStatus = 1
+	DovecotPolicyAccept DovecotPolicyStatus = 0
+	DovecotPolicyReject DovecotPolicyStatus = -1
 )
 
 // HTTPApp Basic auth for the HTTP service.
@@ -360,7 +359,6 @@ func (h *HTTP) POSTQuery() {
 func (h *HTTP) POSTDovecotPolicy() {
 	var (
 		assertOk bool
-		success  bool
 
 		resultCode DovecotPolicyStatus
 		result     string
@@ -369,13 +367,20 @@ func (h *HTTP) POSTDovecotPolicy() {
 		sender  string
 
 		requestI any
-		successI any
 		addressI any
 		senderI  any
 
 		policyResponse *PolicyResponse
 		dovecotPolicy  map[string]any
 	)
+
+	cmd := h.request.URL.Query().Get("command")
+	if cmd != "allow" {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errOnlyAllow)
+
+		return
+	}
 
 	if !HasContentType(h.request, "application/json") {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
@@ -400,9 +405,9 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
-	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
+	level.Debug(logger).Log(
+		"guid", h.guid, "msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
-	foundSuccess := false
 	foundAddress := false
 	foundSender := false
 
@@ -411,25 +416,19 @@ func (h *HTTP) POSTDovecotPolicy() {
 		requestI = dovecotPolicy
 	}
 
-	if successI, assertOk = requestI.(map[string]any)["success"]; assertOk {
-		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-				if success, assertOk = successI.(bool); assertOk {
-					foundSuccess = true
-				}
+	if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
+		if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
+			if address, assertOk = addressI.(string); assertOk {
+				foundAddress = true
+			}
 
-				if address, assertOk = addressI.(string); assertOk {
-					foundAddress = true
-				}
-
-				if sender, assertOk = senderI.(string); assertOk {
-					foundSender = true
-				}
+			if sender, assertOk = senderI.(string); assertOk {
+				foundSender = true
 			}
 		}
 	}
 
-	if foundSuccess && foundAddress && foundSender {
+	if foundAddress && foundSender {
 		userAttribute := Sender
 
 		if config.UseSASLUsername {
@@ -453,19 +452,13 @@ func (h *HTTP) POSTDovecotPolicy() {
 	if err == nil {
 		if policyResponse.fired {
 			result = rejectText
-			if success {
-				// User successfully authenticated, but raised the limits.
-				resultCode = DovecotPolicyTarpitFactor * DovecotPolicyStatus(policyResponse.totalCountries)
-			} else {
-				// User is known, but failed to authenticate and raised the limits.
-				resultCode = DovecotPolicyReject
-			}
+			resultCode = DovecotPolicyReject
 		} else {
 			result = "ok"
 			resultCode = DovecotPolicyAccept
 		}
 	} else {
-		level.Error(logger).Log("error", err.Error())
+		level.Error(logger).Log("guid", h.guid, "error", err.Error())
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 
 		return
