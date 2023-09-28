@@ -381,8 +381,6 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 				if ldapError.ResultCode == uint16(ldap.LDAPResultNoSuchObject) {
 					level.Info(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' does not exist", sender))
 
-					// Policy violation for unknown users
-					policyResponse.fired = true
 					err = nil
 
 					return
