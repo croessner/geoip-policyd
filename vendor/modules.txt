@@ -7,6 +7,9 @@ github.com/akamensky/argparse
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
+## explicit
+github.com/colinmarc/cdb
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous

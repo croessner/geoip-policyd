@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/akamensky/argparse v1.4.0
+	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 	github.com/go-kit/log v0.2.1
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-redis/redis/v8 v8.11.5

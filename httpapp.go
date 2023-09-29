@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
 	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
@@ -154,6 +155,25 @@ func (h *HTTP) GETReload() {
 	geoIPStore.Store(geoip)
 
 	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
+
+	if config.UseCDB {
+		var db *cdb.CDB
+
+		db, err = cdb.Open(config.CDBPath)
+
+		if err != nil {
+			h.responseWriter.WriteHeader(http.StatusInternalServerError)
+			h.LogError(err)
+
+			return
+		}
+
+		if olddb := cdbStore.Load().(*cdb.CDB); olddb != nil {
+			olddb.Close()
+		}
+
+		cdbStore.Store(db)
+	}
 
 	//nolint:forcetypeassert // Global variable
 	if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
@@ -384,6 +404,8 @@ func (h *HTTP) POSTDovecotPolicy() {
 		h.responseWriter.Header().Set("Content-Type", "application/json")
 		h.responseWriter.WriteHeader(http.StatusOK)
 		h.responseWriter.Write(respone)
+
+		return
 	} else if cmd != "allow" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errOnlyAllow)

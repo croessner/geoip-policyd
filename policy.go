@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/go-redis/redis/v8"
@@ -393,8 +394,36 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 			return policyResponse, ldapReply.err
 		} else {
 			if resultAttr, mapKeyFound = ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+				level.Debug(logger).Log(
+					"guid", guid,
+					"msg", fmt.Sprintf("User '%s' found in LDAP", sender),
+				)
+
 				// LDAP single value
 				sender = resultAttr[ldapSingleValue].(string)
+				userKnown = true
+			}
+		}
+	}
+
+	if config.UseCDB {
+		var (
+			value []byte
+			db    *cdb.CDB
+		)
+
+		if db = cdbStore.Load().(*cdb.CDB); db != nil {
+			value, err = db.Get([]byte(sender))
+			if err != nil {
+				return
+			}
+
+			if value != nil {
+				level.Debug(logger).Log(
+					"guid", guid,
+					"msg", fmt.Sprintf("User '%s' found in CDB", sender),
+				)
+
 				userKnown = true
 			}
 		}
@@ -500,7 +529,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		}
 	}
 
-	if len(homeCountries) > 0 {
+	if countryCode != "" && len(homeCountries) > 0 {
 		for index := range homeCountries {
 			level.Debug(logger).Log(
 				"guid", guid, "msg", "Checking", "home_country", homeCountries[index])
@@ -526,7 +555,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		remoteClient.AddCountryCode(countryCode)
 	}
 
-	if len(trustedCountries) > 0 {
+	if countryCode != "" && len(trustedCountries) > 0 {
 		matchCountry := false
 
 		for index := range trustedCountries {

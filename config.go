@@ -115,6 +115,9 @@ type CmdLineConfig struct {
 	// Flag that indicates which command was called
 	CommandServer bool
 
+	UseCDB  bool
+	CDBPath string
+
 	UseLDAP bool
 	*LdapConf
 
@@ -519,6 +522,24 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  httpX509Key,
 			Help:     "HTTP TLS server key",
+		})
+	argServerUseCDB := commandServer.Flag(
+		"", "use-cdb", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Enable CDB support",
+		})
+	argServerCDBPath := commandServer.String(
+		"", "cdb-path", &argparse.Options{
+			Required: false,
+			Validate: func(opt []string) error {
+				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
+					return errFileNotFound
+				}
+
+				return nil
+			},
+			Help: "Full path to the cdb file",
 		})
 	argServerUseLDAP := commandServer.Flag(
 		"", "use-ldap", &argparse.Options{
@@ -1083,6 +1104,23 @@ func (c *CmdLineConfig) Init(args []string) {
 			} else {
 				c.HTTPApp.x509.key = *argServerHTTPTLSKey
 			}
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_USE_CDB"); val != "" {
+			param, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err.Error())
+			}
+
+			c.UseCDB = param
+		} else {
+			c.UseCDB = *argServerUseCDB
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_CDB_PATH"); val != "" {
+			c.CDBPath = val
+		} else {
+			c.CDBPath = *argServerCDBPath
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_USE_LDAP"); val != "" {
