@@ -375,7 +375,16 @@ func (h *HTTP) POSTDovecotPolicy() {
 	)
 
 	cmd := h.request.URL.Query().Get("command")
-	if cmd != "allow" {
+	if cmd == "report" {
+		respone, _ := json.Marshal(&DovecotPolicyResponse{
+			Status:  DovecotPolicyAccept,
+			Message: "Nothing to report",
+		})
+
+		h.responseWriter.Header().Set("Content-Type", "application/json")
+		h.responseWriter.WriteHeader(http.StatusOK)
+		h.responseWriter.Write(respone)
+	} else if cmd != "allow" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errOnlyAllow)
 

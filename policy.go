@@ -33,7 +33,7 @@ import (
 
 const (
 	deferText  = "Service temporarily not available"
-	rejectText = "Your account seems to be compromised. Please contact your support"
+	rejectText = "Policy violation. Please contact your support"
 )
 
 type TTLStringMap map[string]int64
@@ -244,6 +244,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		requireActions          bool
 		mapKeyFound             bool
 		matchIP                 bool
+		userKnown               bool
 		request                 string
 		sender                  string
 		clientIP                string
@@ -394,6 +395,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 			if resultAttr, mapKeyFound = ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
 				// LDAP single value
 				sender = resultAttr[ldapSingleValue].(string)
+				userKnown = true
 			}
 		}
 	}
@@ -646,6 +648,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 
 		runOperator := true
 
+		// Check: Action already priviously done.
 		for _, actionItem := range remoteClient.Actions {
 			if actionItem == "operator" {
 				runOperator = false
@@ -654,7 +657,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 			}
 		}
 
-		if config.RunActionOperator && runOperator {
+		if userKnown && config.RunActionOperator && runOperator {
 			action = &EmailOperator{}
 			if err = action.Call(sender); err != nil {
 				level.Error(logger).Log("guid", guid, "error", err.Error())
