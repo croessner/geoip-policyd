@@ -132,6 +132,7 @@ func (h *HTTP) LogError(err error) {
 		"client", h.request.RemoteAddr,
 		"request", h.request.Method,
 		"path", h.request.URL.Path,
+		"query_string", h.request.URL.RawQuery,
 		"error", err)
 }
 
@@ -408,7 +409,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	} else if cmd != "allow" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(errOnlyAllow)
+		h.LogError(errOnlyAllowReport)
 
 		return
 	}
