@@ -436,37 +436,33 @@ func (h *HTTP) POSTDovecotPolicy() {
 	level.Debug(logger).Log(
 		"guid", h.guid, "msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
-	foundAddress := false
-	foundSender := false
-
-	if address, assertOk = dovecotPolicy["remote"].(string); assertOk {
-		foundAddress = true
-	}
-
-	if sender, assertOk = dovecotPolicy["login"].(string); assertOk {
-		foundSender = true
-	}
-
-	if foundAddress && foundSender {
-		userAttribute := Sender
-
-		if config.UseSASLUsername {
-			userAttribute = SASLUsername
-		}
-
-		policyRequest := map[string]string{
-			"request":        "smtpd_access_policy",
-			"client_address": address,
-			userAttribute:    sender,
-		}
-
-		policyResponse, err = getPolicyResponse(policyRequest, h.guid)
-	} else {
+	if address, assertOk = dovecotPolicy["remote"].(string); !assertOk || address == "" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
 		return
 	}
+
+	if sender, assertOk = dovecotPolicy["login"].(string); !assertOk || sender == "" {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoAddressNORSender)
+
+		return
+	}
+
+	userAttribute := Sender
+
+	if config.UseSASLUsername {
+		userAttribute = SASLUsername
+	}
+
+	policyRequest := map[string]string{
+		"request":        "smtpd_access_policy",
+		"client_address": address,
+		userAttribute:    sender,
+	}
+
+	policyResponse, err = getPolicyResponse(policyRequest, h.guid)
 
 	if err == nil {
 		if policyResponse.fired {
