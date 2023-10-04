@@ -387,10 +387,6 @@ func (h *HTTP) POSTDovecotPolicy() {
 		address string
 		sender  string
 
-		requestI any
-		addressI any
-		senderI  any
-
 		policyResponse *PolicyResponse
 		dovecotPolicy  map[string]any
 	)
@@ -443,21 +439,12 @@ func (h *HTTP) POSTDovecotPolicy() {
 	foundAddress := false
 	foundSender := false
 
-	// Weakforce webhook
-	if requestI, assertOk = dovecotPolicy["request"]; !assertOk {
-		requestI = dovecotPolicy
+	if address, assertOk = dovecotPolicy["remote"].(string); assertOk {
+		foundAddress = true
 	}
 
-	if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-		if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-			if address, assertOk = addressI.(string); assertOk {
-				foundAddress = true
-			}
-
-			if sender, assertOk = senderI.(string); assertOk {
-				foundSender = true
-			}
-		}
+	if sender, assertOk = dovecotPolicy["login"].(string); assertOk {
+		foundSender = true
 	}
 
 	if foundAddress && foundSender {
