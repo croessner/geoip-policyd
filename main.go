@@ -30,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/go-redis/redis/v8"
@@ -42,6 +43,7 @@ var (
 	config              *CmdLineConfig         //nolint:gochecknoglobals // System wide configuration
 	customSettingsStore atomic.Value           //nolint:gochecknoglobals // System wide configuration from custom.yml file
 	geoIPStore          atomic.Value           //nolint:gochecknoglobals // System wide GeoIP handler
+	cdbStore            atomic.Value           //nolint:gochecknoglobals // System wide CDB handler
 	ldapRequestChan     chan *LdapRequest      //nolint:gochecknoglobals // Needed for LDAP pooling
 	ldapEndChan         chan bool              //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
 	redisHandle         redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
@@ -200,12 +202,26 @@ func main() {
 		geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
 
 		if err != nil {
-			level.Error(logger).Log("msg", "Can not open GeoLite2-City database file", "error", err.Error())
+			level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
 
 			geoIP = nil
 		}
 
 		geoIPStore.Store(geoIP)
+
+		if config.UseCDB {
+			var db *cdb.CDB
+
+			db, err = cdb.Open(config.CDBPath)
+
+			if err != nil {
+				level.Error(logger).Log("msg", "Unable to open CDB file", "error", err.Error())
+
+				db = nil
+			}
+
+			cdbStore.Store(db)
+		}
 
 		// REST interface
 		go httpApp()

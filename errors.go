@@ -51,7 +51,7 @@ var (
 	errValueMustNotBeEmpty     = errors.New("value must not be empty")
 	errUnknownKey              = errors.New("unknown key")
 	errValueFormat             = errors.New("wrong value format")
-	errNoAddressNORSender      = errors.New("value does not contain 'address' and 'sender' fields")
+	errNoAddressNORSender      = errors.New("value does not contain a valid 'address' and 'sender' fields")
 	errCommentNotString        = errors.New("'comment' is not a string")
 	errCountriesNotFloat64     = errors.New("'countries' is not a float64")
 	errIPsNotFloat64           = errors.New("'ips' is not a float64")
@@ -62,6 +62,7 @@ var (
 	errValueNotString          = errors.New("value must be string")
 	errValueEmpty              = errors.New("value must not be empty")
 	errSenderNotFound          = errors.New("'sender' not found")
+	errOnlyAllowReport         = errors.New("only command=allow/report supported")
 )
 
 // policy.

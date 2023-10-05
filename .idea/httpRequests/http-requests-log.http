@@ -1,207 +1,135 @@
-POST https://localhost:8443/dovecotpolicy?command=report
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 51
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "login": "testuser1",
+  "remote": "127.1.0.1"
 }
 
-<> 2023-09-27T091733.202.json
+<> 2023-10-04T084459.200.json
 
 ###
 
-POST https://localhost:8443/dovecotpolicy?command=report
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 27
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "remote": "127.1.0.1"
 }
-
-<> 2023-09-27T083056.202.json
 
 ###
 
-POST https://localhost:8443/dovecotpolicy?command=report
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 43
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "login": 123,
+  "remote": "127.1.0.1"
 }
-
-<> 2023-09-26T212545.202.json
 
 ###
 
-POST https://localhost:8443/dovecotpolicy?command=report
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-09-26T212137.202.json
+<> 2023-10-04T084354.200.json
 
 ###
 
-POST https://localhost:8443/dovecotpolicy?command=report
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-10-04T083538.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2023-10-04T083506.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=reportsfsdf
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
 ###
@@ -209,648 +137,50 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-09-26T205634.202.json
+<> 2023-10-02T145009.200.json
 
 ###
 
 POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
-Content-Length: 553
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-09-26T205001.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 553
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
-}
-
-<> 2023-09-26T204431.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 553
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
-}
-
-<> 2023-09-26T204349.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 553
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
-}
-
-<> 2023-09-26T204325.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 553
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
-}
-
-<> 2023-09-26T204232.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 553
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "request": {
-    "attrs": {},
-    "device_attrs": {
-      "imapc.family": "",
-      "imapc.major": "",
-      "imapc.minor": "",
-      "os.family": "",
-      "os.major": "",
-      "os.minor": ""
-    },
-    "device_id": "",
-    "login": "zabbix_mail",
-    "policy_reject": false,
-    "protocol": "imap",
-    "pwhash": "0049",
-    "remote": "127.0.0.1",
-    "session_id": "",
-    "success": false,
-    "t": 1695752457.0004661,
-    "tls": true
-  },
-  "response": {
-    "msg": "allowed",
-    "r_attrs": {},
-    "status": 0
-  },
-  "type": "wforce_allow"
-}
-
-<> 2023-09-26T204031.202.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 224
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "login": "de10000@srvint.net",
-  "pwhash": "ignored",
-  "remote": "134.255.226.248",
-  "device_id": "Test client ignored",
-  "protocol": "imap_ignored",
-  "session_id": "session ID ignored",
-  "attrs":{"cos":"premium"}
-}
-
-<> 2023-09-26T163616.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T125129.202.json
-
-###
-
-POST https://localhost:8443/remove
-Content-Type: application/json
-Content-Length: 54
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T125107.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122253.202.json
-
-###
-
-DELETE https://localhost:8443/remove
-Content-Type: application/json
-Content-Length: 60
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": "christian@roessner.email"
-}
-
-###
-
-PATCH https://localhost:8443/modify
-Content-Type: application/json
-Content-Length: 141
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": {
-    "comment": "Test",
-    "sender": "christian@roessner.email",
-    "ips": 100,
-    "countries": 100
-  }
-}
-
-###
-
-PUT https://localhost:8443/update
-Content-Type: application/json
-Content-Length: 168
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "data": [
-    { "sender":"christian@roessner.email",
-      "ips": 3,
-      "countries": 1
-    },
-    {"sender":"test1@example.com",
-      "countries": 1
-    }
-  ]
-}
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 100
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "8.8.8.8",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122209-2.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "103.49.80.17",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122209-1.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "109.199.0.56",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122209.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 107
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "165.225.200.24",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208-5.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 106
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "102.129.65.37",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208-4.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 127
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "2003:a:a05:a600:858:7851:547f:8aed",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208-3.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208-2.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 114
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
-}
-
-<> 2023-09-26T122208-1.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-09-26T122208.202.json
-
-###
-
-POST https://localhost:8443/remove
-Content-Type: application/json
-Content-Length: 54
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
-
-###
-
-GET https://localhost:8443/custom-settings
-Content-Type: application/json
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-<> 2023-09-26T122208.200.json
+<> 2023-10-02T144355.200.json
 
 ###
 
@@ -861,339 +191,810 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 
 ###
 
-POST https://localhost:8443/query
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+GET https://localhost:8443/reload
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 114
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-09-26T122101.202.json
+<> 2023-09-29T110802.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 108
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "128.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-09-26T122038.202.json
+<> 2023-09-29T110727.200.json
 
 ###
 
-POST https://localhost:8443/remove
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
 Content-Type: application/json
-Content-Length: 54
+Content-Length: 234
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "sender",
-  "value": "de10000@srvint.net"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
+
+<> 2023-09-29T110626.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 114
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-04-25T123323.202.json
+<> 2023-09-29T110614.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 108
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-04-25T123236.202.json
+<> 2023-09-29T110602.200.json
 
 ###
 
-POST https://localhost:8443/remove
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
 Content-Type: application/json
-Content-Length: 54
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.13 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "sender",
-  "value": "de10000@srvint.net"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T105452.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T104957.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2023-09-29T104853.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2023-09-29T104847.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T104806.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T104127.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2023-09-29T104058.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2023-09-29T102534.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 52
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1",
 }
 
 ###
 
-DELETE https://localhost:8443/remove
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
 Content-Type: application/json
-Content-Length: 60
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "sender",
-  "value": "christian@roessner.email"
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
+
+<> 2023-09-29T102355.200.json
 
 ###
 
-PATCH https://localhost:8443/modify
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
 Content-Type: application/json
-Content-Length: 141
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "sender",
-  "value": {
-    "comment": "Test",
-    "sender": "christian@roessner.email",
-    "ips": 100,
-    "countries": 100
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
+
+<> 2023-09-29T102354.200.json
 
 ###
 
-PUT https://localhost:8443/update
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
 Content-Type: application/json
-Content-Length: 168
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "data": [
-    { "sender":"christian@roessner.email",
-      "ips": 3,
-      "countries": 1
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T102353.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T102341.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T102250.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T102205.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2023-09-29T102131.200.json
+
+###
+
+POST https://localhost:8443/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 566
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
+Accept-Encoding: br,deflate,gzip,x-gzip
+
+{
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
     },
-    {"sender":"test1@example.com",
-      "countries": 1
-    }
-  ]
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
 }
+
+<> 2023-09-29T102012.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 100
+Content-Length: 566
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "8.8.8.8",
-    "sender": "de10000@srvint.net"
-  }
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "127.0.0.1",
+    "session_id": "",
+    "success": false,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
 }
 
-<> 2023-04-06T165104-7.202.json
+<> 2023-09-28T202029.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 105
+Content-Length: 234
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "103.49.80.17",
-    "sender": "de10000@srvint.net"
-  }
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "128.0.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
 }
 
-<> 2023-04-06T165104-6.202.json
+<> 2023-09-28T202013.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=allow
 Accept: application/json
 Content-Type: application/json
-Content-Length: 105
+Content-Length: 565
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "109.199.0.56",
-    "sender": "de10000@srvint.net"
-  }
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "128.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
 }
 
-<> 2023-04-06T165104-5.202.json
+<> 2023-09-28T201958.200.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
-Content-Length: 107
+Content-Length: 565
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "165.225.200.24",
-    "sender": "de10000@srvint.net"
-  }
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "128.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
 }
-
-<> 2023-04-06T165104-4.202.json
 
 ###
 
-POST https://localhost:8443/query
+POST https://localhost:8443/dovecotpolicy?command=report
 Accept: application/json
 Content-Type: application/json
-Content-Length: 106
+Content-Length: 565
 Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
+User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
 Accept-Encoding: br,deflate,gzip,x-gzip
 
 {
-  "key": "client",
-  "value": {
-    "address": "102.129.65.37",
-    "sender": "de10000@srvint.net"
-  }
+  "request": {
+    "attrs": {},
+    "device_attrs": {
+      "imapc.family": "",
+      "imapc.major": "",
+      "imapc.minor": "",
+      "os.family": "",
+      "os.major": "",
+      "os.minor": ""
+    },
+    "device_id": "",
+    "login": "christian@roessner.email",
+    "policy_reject": false,
+    "protocol": "imap",
+    "pwhash": "0049",
+    "remote": "128.0.0.1",
+    "session_id": "",
+    "success": true,
+    "t": 1695752457.0004661,
+    "tls": true
+  },
+  "response": {
+    "msg": "allowed",
+    "r_attrs": {},
+    "status": 0
+  },
+  "type": "wforce_allow"
 }
 
-<> 2023-04-06T165104-3.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 127
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "2003:a:a05:a600:858:7851:547f:8aed",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104-2.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104-1.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2023-04-06T165104.202.json
-
-###
-
-POST https://localhost:8443/remove
-Content-Type: application/json
-Content-Length: 54
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.6)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
+<> 2023-09-28T194703.200.json
 
 ###
 

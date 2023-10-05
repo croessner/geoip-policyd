@@ -26,15 +26,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/go-redis/redis/v8"
 )
 
 const (
-	deferText    = "DEFER Service temporarily not available"
-	rejectText   = "REJECT Your account seems to be compromised. Please contact your support"
-	protoErrText = "WARN protocol error"
+	deferText  = "Service temporarily not available"
+	rejectText = "Policy violation. Please contact your support"
 )
 
 type TTLStringMap map[string]int64
@@ -42,6 +42,13 @@ type TTLStringMap map[string]int64
 type RedisHomeCountries struct {
 	IPs       TTLStringMap `redis:"ips"`       // All known home IP addresses
 	Countries TTLStringMap `redis:"countries"` // All known home country codes
+}
+
+type PolicyResponse struct {
+	fired          bool
+	whitelisted    bool
+	totalIPs       int
+	totalCountries int
 }
 
 type RemoteClient struct {
@@ -78,21 +85,6 @@ func (r *RemoteClient) haveCountries() bool {
 
 func (r *RemoteClient) haveIPs() bool {
 	return r.IPs != nil
-}
-
-func date2String(date int64) string {
-	unixtime := time.Unix(0, date)
-
-	return time.Date(
-		unixtime.Year(),
-		unixtime.Month(),
-		unixtime.Day(),
-		unixtime.Hour(),
-		unixtime.Minute(),
-		unixtime.Second(),
-		unixtime.Nanosecond(),
-		time.Local,
-	).String()
 }
 
 func (r *RemoteClient) CleanUpCountries() {
@@ -231,13 +223,29 @@ func (r *RemoteClient) AddHomeIPAddress(ipAddress string) {
 	r.HomeCountries.IPs[ipAddress] = time.Now().UnixNano()
 }
 
+func date2String(date int64) string {
+	unixtime := time.Unix(0, date)
+
+	return time.Date(
+		unixtime.Year(),
+		unixtime.Month(),
+		unixtime.Day(),
+		unixtime.Hour(),
+		unixtime.Minute(),
+		unixtime.Second(),
+		unixtime.Nanosecond(),
+		time.Local,
+	).String()
+}
+
 //nolint:gocognit,gocyclo,maintidx // This function implements the main logic of the policy service
-func getPolicyResponse(policyRequest map[string]string, guid string) (actionText string, err error) {
+func getPolicyResponse(policyRequest map[string]string, guid string) (policyResponse *PolicyResponse, err error) {
 	var (
 		isHome                  bool
 		requireActions          bool
 		mapKeyFound             bool
 		matchIP                 bool
+		userKnown               bool
 		request                 string
 		sender                  string
 		clientIP                string
@@ -251,11 +259,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		homeCountries           = config.HomeCountries
 		allowedMaxHomeIPs       = config.MaxHomeIPs
 		allowedMaxHomeCountries = config.MaxHomeCountries
-		actionTextIgnoreNets    = "INFO client IP address <%s> is defined in ignore-networks"
 	)
 
-	// Default
-	actionText = "DUNNO"
+	policyResponse = &PolicyResponse{}
 
 	userAttribute := Sender
 	if config.UseSASLUsername {
@@ -263,42 +269,36 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 	}
 
 	if request, mapKeyFound = policyRequest["request"]; !mapKeyFound {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
 	}
 
 	if request != "smtpd_access_policy" {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
 	}
 
 	if sender, mapKeyFound = policyRequest[userAttribute]; !mapKeyFound {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
 	}
 
 	if len(sender) == 0 {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
 	}
 
 	if clientIP, mapKeyFound = policyRequest["client_address"]; !mapKeyFound {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
 	}
 
 	if clientIP == "" {
-		actionText = protoErrText
 		err = errPolicyProtocol
 
 		return
@@ -352,7 +352,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 	}
 
 	if matchIP {
-		return fmt.Sprintf(actionTextIgnoreNets, clientIP), err
+		policyResponse.whitelisted = true
+
+		return
 	}
 
 	if config.UseLDAP {
@@ -381,19 +383,48 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 				if ldapError.ResultCode == uint16(ldap.LDAPResultNoSuchObject) {
 					level.Info(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' does not exist", sender))
 
-					return actionText, nil
+					err = nil
+
+					return
 				}
 			}
 
 			level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
 
-			actionText = deferText
-
-			return actionText, ldapReply.err
+			return policyResponse, ldapReply.err
 		} else {
 			if resultAttr, mapKeyFound = ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+				level.Debug(logger).Log(
+					"guid", guid,
+					"msg", fmt.Sprintf("User '%s' found in LDAP", sender),
+				)
+
 				// LDAP single value
 				sender = resultAttr[ldapSingleValue].(string)
+				userKnown = true
+			}
+		}
+	}
+
+	if config.UseCDB {
+		var (
+			value []byte
+			db    *cdb.CDB
+		)
+
+		if db = cdbStore.Load().(*cdb.CDB); db != nil {
+			value, err = db.Get([]byte(sender))
+			if err != nil {
+				return
+			}
+
+			if value != nil {
+				level.Debug(logger).Log(
+					"guid", guid,
+					"msg", fmt.Sprintf("User '%s' found in CDB", sender),
+				)
+
+				userKnown = true
 			}
 		}
 	}
@@ -404,13 +435,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 	// Check Redis for the current sender
 	if redisValue, err = redisHandleReplica.Get(ctx, key).Bytes(); err != nil {
 		if !errors.Is(err, redis.Nil) {
-			actionText = deferText
-
 			return
 		}
 	} else if err = json.Unmarshal(redisValue, remoteClient); err != nil {
-		actionText = deferText
-
 		return
 	}
 
@@ -502,7 +529,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		}
 	}
 
-	if len(homeCountries) > 0 {
+	if countryCode != "" && len(homeCountries) > 0 {
 		for index := range homeCountries {
 			level.Debug(logger).Log(
 				"guid", guid, "msg", "Checking", "home_country", homeCountries[index])
@@ -528,7 +555,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		remoteClient.AddCountryCode(countryCode)
 	}
 
-	if len(trustedCountries) > 0 {
+	if countryCode != "" && len(trustedCountries) > 0 {
 		matchCountry := false
 
 		for index := range trustedCountries {
@@ -548,7 +575,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		}
 
 		if !matchCountry {
-			actionText = rejectText
+			policyResponse.fired = true
 			requireActions = true
 
 			if config.BlockPermanent {
@@ -556,7 +583,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 			}
 		}
 	} else if len(remoteClient.Countries) > allowedMaxCountries {
-		actionText = rejectText
+		policyResponse.fired = true
 		requireActions = true
 
 		if config.BlockPermanent {
@@ -564,7 +591,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		}
 	} else if remoteClient.haveHomeCountries() {
 		if len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries {
-			actionText = rejectText
+			policyResponse.fired = true
 			requireActions = true
 
 			if config.BlockPermanent {
@@ -620,7 +647,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		}
 
 		if !matchIP {
-			actionText = rejectText
+			policyResponse.fired = true
 			requireActions = true
 
 			if config.BlockPermanent {
@@ -628,7 +655,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 			}
 		}
 	} else if len(remoteClient.IPs) > allowedMaxIPs {
-		actionText = rejectText
+		policyResponse.fired = true
 		requireActions = true
 
 		if config.BlockPermanent {
@@ -636,7 +663,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 		}
 	} else if remoteClient.haveHomeIPs() {
 		if len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs {
-			actionText = rejectText
+			policyResponse.fired = true
 			requireActions = true
 
 			if config.BlockPermanent {
@@ -650,6 +677,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 		runOperator := true
 
+		// Check: Action already priviously done.
 		for _, actionItem := range remoteClient.Actions {
 			if actionItem == "operator" {
 				runOperator = false
@@ -658,7 +686,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 			}
 		}
 
-		if config.RunActionOperator && runOperator {
+		if userKnown && config.RunActionOperator && runOperator {
 			action = &EmailOperator{}
 			if err = action.Call(sender); err != nil {
 				level.Error(logger).Log("guid", guid, "error", err.Error())
@@ -673,28 +701,20 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 
 	redisValue, err = json.Marshal(remoteClient)
 	if err != nil {
-		actionText = deferText
-
 		return
 	}
 
 	if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
-		actionText = deferText
-
 		return
 	}
 
 	// For each request update the expiry timestamp
 	if remoteClient.Locked {
 		if err = redisHandle.Persist(ctx, key).Err(); err != nil {
-			actionText = deferText
-
 			return
 		}
 	} else {
 		if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
-			actionText = deferText
-
 			return
 		}
 	}
@@ -753,6 +773,8 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 				sum += len(remoteClient.HomeCountries.Countries)
 			}
 
+			policyResponse.totalCountries = sum
+
 			return sum
 		}(),
 		"allowed_max_foreign_countries", allowedMaxCountries,
@@ -801,11 +823,19 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (actionText
 				sum += len(remoteClient.HomeCountries.IPs)
 			}
 
+			policyResponse.totalIPs = sum
+
 			return sum
 		}(),
 		"allowed_max_foreign_ips", allowedMaxIPs,
 		"allowed_max_home_ips", allowedMaxHomeIPs,
-		"action", actionText)
+		"action", func() string {
+			if policyResponse.fired {
+				return rejectText
+			}
+
+			return "ok"
+		}())
 
 	return
 }

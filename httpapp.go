@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
 	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
@@ -80,6 +81,7 @@ type RESTResult struct {
 	GUID      string `json:"guid"`
 	Object    string `json:"object"`
 	Operation string `json:"operation"`
+	Error     error  `json:"error"`
 	Result    any    `json:"result"`
 }
 
@@ -88,8 +90,6 @@ type HTTP struct {
 	responseWriter http.ResponseWriter
 	request        *http.Request
 }
-
-type DovecotPolicy map[string]any
 
 type DovecotPolicyResponse struct {
 	Status  DovecotPolicyStatus `json:"status"`
@@ -132,6 +132,7 @@ func (h *HTTP) LogError(err error) {
 		"client", h.request.RemoteAddr,
 		"request", h.request.Method,
 		"path", h.request.URL.Path,
+		"query_string", h.request.URL.RawQuery,
 		"error", err)
 }
 
@@ -155,6 +156,25 @@ func (h *HTTP) GETReload() {
 	geoIPStore.Store(geoip)
 
 	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
+
+	if config.UseCDB {
+		var db *cdb.CDB
+
+		db, err = cdb.Open(config.CDBPath)
+
+		if err != nil {
+			h.responseWriter.WriteHeader(http.StatusInternalServerError)
+			h.LogError(err)
+
+			return
+		}
+
+		if olddb := cdbStore.Load().(*cdb.CDB); olddb != nil {
+			olddb.Close()
+		}
+
+		cdbStore.Store(db)
+	}
 
 	//nolint:forcetypeassert // Global variable
 	if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
@@ -265,9 +285,9 @@ func (h *HTTP) POSTRemove() {
 
 func (h *HTTP) POSTQuery() {
 	var (
-		requestData  *Body
-		policyResult string
-		result       bool
+		result         bool
+		requestData    *Body
+		policyResponse *PolicyResponse
 	)
 
 	if !HasContentType(h.request, "application/json") {
@@ -319,7 +339,7 @@ func (h *HTTP) POSTQuery() {
 					userAttribute:    clientRequest[Sender].(string),
 				}
 
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
+				policyResponse, err = getPolicyResponse(policyRequest, h.guid)
 			}
 		}
 
@@ -332,7 +352,7 @@ func (h *HTTP) POSTQuery() {
 	}
 
 	if err == nil {
-		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+		if policyResponse.fired {
 			result = false
 		} else {
 			result = true
@@ -348,6 +368,7 @@ func (h *HTTP) POSTQuery() {
 		GUID:      h.guid,
 		Object:    h.request.RemoteAddr,
 		Operation: "query",
+		Error:     err,
 		Result:    result,
 	})
 
@@ -358,20 +379,36 @@ func (h *HTTP) POSTQuery() {
 
 func (h *HTTP) POSTDovecotPolicy() {
 	var (
-		assertOk     bool
-		resultCode   DovecotPolicyStatus
-		result       string
-		policyResult string
+		assertOk bool
+
+		resultCode DovecotPolicyStatus
+		result     string
 
 		address string
 		sender  string
 
-		requestI any
-		addressI any
-		senderI  any
-
-		dovecotPolicy DovecotPolicy
+		policyResponse *PolicyResponse
+		dovecotPolicy  map[string]any
 	)
+
+	cmd := h.request.URL.Query().Get("command")
+	if cmd == "report" {
+		respone, _ := json.Marshal(&DovecotPolicyResponse{
+			Status:  DovecotPolicyAccept,
+			Message: "Nothing to report",
+		})
+
+		h.responseWriter.Header().Set("Content-Type", "application/json")
+		h.responseWriter.WriteHeader(http.StatusOK)
+		h.responseWriter.Write(respone)
+
+		return
+	} else if cmd != "allow" {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errOnlyAllowReport)
+
+		return
+	}
 
 	if !HasContentType(h.request, "application/json") {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
@@ -388,7 +425,7 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
-	dovecotPolicy = make(DovecotPolicy)
+	dovecotPolicy = make(map[string]any)
 	if err = json.Unmarshal(body, &dovecotPolicy); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
@@ -396,74 +433,39 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
-	level.Debug(logger).Log("msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
+	level.Debug(logger).Log(
+		"guid", h.guid, "msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
-	userAttribute := Sender
-	if config.UseSASLUsername {
-		userAttribute = SASLUsername
-	}
-
-	foundRequirements := false
-
-	// Weakforce webhook
-	if requestI, assertOk = dovecotPolicy["request"]; assertOk {
-		if addressI, assertOk = requestI.(map[string]any)["remote"]; assertOk {
-			if senderI, assertOk = requestI.(map[string]any)["login"]; assertOk {
-				if address, assertOk = addressI.(string); !assertOk {
-					goto assertFail
-				}
-
-				if sender, assertOk = senderI.(string); !assertOk {
-					goto assertFail
-				}
-
-				foundRequirements = true
-
-				policyRequest := map[string]string{
-					"request":        "smtpd_access_policy",
-					"client_address": address,
-					userAttribute:    sender,
-				}
-
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
-			}
-		}
-	} else {
-		// Pure dovecot
-		if addressI, assertOk = dovecotPolicy["remote"]; assertOk {
-			if senderI, assertOk = dovecotPolicy["login"]; assertOk {
-				if address, assertOk = addressI.(string); !assertOk {
-					goto assertFail
-				}
-
-				if sender, assertOk = senderI.(string); !assertOk {
-					goto assertFail
-				}
-
-				foundRequirements = true
-
-				policyRequest := map[string]string{
-					"request":        "smtpd_access_policy",
-					"client_address": address,
-					userAttribute:    sender,
-				}
-
-				policyResult, err = getPolicyResponse(policyRequest, h.guid)
-			}
-		}
-	}
-
-assertFail:
-
-	if !foundRequirements {
+	if address, assertOk = dovecotPolicy["remote"].(string); !assertOk || address == "" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
 		return
 	}
 
+	if sender, assertOk = dovecotPolicy["login"].(string); !assertOk || sender == "" {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoAddressNORSender)
+
+		return
+	}
+
+	userAttribute := Sender
+
+	if config.UseSASLUsername {
+		userAttribute = SASLUsername
+	}
+
+	policyRequest := map[string]string{
+		"request":        "smtpd_access_policy",
+		"client_address": address,
+		userAttribute:    sender,
+	}
+
+	policyResponse, err = getPolicyResponse(policyRequest, h.guid)
+
 	if err == nil {
-		if policyResult == fmt.Sprintf("action=%s", rejectText) {
+		if policyResponse.fired {
 			result = rejectText
 			resultCode = DovecotPolicyReject
 		} else {
@@ -471,7 +473,7 @@ assertFail:
 			resultCode = DovecotPolicyAccept
 		}
 	} else {
-		level.Error(logger).Log("error", err.Error())
+		level.Error(logger).Log("guid", h.guid, "error", err.Error())
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 
 		return
@@ -483,7 +485,7 @@ assertFail:
 	})
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
-	h.responseWriter.WriteHeader(http.StatusAccepted)
+	h.responseWriter.WriteHeader(http.StatusOK)
 	h.responseWriter.Write(respone)
 }
 

@@ -21,11 +21,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/segmentio/ksuid"
 	"net"
 	"strings"
 
 	"github.com/go-kit/log/level"
+	"github.com/segmentio/ksuid"
 )
 
 func clientConnections(listener net.Listener) chan net.Conn {
@@ -71,13 +71,34 @@ func handleConnection(client net.Conn) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			actionText, err := getPolicyResponse(policyRequest, ksuid.New().String())
+			var (
+				prefix         string
+				actionText     string
+				policyResponse *PolicyResponse
+			)
+
+			policyResponse, err = getPolicyResponse(policyRequest, ksuid.New().String())
 
 			if err != nil {
+				prefix = "DEFER "
+				actionText = deferText
+
 				level.Error(logger).Log("error", err.Error())
+			} else {
+				if policyResponse.fired {
+					prefix = "REJECT "
+					actionText = rejectText
+				} else {
+					if policyResponse.whitelisted {
+						prefix = "INFO "
+						actionText = fmt.Sprintf("Client IP address <%s> is defined in ignore-networks", policyRequest["client_address"])
+					} else {
+						prefix = "DUNNO"
+					}
+				}
 			}
 
-			client.Write([]byte(fmt.Sprintf("action=%s\n\n", actionText)))
+			client.Write([]byte(fmt.Sprintf("action=%s%s\n\n", prefix, actionText)))
 
 			// Clear policy request for next connection
 			policyRequest = make(map[string]string)
