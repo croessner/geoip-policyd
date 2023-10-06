@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	stdLibLog "log"
 	"net"
 	"os"
 	"os/signal"
@@ -170,6 +171,8 @@ func main() {
 	} else {
 		logger = log.With(logger, "ts", log.DefaultTimestamp)
 	}
+
+	stdLibLog.SetOutput(log.NewStdlibAdapter(logger))
 
 	// Manually set time zone
 	if tz := os.Getenv("TZ"); tz != "" {
