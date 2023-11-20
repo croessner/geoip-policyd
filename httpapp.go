@@ -285,10 +285,11 @@ func (h *HTTP) POSTRemove() {
 
 func (h *HTTP) POSTQuery() {
 	var (
-		result         bool
-		requestData    *Body
-		policyResponse *PolicyResponse
+		result      bool
+		requestData *Body
 	)
+
+	policyResponse := &PolicyResponse{}
 
 	if !HasContentType(h.request, "application/json") {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
@@ -349,6 +350,11 @@ func (h *HTTP) POSTQuery() {
 
 			return
 		}
+	} else {
+		h.responseWriter.WriteHeader(http.StatusBadRequest)
+		h.LogError(errNoClient)
+
+		return
 	}
 
 	if err == nil {

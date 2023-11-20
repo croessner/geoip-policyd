@@ -52,6 +52,7 @@ var (
 	errUnknownKey              = errors.New("unknown key")
 	errValueFormat             = errors.New("wrong value format")
 	errNoAddressNORSender      = errors.New("value does not contain a valid 'address' and 'sender' fields")
+	errNoClient                = errors.New("key does not contain 'client' value")
 	errCommentNotString        = errors.New("'comment' is not a string")
 	errCountriesNotFloat64     = errors.New("'countries' is not a float64")
 	errIPsNotFloat64           = errors.New("'ips' is not a float64")
