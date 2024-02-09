@@ -45,10 +45,14 @@ type RedisHomeCountries struct {
 }
 
 type PolicyResponse struct {
-	fired          bool
-	whitelisted    bool
-	totalIPs       int
-	totalCountries int
+	fired                bool
+	whitelisted          bool
+	totalIPs             int
+	totalCountries       int
+	homeIPsSeen          []string
+	foreignIPsSeen       []string
+	homeCountriesSeen    []string
+	foreignCountriesSeen []string
 }
 
 type RemoteClient struct {
@@ -724,26 +728,30 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		userAttribute, sender,
 		"foreign_countries_seen", func() string {
 			if remoteClient.haveCountries() {
-				var countries []string
+				var foreignCountriesSeen []string
 
 				for country := range remoteClient.Countries {
-					countries = append(countries, country)
+					foreignCountriesSeen = append(foreignCountriesSeen, country)
 				}
 
-				return strings.Join(countries, ",")
+				policyResponse.foreignCountriesSeen = foreignCountriesSeen
+
+				return strings.Join(foreignCountriesSeen, ",")
 			}
 
 			return "N/A"
 		}(),
 		"home_countries_seen", func() string {
 			if remoteClient.haveHomeCountries() {
-				var countries []string
+				var homeCountriesSeen []string
 
 				for country := range remoteClient.HomeCountries.Countries {
-					countries = append(countries, country)
+					homeCountriesSeen = append(homeCountriesSeen, country)
 				}
 
-				return strings.Join(countries, ",")
+				policyResponse.homeCountriesSeen = homeCountriesSeen
+
+				return strings.Join(homeCountriesSeen, ",")
 			}
 
 			return "N/A"
@@ -781,26 +789,30 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		"allowed_max_home_countries", allowedMaxHomeCountries,
 		"foreign_ips_seen", func() string {
 			if remoteClient.haveIPs() {
-				var ips []string
+				var foreignIPsSeen []string
 
 				for ipAddress := range remoteClient.IPs {
-					ips = append(ips, ipAddress)
+					foreignIPsSeen = append(foreignIPsSeen, ipAddress)
 				}
 
-				return strings.Join(ips, ",")
+				policyResponse.foreignIPsSeen = foreignIPsSeen
+
+				return strings.Join(foreignIPsSeen, ",")
 			}
 
 			return "N/A"
 		}(),
 		"home_ips_seen", func() string {
 			if remoteClient.haveHomeIPs() {
-				var ips []string
+				var homeIPsSeen []string
 
 				for ipAddress := range remoteClient.HomeCountries.IPs {
-					ips = append(ips, ipAddress)
+					homeIPsSeen = append(homeIPsSeen, ipAddress)
 				}
 
-				return strings.Join(ips, ",")
+				policyResponse.homeIPsSeen = homeIPsSeen
+
+				return strings.Join(homeIPsSeen, ",")
 			}
 
 			return "N/A"
