@@ -79,7 +79,7 @@ type Body struct {
 
 type RESTResult struct {
 	GUID      string `json:"guid"`
-	Object    string `json:"object"`
+	Object    any    `json:"object"`
 	Operation string `json:"operation"`
 	Error     error  `json:"error"`
 	Result    any    `json:"result"`
@@ -371,8 +371,20 @@ func (h *HTTP) POSTQuery() {
 	}
 
 	respone, _ := json.Marshal(&RESTResult{
-		GUID:      h.guid,
-		Object:    h.request.RemoteAddr,
+		GUID: h.guid,
+		Object: struct {
+			RemoteAddr           string   `json:"remote_addr"`
+			HomeIPsSeen          []string `json:"home_ips_seen"`
+			ForeignIPsSeen       []string `json:"foreign_ips_seen"`
+			HomeCountriesSeen    []string `json:"home_countries_seen"`
+			ForeignCountriesSeen []string `json:"foreign_countries_seen"`
+		}{
+			h.request.RemoteAddr,
+			policyResponse.homeIPsSeen,
+			policyResponse.foreignIPsSeen,
+			policyResponse.homeCountriesSeen,
+			policyResponse.foreignCountriesSeen,
+		},
 		Operation: "query",
 		Error:     err,
 		Result:    result,
