@@ -21,6 +21,7 @@ package main
 import (
 	"net"
 	"os"
+	"sync"
 
 	"github.com/go-kit/log/level"
 	"github.com/oschwald/maxminddb-golang"
@@ -28,6 +29,7 @@ import (
 
 type GeoIP struct {
 	Reader *maxminddb.Reader
+	mu     sync.RWMutex
 }
 
 //goland:noinspection GoUnhandledErrorResult
@@ -42,14 +44,17 @@ func getCountryCode(ipAddress string) string {
 	)
 
 	if val := os.Getenv("GO_TESTING"); val == "" {
-		geoIP := geoIPStore.Load().(*GeoIP) //nolint:forcetypeassert // Global variable
-
 		ip := net.ParseIP(ipAddress)
 		if ip != nil {
+			geoIP.mu.RLock()
+
 			err = geoIP.Reader.Lookup(ip, &record)
 			if err != nil {
 				level.Error(logger).Log("error", err.Error())
+
 			}
+
+			geoIP.mu.RUnlock()
 
 			return record.Country.ISOCode
 		}
