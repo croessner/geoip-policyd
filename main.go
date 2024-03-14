@@ -41,16 +41,16 @@ import (
 const version = "@@gittag@@-@@gitcommit@@"
 
 var (
-	config              *CmdLineConfig         //nolint:gochecknoglobals // System wide configuration
-	customSettingsStore atomic.Value           //nolint:gochecknoglobals // System wide configuration from custom.yml file
-	geoIPStore          atomic.Value           //nolint:gochecknoglobals // System wide GeoIP handler
-	cdbStore            atomic.Value           //nolint:gochecknoglobals // System wide CDB handler
-	ldapRequestChan     chan *LdapRequest      //nolint:gochecknoglobals // Needed for LDAP pooling
-	ldapEndChan         chan bool              //nolint:gochecknoglobals // Quit-Channel for LDAP on shutdown
-	redisHandle         redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
-	redisHandleReplica  redis.UniversalClient  //nolint:gochecknoglobals // System wide redis pool
-	logger              log.Logger             //nolint:gochecknoglobals // System wide logger
-	ctx                 = context.Background() //nolint:gochecknoglobals // System wide context
+	config              *CmdLineConfig
+	geoIP               *GeoIP
+	customSettingsStore atomic.Value
+	cdbStore            atomic.Value
+	ldapRequestChan     chan *LdapRequest
+	ldapEndChan         chan bool
+	redisHandle         redis.UniversalClient
+	redisHandleReplica  redis.UniversalClient
+	logger              log.Logger
+	ctx                 = context.Background()
 )
 
 type RedisLogger struct{}
@@ -201,16 +201,25 @@ func main() {
 			go ldapWorker(context.Background())
 		}
 
-		geoIP := &GeoIP{}
+		_, err = os.Stat(config.GeoipPath)
+		if os.IsNotExist(err) {
+			level.Error(logger).Log("msg", fmt.Sprintf("File '%s' does not exist", config.GeoipPath))
+
+			panic(err.Error())
+		} else if err != nil {
+			level.Error(logger).Log("msg", fmt.Sprintf("File '%s' may exist, but there's an error accessing it", config.GeoipPath))
+
+			panic(err.Error())
+		}
+
+		geoIP = &GeoIP{}
 		geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
 
 		if err != nil {
 			level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
 
-			geoIP = nil
+			panic(err.Error())
 		}
-
-		geoIPStore.Store(geoIP)
 
 		if config.UseCDB {
 			var db *cdb.CDB
@@ -245,6 +254,39 @@ func main() {
 		}
 
 		clientChan := clientConnections(server)
+
+		// Auto reload mmdb
+		go func() {
+			var lastModTime time.Time
+
+			ticker := time.NewTicker(300 * time.Second)
+			for range ticker.C {
+				fileInfo, err := os.Stat(config.GeoipPath)
+				if err != nil {
+					level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
+
+					continue
+				}
+
+				if !fileInfo.ModTime().Equal(lastModTime) {
+					level.Info(logger).Log("msg", "GeoIP database file has changed")
+
+					lastModTime = fileInfo.ModTime()
+
+					geoIP.mu.Lock()
+					geoIP.Reader.Close()
+
+					geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+					if err != nil {
+						level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
+
+						geoIP.Reader = nil
+					}
+
+					geoIP.mu.Unlock()
+				}
+			}
+		}()
 
 		for {
 			go handleConnection(<-clientChan)

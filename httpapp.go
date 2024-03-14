@@ -143,17 +143,19 @@ func (h *HTTP) GETReload() {
 		newCustomSettings *CustomSettings
 	)
 
-	geoip := &GeoIP{}
-	geoip.Reader, err = maxminddb.Open(config.GeoipPath)
+	geoIP.mu.Lock()
 
+	defer geoIP.mu.Unlock()
+
+	geoIP.Reader.Close()
+
+	geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
 	if err != nil {
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
 		return
 	}
-
-	geoIPStore.Store(geoip)
 
 	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
 
