@@ -201,13 +201,24 @@ func main() {
 			go ldapWorker(context.Background())
 		}
 
+		_, err = os.Stat(config.GeoipPath)
+		if os.IsNotExist(err) {
+			level.Error(logger).Log("msg", fmt.Sprintf("File '%s' does not exist", config.GeoipPath))
+
+			panic(err.Error())
+		} else if err != nil {
+			level.Error(logger).Log("msg", fmt.Sprintf("File '%s' may exist, but there's an error accessing it", config.GeoipPath))
+
+			panic(err.Error())
+		}
+
 		geoIP = &GeoIP{}
 		geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
 
 		if err != nil {
 			level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
 
-			geoIP = nil
+			panic(err.Error())
 		}
 
 		if config.UseCDB {
