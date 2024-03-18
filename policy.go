@@ -29,7 +29,7 @@ import (
 	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 const (

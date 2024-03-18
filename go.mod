@@ -7,8 +7,8 @@ require (
 	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 	github.com/go-kit/log v0.2.1
 	github.com/go-ldap/ldap/v3 v3.4.6
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/oschwald/maxminddb-golang v1.12.0
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/segmentio/ksuid v1.0.4
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )

@@ -34,8 +34,8 @@ import (
 	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/go-redis/redis/v8"
 	"github.com/oschwald/maxminddb-golang"
+	"github.com/redis/go-redis/v9"
 )
 
 const version = "@@gittag@@-@@gitcommit@@"
@@ -111,7 +111,7 @@ func NewRedisReplicaClient() redis.UniversalClient {
 		return redis.NewFailoverClient(&redis.FailoverOptions{
 			MasterName:       config.RedisSentinelMasterName,
 			SentinelAddrs:    config.RedisSentinels,
-			SlaveOnly:        true,
+			ReplicaOnly:      true,
 			DB:               config.RedisDB,
 			SentinelUsername: config.RedisSentinelUsername,
 			SentinelPassword: config.RedisSentinelPassword,
