@@ -1,6 +1,6 @@
 module geoip-policyd
 
-go 1.21
+go 1.22
 
 require (
 	github.com/akamensky/argparse v1.4.0
@@ -19,8 +19,8 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/google/uuid v1.4.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )

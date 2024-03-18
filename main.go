@@ -84,8 +84,7 @@ func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
 }
 
 func NewRedisClient() redis.UniversalClient {
-	// If two or more sentinels are defined and a master name is set, switch to a FailoverClient.
-	if len(config.RedisSentinels) > 1 && config.RedisSentinelMasterName != "" {
+	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
 		redisHandle = redis.NewFailoverClient(&redis.FailoverOptions{
 			MasterName:       config.RedisSentinelMasterName,
 			SentinelAddrs:    config.RedisSentinels,
