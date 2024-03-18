@@ -108,7 +108,7 @@ func NewRedisClient() redis.UniversalClient {
 }
 
 func NewRedisReplicaClient() redis.UniversalClient {
-	if len(config.RedisSentinels) > 1 && config.RedisSentinelMasterName != "" {
+	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
 		return redis.NewFailoverClient(&redis.FailoverOptions{
 			MasterName:       config.RedisSentinelMasterName,
 			SentinelAddrs:    config.RedisSentinels,
