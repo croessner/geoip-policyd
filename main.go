@@ -83,24 +83,33 @@ func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
 	return nil
 }
 
+func createFailoverClient(replicaOnly bool) redis.UniversalClient {
+	return redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:       config.RedisSentinelMasterName,
+		SentinelAddrs:    config.RedisSentinels,
+		ReplicaOnly:      replicaOnly,
+		DB:               config.RedisDB,
+		SentinelUsername: config.RedisSentinelUsername,
+		SentinelPassword: config.RedisSentinelPassword,
+		Username:         config.RedisUsername,
+		Password:         config.RedisPassword,
+	})
+}
+
+func createStandardClient(addr string, port int) redis.UniversalClient {
+	return redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", addr, port),
+		Username: config.RedisUsername,
+		Password: config.RedisPassword,
+		DB:       config.RedisDB,
+	})
+}
+
 func NewRedisClient() redis.UniversalClient {
 	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
-		redisHandle = redis.NewFailoverClient(&redis.FailoverOptions{
-			MasterName:       config.RedisSentinelMasterName,
-			SentinelAddrs:    config.RedisSentinels,
-			DB:               config.RedisDB,
-			SentinelUsername: config.RedisSentinelUsername,
-			SentinelPassword: config.RedisSentinelPassword,
-			Username:         config.RedisUsername,
-			Password:         config.RedisPassword,
-		})
+		redisHandle = createFailoverClient(false)
 	} else {
-		redisHandle = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", config.RedisAddress, config.RedisPort),
-			Username: config.RedisUsername,
-			Password: config.RedisPassword,
-			DB:       config.RedisDB,
-		})
+		redisHandle = createStandardClient(config.RedisAddress, config.RedisPort)
 	}
 
 	return redisHandle
@@ -108,25 +117,11 @@ func NewRedisClient() redis.UniversalClient {
 
 func NewRedisReplicaClient() redis.UniversalClient {
 	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
-		return redis.NewFailoverClient(&redis.FailoverOptions{
-			MasterName:       config.RedisSentinelMasterName,
-			SentinelAddrs:    config.RedisSentinels,
-			ReplicaOnly:      true,
-			DB:               config.RedisDB,
-			SentinelUsername: config.RedisSentinelUsername,
-			SentinelPassword: config.RedisSentinelPassword,
-			Username:         config.RedisUsername,
-			Password:         config.RedisPassword,
-		})
+		return createFailoverClient(true)
 	}
 
 	if config.RedisAddressRO != config.RedisAddress || config.RedisPortRO != config.RedisPort {
-		return redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", config.RedisAddressRO, config.RedisPortRO),
-			Username: config.RedisUsername,
-			Password: config.RedisPassword,
-			DB:       config.RedisDB,
-		})
+		return createStandardClient(config.RedisAddressRO, config.RedisPortRO)
 	}
 
 	return nil
