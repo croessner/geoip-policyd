@@ -715,10 +715,24 @@ func processHomeCountries(remoteClient *RemoteClient, homeCountries []string, co
 // If the policy allows permanent blocking, the function sets the locked status of the remote client to true.
 // Returns a boolean indicating whether the country triggered the policy check or not.
 func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxCountries, allowedMaxHomeCountries int, guid string) bool {
-	if isTrustedCountry(trustedCountries, countryCode, guid) ||
-		len(remoteClient.Countries) > allowedMaxCountries ||
-		(remoteClient.haveHomeCountries() &&
-			len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries) {
+	if len(trustedCountries) > 0 {
+		if isTrustedCountry(trustedCountries, countryCode, guid) {
+			// client country code is trusted, ignore other checks
+			return false
+		}
+
+		// client country code is not trusted
+		policyResponse.fired = true
+		if config.BlockPermanent {
+			remoteClient.Locked = true
+		}
+
+		return true
+	}
+
+	// Proceed with other checks if no trusted country codes
+	if len(remoteClient.Countries) > allowedMaxCountries ||
+		(remoteClient.haveHomeCountries() && len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries) {
 
 		policyResponse.fired = true
 		if config.BlockPermanent {
@@ -738,10 +752,25 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 // the function updates the policyResponse object and locks the remoteClient account if necessary.
 // It returns true if the policy is violated, false otherwise.
 func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxIPs, allowedMaxHomeIPs int, guid string) bool {
-	if len(trustedIPs) > 0 && !isTrustedIP(trustedIPs, clientIP, guid) ||
-		len(remoteClient.IPs) > allowedMaxIPs ||
-		(remoteClient.haveHomeIPs() &&
-			len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs) {
+	// Check if clientIP is in trustedIPs
+	if len(trustedIPs) > 0 {
+		if isTrustedIP(trustedIPs, clientIP, guid) {
+			// clientIP is trusted, ignore other checks
+			return false
+		}
+
+		// clientIP is not trusted
+		policyResponse.fired = true
+		if config.BlockPermanent {
+			remoteClient.Locked = true
+		}
+
+		return true
+	}
+
+	// Proceed with other checks if no trusted IPs
+	if len(remoteClient.IPs) > allowedMaxIPs ||
+		(remoteClient.haveHomeIPs() && len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs) {
 
 		policyResponse.fired = true
 		if config.BlockPermanent {
@@ -759,7 +788,7 @@ func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP st
 // If a match is found, it returns true, otherwise false.
 // The function logs debug messages for each checked country.
 // Returns a boolean indicating whether the country is trusted or not.
-func isTrustedCountry(trustedCountries []string, guid, countryCode string) bool {
+func isTrustedCountry(trustedCountries []string, countryCode, guid string) bool {
 	for _, trustedCountry := range trustedCountries {
 		level.Debug(logger).Log("guid", guid, "msg", "Checking", "trusted_country", trustedCountry)
 
