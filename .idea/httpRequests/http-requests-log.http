@@ -2,6 +2,101 @@ POST http://localhost:8080/query
 Accept: application/json
 Content-Type: application/json
 Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-23T115048.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-23T114914.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-07-22T084857.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-07-19T171453.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-07-19T171436.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
 Connection: Keep-Alive
 User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.9)
 Accept-Encoding: br,deflate,gzip,x-gzip
@@ -742,107 +837,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 }
 
 <> 2023-09-29T104853.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 51
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "login": "testuser1",
-  "remote": "127.1.0.1"
-}
-
-<> 2023-09-29T104847.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2023-09-29T104806.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2023-09-29T104127.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 51
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "login": "testuser1",
-  "remote": "127.1.0.1"
-}
-
-<> 2023-09-29T104058.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 51
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "login": "testuser1",
-  "remote": "127.1.0.1"
-}
-
-<> 2023-09-29T102534.200.json
 
 ###
 
