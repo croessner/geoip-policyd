@@ -64,6 +64,10 @@ type PolicyResponse struct {
 	// whitelisted represents a boolean field in the PolicyResponse struct indicating whether the remote client is whitelisted or not.
 	whitelisted bool
 
+	currentClientIP string
+
+	currentCountryCode string
+
 	// totalIPs represents the total number of IP addresses associated with a remote client.
 	// It is an integer field in the PolicyResponse struct.
 	totalIPs int
@@ -1023,6 +1027,8 @@ func updateRedisCache(sender string, remoteClient *RemoteClient) error {
 func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient, sender string, trustedCountries, trustedIPs []string, guid string) {
 	level.Info(logger).Log("guid", guid,
 		getUserAttribute(), sender,
+		"current_client_ip", policyResponse.currentClientIP,
+		"current_country_code", policyResponse.currentCountryCode,
 		"foreign_countries_seen", getForeignCountriesSeen(remoteClient),
 		"home_countries_seen", getHomeCountriesSeen(remoteClient),
 		"home_countries_defined", getHouseCountries(),
@@ -1203,6 +1209,15 @@ func getActionStatus(policyResponse *PolicyResponse) string {
 	return "ok"
 }
 
+// setCurrentValues sets the current client IP and country code in the PolicyResponse object.
+// It takes the IP address, country code, and a pointer to the PolicyResponse object as input parameters.
+// It assigns the IP address to the `currentClientIP` field and the country code to the `currentCountryCode` field
+// of the PolicyResponse object.
+func setCurrentValues(ip string, code string, policyResponse *PolicyResponse) {
+	policyResponse.currentClientIP = ip
+	policyResponse.currentCountryCode = code
+}
+
 // getPolicyResponse is a function that takes a policyRequest map and a guid string as input parameters
 // and returns a policyResponse pointer and an error as output. It initializes a PolicyResponse object,
 // initializes the sender, clientIP, and err variables by calling the initializePolicy function with the
@@ -1245,6 +1260,8 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 	}
 
 	countryCode := getCountryCode(clientIP)
+
+	setCurrentValues(clientIP, countryCode, policyResponse)
 
 	remoteClient, err := fetchAndLogRemoteClient(sender, clientIP, countryCode, guid)
 	if err != nil {

@@ -1,3 +1,79 @@
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-30T115534.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-30T114907.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-30T114051.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-08-30T113401.202.json
+
+###
+
 DELETE http://localhost:8080/remove
 Content-Type: application/json
 Content-Length: 60
@@ -818,96 +894,6 @@ Accept-Encoding: br,deflate,gzip,x-gzip
 {
   "login": 123,
   "remote": "127.1.0.1"
-}
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2023-10-04T084354.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2023-10-04T083538.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 51
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "login": "testuser1",
-  "remote": "127.1.0.1"
-}
-
-<> 2023-10-04T083506.200.json
-
-###
-
-POST https://localhost:8443/dovecotpolicy?command=reportsfsdf
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.8)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
 }
 
 ###

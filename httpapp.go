@@ -372,21 +372,32 @@ func (h *HTTP) POSTQuery() {
 		result = true
 	}
 
-	respone, _ := json.Marshal(&RESTResult{
-		GUID: h.guid,
-		Object: struct {
+	var object any
+
+	if policyResponse == nil {
+		object = nil
+	} else {
+		object = struct {
 			RemoteAddr           string   `json:"remote_addr"`
 			HomeIPsSeen          []string `json:"home_ips_seen"`
 			ForeignIPsSeen       []string `json:"foreign_ips_seen"`
 			HomeCountriesSeen    []string `json:"home_countries_seen"`
 			ForeignCountriesSeen []string `json:"foreign_countries_seen"`
+			CurrentClientIP      string   `json:"current_client_ip"`
+			CurrentCountryCode   string   `json:"current_country_code"`
 		}{
 			h.request.RemoteAddr,
 			policyResponse.homeIPsSeen,
 			policyResponse.foreignIPsSeen,
 			policyResponse.homeCountriesSeen,
 			policyResponse.foreignCountriesSeen,
-		},
+			policyResponse.currentClientIP,
+			policyResponse.currentCountryCode,
+		}
+	}
+	respone, _ := json.Marshal(&RESTResult{
+		GUID:      h.guid,
+		Object:    object,
 		Operation: "query",
 		Error:     err,
 		Result:    result,
@@ -668,6 +679,7 @@ func (h *HTTP) PATCHModify() {
 					IPs:       ips,
 					Countries: countries,
 				}
+
 				customSettings.Data = append(customSettings.Data, accountRecord)
 
 				customSettingsStore.Store(customSettings)

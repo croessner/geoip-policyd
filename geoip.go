@@ -32,7 +32,10 @@ type GeoIP struct {
 	mu     sync.RWMutex
 }
 
-//goland:noinspection GoUnhandledErrorResult
+// getCountryCode returns the ISO code of the country associated with the given IP address.
+// It retrieves the geoIP.Reader and acquires a read lock on it. It then calls the Lookup function
+// on the geoIP.Reader to find the country associated with the IP address. If an error occurs,
+// it logs the error. Finally, it releases the read lock and returns the ISO code of the country.
 func getCountryCode(ipAddress string) string {
 	var (
 		err    error
@@ -43,6 +46,12 @@ func getCountryCode(ipAddress string) string {
 		}
 	)
 
+	if geoIP == nil {
+		level.Error(logger).Log("error", "no GeoIP database file available")
+
+		return ""
+	}
+
 	if val := os.Getenv("GO_TESTING"); val == "" {
 		ip := net.ParseIP(ipAddress)
 		if ip != nil {
@@ -51,7 +60,6 @@ func getCountryCode(ipAddress string) string {
 			err = geoIP.Reader.Lookup(ip, &record)
 			if err != nil {
 				level.Error(logger).Log("error", err.Error())
-
 			}
 
 			geoIP.mu.RUnlock()
