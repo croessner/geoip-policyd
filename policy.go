@@ -719,6 +719,10 @@ func processHomeCountries(remoteClient *RemoteClient, homeCountries []string, co
 // If the policy allows permanent blocking, the function sets the locked status of the remote client to true.
 // Returns a boolean indicating whether the country triggered the policy check or not.
 func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxCountries, allowedMaxHomeCountries int, guid string) bool {
+	if countryCode == "" {
+		return false
+	}
+
 	if len(trustedCountries) > 0 {
 		if isTrustedCountry(trustedCountries, countryCode, guid) {
 			// client country code is trusted, ignore other checks
@@ -756,6 +760,10 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 // the function updates the policyResponse object and locks the remoteClient account if necessary.
 // It returns true if the policy is violated, false otherwise.
 func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxIPs, allowedMaxHomeIPs int, guid string) bool {
+	if clientIP == "" {
+		return false
+	}
+
 	// Check if clientIP is in trustedIPs
 	if len(trustedIPs) > 0 {
 		if isTrustedIP(trustedIPs, clientIP, guid) {
