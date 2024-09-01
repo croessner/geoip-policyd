@@ -133,6 +133,7 @@ Arguments:
       --max-home-countries            Maximum number of home countries before rejecting e-mails. Default: 3
       --max-home-ips                  Maximum number of home IP addresses before rejecting e-mails. Default: 10
       --block-permanent               Do not expire senders from Redis, if they were blocked in the past. Default: false
+      --force-user-known              Senders are already known by an upstream service. Default: false
   -c  --custom-settings-path          Custom settings with different IP and country limits. Default: 
       --http-use-basic-auth           Enable basic HTTP auth. Default: false
       --http-use-ssl                  Enable HTTPS. Default: false
