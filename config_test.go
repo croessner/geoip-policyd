@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-ldap/ldap/v3"
 	"os"
 	"testing"
+
+	"github.com/go-ldap/ldap/v3"
 )
 
 func envSetter(envs map[string]string) (closer func()) {
@@ -731,6 +732,28 @@ func TestConfigEnvBlockedNoExpire(t *testing.T) {
 
 	if cfg.BlockPermanent != true {
 		t.Errorf("Expected --block-permanent, got value=%v", cfg.BlockPermanent)
+	}
+}
+
+func TestConfigForceUserKnown(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server", "--force-user-known"})
+
+	if cfg.ForceUserKnown != true {
+		t.Errorf("Expected --force-user-known, got value=%v", cfg.ForceUserKnown)
+	}
+}
+
+func TestConfigEnvForceUserKnown(t *testing.T) {
+	closer := envSetter(map[string]string{
+		"GEOIPPOLICYD_FORCE_USER_KNOWN": "true",
+	})
+	defer closer()
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{"app", "server"})
+
+	if cfg.ForceUserKnown != true {
+		t.Errorf("Expected --force-user-known, got value=%v", cfg.ForceUserKnown)
 	}
 }
 
