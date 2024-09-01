@@ -144,6 +144,9 @@ type CmdLineConfig struct {
 	MailUsername string
 	MailPassword string
 	MailSSL      bool
+
+	// ForceUserKnown represents a boolean flag indicating whether the user is known or not.
+	ForceUserKnown bool
 }
 
 type CustomSettings struct {
@@ -480,6 +483,12 @@ func (c *CmdLineConfig) Init(args []string) {
 			Required: false,
 			Default:  false,
 			Help:     "Do not expire senders from Redis, if they were blocked in the past",
+		})
+	argServerForceUserKnown := commandServer.Flag(
+		"", "force-user-known", &argparse.Options{
+			Required: false,
+			Default:  false,
+			Help:     "Senders are already known by an upstream service",
 		})
 	argServerCustomSettingsPath := commandServer.String(
 		"c", "custom-settings-path", &argparse.Options{
@@ -1042,6 +1051,17 @@ func (c *CmdLineConfig) Init(args []string) {
 			c.BlockPermanent = param
 		} else {
 			c.BlockPermanent = *argServerBlockedNoExpire
+		}
+
+		if val := os.Getenv("GEOIPPOLICYD_FORCE_USER_KNOWN"); val != "" {
+			param, err := strconv.ParseBool(val)
+			if err != nil {
+				log.Fatalln("Error:", err.Error())
+			}
+
+			c.ForceUserKnown = param
+		} else {
+			c.ForceUserKnown = *argServerForceUserKnown
 		}
 
 		if val := os.Getenv("GEOIPPOLICYD_IGNORE_NETWORKS"); val != "" {
