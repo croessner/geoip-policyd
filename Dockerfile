@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.22-alpine3.20 AS builder
 
 WORKDIR /build
 
@@ -11,13 +11,15 @@ ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 RUN go build -mod vendor -v -ldflags="-s -w" -o geoip-policyd .
 RUN cd ./stresstest && go build -mod vendor -v -v -ldflags="-s -w" -o stresstest main.go
 
-FROM scratch
+FROM alpine:3.20
 
 LABEL org.opencontainers.image.authors="christian@roessner.email"
 LABEL com.roessner-network-solutions.vendor="Rößner-Network-Solutions"
 LABEL description="Postfix policy service that blocks clients, if they come from too many countires or IP addresses."
 
 WORKDIR /usr/app
+
+RUN apk --no-cache --upgrade add ca-certificates bash curl
 
 # Copy binary to destination image
 COPY --from=builder ["/build/geoip-policyd", "./"]
