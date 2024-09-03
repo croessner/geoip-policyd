@@ -379,22 +379,31 @@ func (h *HTTP) POSTQuery() {
 	} else {
 		object = struct {
 			RemoteAddr           string   `json:"remote_addr"`
+			PolicyReject         bool     `json:"policy_reject"`
+			Whitelisted          bool     `json:"whitelisted"`
+			CurrentClientIP      string   `json:"current_client_ip"`
+			CurrentCountryCode   string   `json:"current_country_code"`
+			ToalIPs              int      `json:"total_ips"`
+			ToalCountries        int      `json:"total_countries"`
 			HomeIPsSeen          []string `json:"home_ips_seen"`
 			ForeignIPsSeen       []string `json:"foreign_ips_seen"`
 			HomeCountriesSeen    []string `json:"home_countries_seen"`
 			ForeignCountriesSeen []string `json:"foreign_countries_seen"`
-			CurrentClientIP      string   `json:"current_client_ip"`
-			CurrentCountryCode   string   `json:"current_country_code"`
 		}{
 			h.request.RemoteAddr,
+			policyResponse.fired,
+			policyResponse.whitelisted,
+			policyResponse.currentClientIP,
+			policyResponse.currentCountryCode,
+			policyResponse.totalIPs,
+			policyResponse.totalCountries,
 			policyResponse.homeIPsSeen,
 			policyResponse.foreignIPsSeen,
 			policyResponse.homeCountriesSeen,
 			policyResponse.foreignCountriesSeen,
-			policyResponse.currentClientIP,
-			policyResponse.currentCountryCode,
 		}
 	}
+
 	respone, _ := json.Marshal(&RESTResult{
 		GUID:      h.guid,
 		Object:    object,

@@ -679,7 +679,7 @@ func applyCustomSettings(customSettings *CustomSettings, sender string, allowedM
 	}
 }
 
-// applyHomeSettings processes the home countries for a remote client.
+// checkHomeCountry processes the home countries for a remote client.
 //
 // It checks if the given list of home countries contains the provided country code.
 // If a match is found, the client's home IP address and country code are updated,
@@ -691,7 +691,9 @@ func applyCustomSettings(customSettings *CustomSettings, sender string, allowedM
 // - countryCode: The country code to match against the home countries.
 // - clientIP: The IP address of the client.
 // - guid: The unique identifier of the client.
-func applyHomeSettings(remoteClient *RemoteClient, homeCountries []string, countryCode, clientIP, guid string) {
+//
+// Returns true, if the IP or country matched home settings
+func checkHomeCountry(remoteClient *RemoteClient, homeCountries []string, countryCode, clientIP, guid string) bool {
 	for _, homeCountry := range homeCountries {
 		level.Debug(logger).Log("guid", guid, "msg", "Checking", "home_country", homeCountry)
 
@@ -700,11 +702,14 @@ func applyHomeSettings(remoteClient *RemoteClient, homeCountries []string, count
 		}
 
 		level.Debug(logger).Log("guid", guid, "msg", "Country matched", "home_country", homeCountry)
+
 		remoteClient.AddHomeIPAddress(clientIP)
 		remoteClient.AddHomeCountryCode(countryCode)
 
-		break
+		return true
 	}
+
+	return false
 }
 
 // checkCountryPolicy checks if the country policy allows the remote client to proceed.
@@ -713,7 +718,7 @@ func applyHomeSettings(remoteClient *RemoteClient, homeCountries []string, count
 // or the number of home countries in the remote client exceeds the allowed maximum home countries, the function returns true.
 // If the policy allows permanent blocking, the function sets the locked status of the remote client to true.
 // Returns a boolean indicating whether the country triggered the policy check or not.
-func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxCountries, allowedMaxHomeCountries int, guid string) bool {
+func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxCountries, allowedMaxHomeCountries int, guid string, isHome bool) bool {
 	if countryCode == "" {
 		return false
 	}
@@ -731,6 +736,10 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 		}
 
 		return true
+	}
+
+	if !isHome {
+		remoteClient.AddCountryCode(countryCode)
 	}
 
 	// Proceed with other checks if no trusted country codes
@@ -754,7 +763,7 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 // If the client's IP address is not trusted or the number of IP addresses or home IP addresses exceeds the allowed maximums,
 // the function updates the policyResponse object and locks the remoteClient account if necessary.
 // It returns true if the policy is violated, false otherwise.
-func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxIPs, allowedMaxHomeIPs int, guid string) bool {
+func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxIPs, allowedMaxHomeIPs int, guid string, isHome bool) bool {
 	if clientIP == "" {
 		return false
 	}
@@ -773,6 +782,10 @@ func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP st
 		}
 
 		return true
+	}
+
+	if !isHome {
+		remoteClient.AddIPAddress(clientIP)
 	}
 
 	// Proceed with other checks if no trusted IPs
@@ -893,11 +906,11 @@ func networkContainsIP(trustedIPOrNet string, ipAddress net.IP, guid string) boo
 //	evaluatePolicy(remoteClient, trustedIPs, trustedCountries, countryCode,
 //	                 allowedMaxCountries, allowedMaxHomeCountries, allowedMaxIPs,
 //	                 allowedMaxHomeIPs, policyResponse, clientIP, guid)
-func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []string, countryCode string, allowedMaxCountries, allowedMaxHomeCountries, allowedMaxIPs, allowedMaxHomeIPs int, policyResponse *PolicyResponse, clientIP, guid string) bool {
+func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []string, countryCode string, allowedMaxCountries, allowedMaxHomeCountries, allowedMaxIPs, allowedMaxHomeIPs int, policyResponse *PolicyResponse, clientIP, guid string, isHome bool) bool {
 	var requireActions bool
 
-	if checkCountryPolicy(remoteClient, trustedCountries, countryCode, policyResponse, allowedMaxCountries, allowedMaxHomeCountries, guid) ||
-		checkIPsPolicy(remoteClient, trustedIPs, clientIP, policyResponse, allowedMaxIPs, allowedMaxHomeIPs, guid) {
+	if checkCountryPolicy(remoteClient, trustedCountries, countryCode, policyResponse, allowedMaxCountries, allowedMaxHomeCountries, guid, isHome) ||
+		checkIPsPolicy(remoteClient, trustedIPs, clientIP, policyResponse, allowedMaxIPs, allowedMaxHomeIPs, guid, isHome) {
 		requireActions = true
 	}
 
@@ -1051,6 +1064,19 @@ func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient,
 		"allowed_max_home_ips", config.MaxHomeIPs,
 		"action", getActionStatus(policyResponse),
 	)
+}
+
+// updatePolicyResponse updates the fields of the PolicyResponse struct based on information from the RemoteClient.
+// It populates the foreignIPsSeen, foreignCountriesSeen, homeIPsSeen, homeCountriesSeen, totalIPs, and totalCountries fields.
+// The response parameter is a pointer to the PolicyResponse struct that needs to be updated.
+// The client parameter is a pointer to the RemoteClient struct from which the information is extracted.
+func updatePolicyResponse(response *PolicyResponse, client *RemoteClient) {
+	response.foreignIPsSeen = strings.Split(getForeignIPsSeen(client), ",")
+	response.foreignCountriesSeen = strings.Split(getForeignCountriesSeen(client), ",")
+	response.homeIPsSeen = strings.Split(getHomeIPsSeen(client), ",")
+	response.homeCountriesSeen = strings.Split(getHomeCountriesSeen(client), ",")
+	response.totalIPs = getTotalIPs(client, response)
+	response.totalCountries = getTotalCountries(client, response)
 }
 
 // getUserAttribute returns the attribute to be used for the user.
@@ -1216,11 +1242,11 @@ func getActionStatus(policyResponse *PolicyResponse) string {
 	return "ok"
 }
 
-// setCurrentValues sets the current client IP and country code in the PolicyResponse object.
+// setCurrentClientInfo sets the current client IP and country code in the PolicyResponse object.
 // It takes the IP address, country code, and a pointer to the PolicyResponse object as input parameters.
 // It assigns the IP address to the `currentClientIP` field and the country code to the `currentCountryCode` field
 // of the PolicyResponse object.
-func setCurrentValues(ip string, code string, policyResponse *PolicyResponse) {
+func setCurrentClientInfo(ip string, code string, policyResponse *PolicyResponse) {
 	policyResponse.currentClientIP = ip
 	policyResponse.currentCountryCode = code
 }
@@ -1232,7 +1258,7 @@ func setCurrentValues(ip string, code string, policyResponse *PolicyResponse) {
 // if the sender is known by calling the checkUserKnown function, gets the country code of the clientIP by
 // calling the getCountryCode function, fetches and logs the remote client by calling the fetchAndLogRemoteClient
 // function, applies custom settings based on the sender by calling the applyCustomSettings function, determines
-// if the client is at home by calling the applyHomeSettings function, processes the remote client's countries
+// if the client is at home by calling the checkHomeCountry function, processes the remote client's countries
 // by calling the evaluatePolicy function, handles the client actions based on the remoteClient, sender,
 // userKnown, and requireActions variables by calling the handleClientActions function, updates the Redis cache
 // by calling the updateRedisCache function, logs the policy result by calling the logPolicyResult function,
@@ -1268,7 +1294,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 
 	countryCode := getCountryCode(clientIP)
 
-	setCurrentValues(clientIP, countryCode, policyResponse)
+	setCurrentClientInfo(clientIP, countryCode, policyResponse)
 
 	remoteClient, err := fetchAndLogRemoteClient(sender, clientIP, countryCode, guid)
 	if err != nil {
@@ -1287,8 +1313,6 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		&allowedMaxHomeCountries,
 	)
 
-	applyHomeSettings(remoteClient, homeCountries, countryCode, clientIP, guid)
-
 	requireActions := evaluatePolicy(
 		remoteClient,
 		trustedIPs,
@@ -1301,6 +1325,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		policyResponse,
 		clientIP,
 		guid,
+		checkHomeCountry(remoteClient, homeCountries, countryCode, clientIP, guid),
 	)
 
 	if remoteClient.Locked {
@@ -1315,6 +1340,7 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		return nil, err
 	}
 
+	updatePolicyResponse(policyResponse, remoteClient)
 	logPolicyResult(policyResponse, remoteClient, sender, trustedCountries, trustedIPs, guid)
 
 	return policyResponse, nil
