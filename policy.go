@@ -92,8 +92,8 @@ type PolicyResponse struct {
 
 // RemoteClient represents a remote client and its related information.
 // It contains the following properties:
-//   - IPs: A map of known IP addresses with their time-to-live (TTL) values.
-//   - Countries: A map of known country codes with their TTL values.
+//   - ForeignIPs: A map of known IP addresses with their time-to-live (TTL) values.
+//   - ForeignCountries: A map of known country codes with their TTL values.
 //   - HomeCountries: A pointer to a RedisHomeCountries object that contains
 //     information about home IP addresses and their corresponding countries.
 //   - Actions: A slice of strings representing the actions that may have been executed.
@@ -109,29 +109,29 @@ type PolicyResponse struct {
 // Example usage:
 //
 //	rc := &RemoteClient{
-//	  IPs:           make(TTLStringMap),
-//	  Countries:     make(TTLStringMap),
-//	  HomeCountries: &RedisHomeCountries{IPs: make(TTLStringMap), Countries: make(TTLStringMap)},
+//	  ForeignIPs:           make(TTLStringMap),
+//	  ForeignCountries:     make(TTLStringMap),
+//	  HomeCountries: &RedisHomeCountries{ForeignIPs: make(TTLStringMap), ForeignCountries: make(TTLStringMap)},
 //	  Actions:       []string{"action1", "action2"},
 //	  Locked:        false,
 //	}
 //
-// rc.AddCountryCode("US")
-// rc.CleanUpCountries()
+// rc.AddForeignCountryCode("US")
+// rc.CleanUpForeignCountries()
 // rc.CleanUpHomeCountries()
-// rc.CleanUpIPs()
+// rc.CleanUpForeignIPs()
 // rc.CleanUpHomeIPs()
-// rc.haveCountries()
-// rc.haveIPs()
+// rc.haveForeignCountries()
+// rc.haveForeignIPs()
 // rc.haveHome()
 // rc.haveHomeCountries()
 // rc.haveHomeIPs()
 type RemoteClient struct {
-	// IPs represents  a Time To Live (TTL) string map with the Redis tag "ips".
-	IPs TTLStringMap `redis:"ips"`
+	// ForeignIPs represents  a Time To Live (TTL) string map with the Redis tag "ips".
+	ForeignIPs TTLStringMap `redis:"ips"`
 
-	// Countries represents a Time To Live (TTL) string map stored in Redis with the key name "countries".
-	Countries TTLStringMap `redis:"countries"`
+	// ForeignCountries represents a Time To Live (TTL) string map stored in Redis with the key name "countries".
+	ForeignCountries TTLStringMap `redis:"countries"`
 
 	// HomeCountries represents a field used to store RedisHomeCountries data in the Redis database.
 	// It is tagged with "home_countries" for Redis mapping.
@@ -151,7 +151,7 @@ func (r *RemoteClient) haveHome() bool {
 	return r.HomeCountries != nil
 }
 
-// haveHomeCountries checks if the RemoteClient has a non-nil HomeCountries map and non-nil Countries map.
+// haveHomeCountries checks if the RemoteClient has a non-nil HomeCountries map and non-nil ForeignCountries map.
 // It returns true if both maps exist and are not empty, otherwise it returns false.
 func (r *RemoteClient) haveHomeCountries() bool {
 	if r.haveHome() {
@@ -161,7 +161,7 @@ func (r *RemoteClient) haveHomeCountries() bool {
 	return false
 }
 
-// haveHomeIPs checks if the RemoteClient has a non-nil HomeCountries map and non-nil IPs map.
+// haveHomeIPs checks if the RemoteClient has a non-nil HomeCountries map and non-nil ForeignIPs map.
 // It returns true if both maps exist and are not empty, otherwise it returns false.
 func (r *RemoteClient) haveHomeIPs() bool {
 	if r.haveHome() {
@@ -171,31 +171,31 @@ func (r *RemoteClient) haveHomeIPs() bool {
 	return false
 }
 
-// haveCountries checks if the RemoteClient has a non-nil Countries map.
-// It returns true if the Countries map exists and is not empty, otherwise it returns false.
-func (r *RemoteClient) haveCountries() bool {
-	return r.Countries != nil
+// haveForeignCountries checks if the RemoteClient has a non-nil ForeignCountries map.
+// It returns true if the ForeignCountries map exists and is not empty, otherwise it returns false.
+func (r *RemoteClient) haveForeignCountries() bool {
+	return r.ForeignCountries != nil
 }
 
-// haveIPs checks if the RemoteClient has a non-nil IPs map.
-// It returns true if the IPs map exists and is not empty, otherwise it returns false.
-func (r *RemoteClient) haveIPs() bool {
-	return r.IPs != nil
+// haveForeignIPs checks if the RemoteClient has a non-nil ForeignIPs map.
+// It returns true if the ForeignIPs map exists and is not empty, otherwise it returns false.
+func (r *RemoteClient) haveForeignIPs() bool {
+	return r.ForeignIPs != nil
 }
 
-// CleanUpCountries removes expired country codes from the RemoteClient's Countries map.
+// CleanUpForeignCountries removes expired country codes from the RemoteClient's ForeignCountries map.
 // If the map does not exist or is empty, it does nothing.
 // It iterates over the country codes in the map, and for each code, checks if its lifetime
 // exceeds the configured Redis TTL. If it does, the code is removed from the map.
 // The cleaning logic is based on the current timestamp and the created timestamp for each country code.
-func (r *RemoteClient) CleanUpCountries() {
-	if !r.haveCountries() {
+func (r *RemoteClient) CleanUpForeignCountries() {
+	if !r.haveForeignCountries() {
 		return
 	}
 
 	countryCodes := make(TTLStringMap)
 
-	for country, created := range r.Countries {
+	for country, created := range r.ForeignCountries {
 		lifetime := time.Duration(config.RedisTTL) * time.Second
 
 		if time.Now().UnixNano()-lifetime.Nanoseconds() < created {
@@ -203,7 +203,7 @@ func (r *RemoteClient) CleanUpCountries() {
 		}
 	}
 
-	r.Countries = countryCodes
+	r.ForeignCountries = countryCodes
 }
 
 // CleanUpHomeCountries removes expired home country codes from the RemoteClient's HomeCountries map.
@@ -230,20 +230,20 @@ func (r *RemoteClient) CleanUpHomeCountries() {
 	r.HomeCountries.Countries = countryCodes
 }
 
-// CleanUpIPs removes expired IP addresses from the RemoteClient's IPs map.
-// If the IPs map does not exist or is empty, it does nothing.
+// CleanUpForeignIPs removes expired IP addresses from the RemoteClient's ForeignIPs map.
+// If the ForeignIPs map does not exist or is empty, it does nothing.
 // It iterates over the IP addresses in the map, and for each address, checks if its lifetime
-// exceeds the configured Redis TTL. If it does, the address is removed from the IPs map.
+// exceeds the configured Redis TTL. If it does, the address is removed from the ForeignIPs map.
 // The cleaning logic is based on the current timestamp and the created timestamp for each IP address.
-// If the RemoteClient does not have an IPs map, it creates an empty map.
-func (r *RemoteClient) CleanUpIPs() {
-	if !r.haveIPs() {
+// If the RemoteClient does not have an ForeignIPs map, it creates an empty map.
+func (r *RemoteClient) CleanUpForeignIPs() {
+	if !r.haveForeignIPs() {
 		return
 	}
 
 	ips := make(TTLStringMap)
 
-	for ipAddress, created := range r.IPs {
+	for ipAddress, created := range r.ForeignIPs {
 		lifetime := time.Duration(config.RedisTTL) * time.Second
 
 		if time.Now().UnixNano()-lifetime.Nanoseconds() < created {
@@ -251,7 +251,7 @@ func (r *RemoteClient) CleanUpIPs() {
 		}
 	}
 
-	r.IPs = ips
+	r.ForeignIPs = ips
 }
 
 // CleanUpHomeIPs removes expired home IP addresses from the RemoteClient's HomeCountries map.
@@ -278,25 +278,25 @@ func (r *RemoteClient) CleanUpHomeIPs() {
 	r.HomeCountries.IPs = ips
 }
 
-// AddCountryCode adds a country code to the RemoteClient's Countries map.
+// AddForeignCountryCode adds a country code to the RemoteClient's ForeignCountries map.
 // If the country code is empty, it does nothing.
-// If the RemoteClient is not locked, it cleans up the Countries using the CleanUpCountries method.
-// If the Countries map does not exist, it creates one.
-// Finally, it adds the country code with the current timestamp to the Countries map.
-func (r *RemoteClient) AddCountryCode(countryCode string) {
+// If the RemoteClient is not locked, it cleans up the ForeignCountries using the CleanUpForeignCountries method.
+// If the ForeignCountries map does not exist, it creates one.
+// Finally, it adds the country code with the current timestamp to the ForeignCountries map.
+func (r *RemoteClient) AddForeignCountryCode(countryCode string) {
 	if countryCode == "" {
 		return
 	}
 
 	if !r.Locked {
-		r.CleanUpCountries()
+		r.CleanUpForeignCountries()
 	}
 
-	if !r.haveCountries() {
-		r.Countries = make(TTLStringMap)
+	if !r.haveForeignCountries() {
+		r.ForeignCountries = make(TTLStringMap)
 	}
 
-	r.Countries[countryCode] = time.Now().UnixNano()
+	r.ForeignCountries[countryCode] = time.Now().UnixNano()
 }
 
 // AddHomeCountryCode adds a home country code to the RemoteClient's HomeCountries map.
@@ -304,7 +304,7 @@ func (r *RemoteClient) AddCountryCode(countryCode string) {
 // If the RemoteClient does not have a HomeCountries map, it creates one.
 // If the RemoteClient is not locked, it cleans up the HomeCountries using the CleanUpHomeCountries method.
 // If the HomeCountries map does not exist, it creates one.
-// Finally, it adds the country code with the current timestamp to the HomeCountries' Countries map.
+// Finally, it adds the country code with the current timestamp to the HomeCountries' ForeignCountries map.
 func (r *RemoteClient) AddHomeCountryCode(countryCode string) {
 	if countryCode == "" {
 		return
@@ -325,27 +325,27 @@ func (r *RemoteClient) AddHomeCountryCode(countryCode string) {
 	r.HomeCountries.Countries[countryCode] = time.Now().UnixNano()
 }
 
-// AddIPAddress adds an IP address to the RemoteClient's IPs map.
-// If the RemoteClient is not locked, it cleans up the IPs using the CleanUpIPs method.
-// If the IPs map does not exist, it creates one.
-// Finally, it adds the ipAddress with the current timestamp to the IPs map.
-func (r *RemoteClient) AddIPAddress(ipAddress string) {
+// AddForeignIPAddress adds an IP address to the RemoteClient's ForeignIPs map.
+// If the RemoteClient is not locked, it cleans up the ForeignIPs using the CleanUpForeignIPs method.
+// If the ForeignIPs map does not exist, it creates one.
+// Finally, it adds the ipAddress with the current timestamp to the ForeignIPs map.
+func (r *RemoteClient) AddForeignIPAddress(ipAddress string) {
 	if !r.Locked {
-		r.CleanUpIPs()
+		r.CleanUpForeignIPs()
 	}
 
-	if !r.haveIPs() {
-		r.IPs = make(TTLStringMap)
+	if !r.haveForeignIPs() {
+		r.ForeignIPs = make(TTLStringMap)
 	}
 
-	r.IPs[ipAddress] = time.Now().UnixNano()
+	r.ForeignIPs[ipAddress] = time.Now().UnixNano()
 }
 
 // AddHomeIPAddress adds a home IP address to the RemoteClient's HomeCountries map.
 // If the RemoteClient does not have a HomeCountries map, it creates one.
 // If the RemoteClient is not locked, it cleans up the HomeIPs using the CleanUpHomeIPs method.
 // If the HomeCountries map does not exist, it creates one.
-// Finally, it adds the ipAddress with the current timestamp to the HomeCountries' IPs map.
+// Finally, it adds the ipAddress with the current timestamp to the HomeCountries' ForeignIPs map.
 func (r *RemoteClient) AddHomeIPAddress(ipAddress string) {
 	if !r.haveHome() {
 		r.HomeCountries = &RedisHomeCountries{}
@@ -602,8 +602,8 @@ func fetchRemoteClient(sender string) (*RemoteClient, error) {
 // and logs the GUID, home IP address, and timestamp.
 // The function does not return any values.
 func logClientDetails(remoteClient *RemoteClient, guid string) {
-	if remoteClient.haveIPs() {
-		for ipAddress, date := range remoteClient.IPs {
+	if remoteClient.haveForeignIPs() {
+		for ipAddress, date := range remoteClient.ForeignIPs {
 			level.Debug(logger).Log("guid", guid, "ip_address", ipAddress, "timestamp", date2String(date))
 		}
 	}
@@ -623,11 +623,12 @@ func logCountryDetails(remoteClient *RemoteClient, countryCode, clientIP, guid s
 	if countryCode == "" {
 		level.Debug(logger).Log("guid", guid, "msg", "No country code present", "client_address", clientIP)
 	} else {
-		if remoteClient.haveCountries() {
-			for country, date := range remoteClient.Countries {
+		if remoteClient.haveForeignCountries() {
+			for country, date := range remoteClient.ForeignCountries {
 				level.Debug(logger).Log("guid", guid, "country_code", country, "timestamp", date2String(date))
 			}
 		}
+
 		if remoteClient.haveHomeCountries() {
 			for country, date := range remoteClient.HomeCountries.Countries {
 				level.Debug(logger).Log("guid", guid, "home_country_code", country, "timestamp", date2String(date))
@@ -637,9 +638,9 @@ func logCountryDetails(remoteClient *RemoteClient, countryCode, clientIP, guid s
 }
 
 // applyCustomSettings applies custom settings based on the sender from the given custom settings.
-// The allowedMaxIPs, allowedMaxCountries, trustedIPs, trustedCountries, homeCountries, allowedMaxHomeIPs,
+// The allowedMaxForeignIPs, allowedMaxForeignCountries, trustedIPs, trustedCountries, homeCountries, allowedMaxHomeIPs,
 // and allowedMaxHomeCountries variables are updated with the corresponding values from the custom settings.
-func applyCustomSettings(customSettings *CustomSettings, sender string, allowedMaxIPs, allowedMaxCountries *int, trustedIPs, trustedCountries *[]string, homeCountries *[]string, allowedMaxHomeIPs, allowedMaxHomeCountries *int) {
+func applyCustomSettings(customSettings *CustomSettings, sender string, allowedMaxForeignIPs, allowedMaxForeignCountries *int, trustedIPs, trustedCountries *[]string, homeCountries *[]string, allowedMaxHomeIPs, allowedMaxHomeCountries *int) {
 	if customSettings != nil && len(customSettings.Data) > 0 {
 		for _, setting := range customSettings.Data {
 			if setting.Sender != sender {
@@ -647,11 +648,11 @@ func applyCustomSettings(customSettings *CustomSettings, sender string, allowedM
 			}
 
 			if setting.IPs > 0 {
-				*allowedMaxIPs = setting.IPs
+				*allowedMaxForeignIPs = setting.IPs
 			}
 
 			if setting.Countries > 0 {
-				*allowedMaxCountries = setting.Countries
+				*allowedMaxForeignCountries = setting.Countries
 			}
 
 			if len(setting.TrustedIPs) > 0 {
@@ -718,7 +719,7 @@ func checkHomeCountry(remoteClient *RemoteClient, homeCountries []string, countr
 // or the number of home countries in the remote client exceeds the allowed maximum home countries, the function returns true.
 // If the policy allows permanent blocking, the function sets the locked status of the remote client to true.
 // Returns a boolean indicating whether the country triggered the policy check or not.
-func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxCountries, allowedMaxHomeCountries int, guid string, isHome bool) bool {
+func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxForeignCountries, allowedMaxHomeCountries int, guid string, isHome bool) bool {
 	if countryCode == "" {
 		return false
 	}
@@ -739,11 +740,11 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 	}
 
 	if !isHome {
-		remoteClient.AddCountryCode(countryCode)
+		remoteClient.AddForeignCountryCode(countryCode)
 	}
 
 	// Proceed with other checks if no trusted country codes
-	if len(remoteClient.Countries) > allowedMaxCountries ||
+	if len(remoteClient.ForeignCountries) > allowedMaxForeignCountries ||
 		(remoteClient.haveHomeCountries() && len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries) {
 
 		policyResponse.fired = true
@@ -763,7 +764,7 @@ func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, c
 // If the client's IP address is not trusted or the number of IP addresses or home IP addresses exceeds the allowed maximums,
 // the function updates the policyResponse object and locks the remoteClient account if necessary.
 // It returns true if the policy is violated, false otherwise.
-func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxIPs, allowedMaxHomeIPs int, guid string, isHome bool) bool {
+func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxForeignIPs, allowedMaxHomeIPs int, guid string, isHome bool) bool {
 	if clientIP == "" {
 		return false
 	}
@@ -785,11 +786,11 @@ func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP st
 	}
 
 	if !isHome {
-		remoteClient.AddIPAddress(clientIP)
+		remoteClient.AddForeignIPAddress(clientIP)
 	}
 
-	// Proceed with other checks if no trusted IPs
-	if len(remoteClient.IPs) > allowedMaxIPs ||
+	// Proceed with other checks if no trusted ForeignIPs
+	if len(remoteClient.ForeignIPs) > allowedMaxForeignIPs ||
 		(remoteClient.haveHomeIPs() && len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs) {
 
 		policyResponse.fired = true
@@ -887,9 +888,9 @@ func networkContainsIP(trustedIPOrNet string, ipAddress net.IP, guid string) boo
 // - trustedIPs: a slice of trusted IP addresses
 // - trustedCountries: a slice of trusted country codes
 // - countryCode: a string representing the country code of the client
-// - allowedMaxCountries: an int representing the maximum number of countries allowed
+// - allowedMaxForeignCountries: an int representing the maximum number of countries allowed
 // - allowedMaxHomeCountries: an int representing the maximum number of home countries allowed
-// - allowedMaxIPs: an int representing the maximum number of IP addresses allowed
+// - allowedMaxForeignIPs: an int representing the maximum number of IP addresses allowed
 // - allowedMaxHomeIPs: an int representing the maximum number of home IP addresses allowed
 // - policyResponse: a pointer to a PolicyResponse object where the responses are updated
 // - clientIP: a string representing the IP address of the client
@@ -904,13 +905,13 @@ func networkContainsIP(trustedIPOrNet string, ipAddress net.IP, guid string) boo
 // Example usage:
 //
 //	evaluatePolicy(remoteClient, trustedIPs, trustedCountries, countryCode,
-//	                 allowedMaxCountries, allowedMaxHomeCountries, allowedMaxIPs,
+//	                 allowedMaxForeignCountries, allowedMaxHomeCountries, allowedMaxForeignIPs,
 //	                 allowedMaxHomeIPs, policyResponse, clientIP, guid)
-func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []string, countryCode string, allowedMaxCountries, allowedMaxHomeCountries, allowedMaxIPs, allowedMaxHomeIPs int, policyResponse *PolicyResponse, clientIP, guid string, isHome bool) bool {
+func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []string, countryCode string, allowedMaxForeignCountries, allowedMaxHomeCountries, allowedMaxForeignIPs, allowedMaxHomeIPs int, policyResponse *PolicyResponse, clientIP, guid string, isHome bool) bool {
 	var requireActions bool
 
-	if checkCountryPolicy(remoteClient, trustedCountries, countryCode, policyResponse, allowedMaxCountries, allowedMaxHomeCountries, guid, isHome) ||
-		checkIPsPolicy(remoteClient, trustedIPs, clientIP, policyResponse, allowedMaxIPs, allowedMaxHomeIPs, guid, isHome) {
+	if checkCountryPolicy(remoteClient, trustedCountries, countryCode, policyResponse, allowedMaxForeignCountries, allowedMaxHomeCountries, guid, isHome) ||
+		checkIPsPolicy(remoteClient, trustedIPs, clientIP, policyResponse, allowedMaxForeignIPs, allowedMaxHomeIPs, guid, isHome) {
 		requireActions = true
 	}
 
@@ -1038,11 +1039,11 @@ func updateRedisCache(sender string, remoteClient *RemoteClient) error {
 }
 
 // logPolicyResult logs the policy result using the provided policy response, remote client, sender,
-// trusted countries, trusted IPs, and GUID. It uses the level.Info function from the logger
+// trusted countries, trusted ForeignIPs, and GUID. It uses the level.Info function from the logger
 // to log the information with the following fields: guid, user attribute,
 // foreign countries seen, home countries seen, home countries defined, trusted countries defined,
-// total countries, allowed max foreign countries, allowed max home countries, foreign IPs seen,
-// home IPs seen, trusted IPs defined, total IPs, allowed max foreign IPs, allowed max home IPs,
+// total countries, allowed max foreign countries, allowed max home countries, foreign ForeignIPs seen,
+// home ForeignIPs seen, trusted ForeignIPs defined, total ForeignIPs, allowed max foreign ForeignIPs, allowed max home ForeignIPs,
 // and action status.
 func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient, sender string, trustedCountries, trustedIPs []string, guid string) {
 	level.Info(logger).Log("guid", guid,
@@ -1097,10 +1098,10 @@ func getUserAttribute() string {
 // getForeignCountriesSeen returns a string containing all the foreign country codes seen by the remote client.
 // If the remote client does not have any foreign country codes, it returns "N/A".
 func getForeignCountriesSeen(remoteClient *RemoteClient) string {
-	if remoteClient.haveCountries() {
+	if remoteClient.haveForeignCountries() {
 		var countries []string
 
-		for country := range remoteClient.Countries {
+		for country := range remoteClient.ForeignCountries {
 			countries = append(countries, country)
 		}
 
@@ -1154,8 +1155,8 @@ func getTrustedCountries(trustedCountries []string) string {
 func getTotalCountries(remoteClient *RemoteClient, policyResponse *PolicyResponse) int {
 	sum := 0
 
-	if remoteClient.haveCountries() {
-		sum = len(remoteClient.Countries)
+	if remoteClient.haveForeignCountries() {
+		sum = len(remoteClient.ForeignCountries)
 	}
 
 	if remoteClient.haveHomeCountries() {
@@ -1170,9 +1171,9 @@ func getTotalCountries(remoteClient *RemoteClient, policyResponse *PolicyRespons
 // getForeignIPsSeen returns a string containing all the foreign IP addresses
 // seen by the remote client. If there are no IP addresses available, it returns "N/A".
 func getForeignIPsSeen(remoteClient *RemoteClient) string {
-	if remoteClient.haveIPs() {
+	if remoteClient.haveForeignIPs() {
 		var ips []string
-		for ip := range remoteClient.IPs {
+		for ip := range remoteClient.ForeignIPs {
 			ips = append(ips, ip)
 		}
 
@@ -1199,7 +1200,7 @@ func getHomeIPsSeen(remoteClient *RemoteClient) string {
 }
 
 // getTrustedIPs takes a slice of trustedIPs and returns a string representation
-// of the trusted IPs separated by commas. If the trustedIPs slice is empty,
+// of the trusted ForeignIPs separated by commas. If the trustedIPs slice is empty,
 // the function returns "N/A".
 func getTrustedIPs(trustedIPs []string) string {
 	if len(trustedIPs) > 0 {
@@ -1218,8 +1219,8 @@ func getTrustedIPs(trustedIPs []string) string {
 func getTotalIPs(remoteClient *RemoteClient, policyResponse *PolicyResponse) int {
 	sum := 0
 
-	if remoteClient.haveIPs() {
-		sum = len(remoteClient.IPs)
+	if remoteClient.haveForeignIPs() {
+		sum = len(remoteClient.ForeignIPs)
 	}
 
 	if remoteClient.haveHomeIPs() {
@@ -1265,13 +1266,13 @@ func setCurrentClientInfo(ip string, code string, policyResponse *PolicyResponse
 // and finally returns the policyResponse and nil error.
 func getPolicyResponse(policyRequest map[string]string, guid string) (policyResponse *PolicyResponse, err error) {
 	var (
-		trustedCountries        []string
-		trustedIPs              []string
-		allowedMaxIPs           = config.MaxIPs
-		allowedMaxCountries     = config.MaxCountries
-		homeCountries           = config.HomeCountries
-		allowedMaxHomeIPs       = config.MaxHomeIPs
-		allowedMaxHomeCountries = config.MaxHomeCountries
+		trustedCountries           []string
+		trustedIPs                 []string
+		allowedMaxForeignIPs       = config.MaxIPs
+		allowedMaxForeignCountries = config.MaxCountries
+		homeCountries              = config.HomeCountries
+		allowedMaxHomeIPs          = config.MaxHomeIPs
+		allowedMaxHomeCountries    = config.MaxHomeCountries
 	)
 
 	policyResponse = &PolicyResponse{}
@@ -1304,8 +1305,8 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 	applyCustomSettings(
 		customSettingsStore.Load().(*CustomSettings),
 		sender,
-		&allowedMaxIPs,
-		&allowedMaxCountries,
+		&allowedMaxForeignIPs,
+		&allowedMaxForeignCountries,
 		&trustedIPs,
 		&trustedCountries,
 		&homeCountries,
@@ -1318,9 +1319,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		trustedIPs,
 		trustedCountries,
 		countryCode,
-		allowedMaxCountries,
+		allowedMaxForeignCountries,
 		allowedMaxHomeCountries,
-		allowedMaxIPs,
+		allowedMaxForeignIPs,
 		allowedMaxHomeIPs,
 		policyResponse,
 		clientIP,
