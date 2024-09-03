@@ -8,8 +8,14 @@ RUN go mod download
 
 # Set necessarry environment vairables and compile the app
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -mod vendor -v -ldflags="-s -w" -o geoip-policyd .
-RUN cd ./stresstest && go build -mod vendor -v -v -ldflags="-s -w" -o stresstest main.go
+
+RUN apk --no-cache --upgrade add git
+
+RUN GIT_TAG=$(git describe --tags --abbrev=0) && echo "tag="${GIT_TAG}"" && \
+    GIT_COMMIT=$(git rev-parse --short HEAD) && echo "commit="${GIT_COMMIT}"" && \
+    go build -mod vendor -v -ldflags="-s -X main.version=${GIT_TAG}-${GIT_COMMIT}" -o geoip-policyd .
+
+RUN cd ./stresstest && go build -mod vendor -v -ldflags="-s" -o stresstest main.go
 
 FROM alpine:3.20
 

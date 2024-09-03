@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -135,6 +136,11 @@ func TestNetworkContainsIP(t *testing.T) {
 	}
 }
 
+// setTTL returns the Unix timestamp in nanoseconds for the current time plus one hour.
+func setTTL() int64 {
+	return time.Now().UnixNano() + time.Hour.Nanoseconds()
+}
+
 func TestCheckIPsPolicy(t *testing.T) {
 	config = &CmdLineConfig{BlockPermanent: true}
 
@@ -145,43 +151,43 @@ func TestCheckIPsPolicy(t *testing.T) {
 		clientIP              string
 		policyResponse        *PolicyResponse
 		expectedPolicyRespone *PolicyResponse
-		allowedMaxIPs         int
+		allowedMaxForeignIPs  int
 		allowedMaxHomeIPs     int
 		guid                  string
 		want                  bool
 	}{
 		{
 			name:                  "No trusted IPs, within max IP limits",
-			remoteClient:          &RemoteClient{IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()}},
 			trustedIPs:            []string{},
 			clientIP:              "1.1.1.1",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
-			allowedMaxIPs:         10,
+			allowedMaxForeignIPs:  10,
 			allowedMaxHomeIPs:     10,
 			guid:                  "test1",
 			want:                  false,
 		},
 		{
 			name:                  "Client IP not trusted, exceeds max IP limits",
-			remoteClient:          &RemoteClient{IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0, "3.3.3.3": 0, "4.4.4.4": 0, "5.5.5.5": 0, "6.6.6.6": 0}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL(), "4.4.4.4": setTTL(), "5.5.5.5": setTTL(), "6.6.6.6": setTTL()}},
 			trustedIPs:            []string{},
 			clientIP:              "7.7.7.7",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: true},
-			allowedMaxIPs:         5,
+			allowedMaxForeignIPs:  5,
 			allowedMaxHomeIPs:     5,
 			guid:                  "test2",
 			want:                  true,
 		},
 		{
 			name:                  "Client IP trusted, within max IP limits",
-			remoteClient:          &RemoteClient{IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()}},
 			trustedIPs:            []string{"1.1.1.1"},
 			clientIP:              "1.1.1.1",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
-			allowedMaxIPs:         10,
+			allowedMaxForeignIPs:  10,
 			allowedMaxHomeIPs:     10,
 			guid:                  "test3",
 			want:                  false,
@@ -189,40 +195,40 @@ func TestCheckIPsPolicy(t *testing.T) {
 		{
 			name: "Client IP trusted, exceeds max home IP limits",
 			remoteClient: &RemoteClient{
-				IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0},
+				ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()},
 				HomeCountries: &RedisHomeCountries{
-					IPs: TTLStringMap{"3.3.3.3": 0, "4.4.4.4": 0},
+					IPs: TTLStringMap{"3.3.3.3": setTTL(), "4.4.4.4": setTTL()},
 				},
 			},
 			trustedIPs:            []string{"1.1.1.1"},
 			clientIP:              "1.1.1.1",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
-			allowedMaxIPs:         10,
+			allowedMaxForeignIPs:  10,
 			allowedMaxHomeIPs:     1,
 			guid:                  "test4",
 			want:                  false,
 		},
 		{
 			name:                  "All IPs trusted, within max IP limits",
-			remoteClient:          &RemoteClient{IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0, "3.3.3.3": 0}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL()}},
 			trustedIPs:            []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"},
 			clientIP:              "1.1.1.1",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
-			allowedMaxIPs:         10,
+			allowedMaxForeignIPs:  10,
 			allowedMaxHomeIPs:     10,
 			guid:                  "test7",
 			want:                  false,
 		},
 		{
 			name:                  "All IPs trusted, exceeds max IP limits",
-			remoteClient:          &RemoteClient{IPs: TTLStringMap{"1.1.1.1": 0, "2.2.2.2": 0, "3.3.3.3": 0}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL()}},
 			trustedIPs:            []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"},
 			clientIP:              "1.1.1.1",
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
-			allowedMaxIPs:         2,
+			allowedMaxForeignIPs:  2,
 			allowedMaxHomeIPs:     2,
 			guid:                  "test8",
 			want:                  false,
@@ -231,7 +237,7 @@ func TestCheckIPsPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := checkIPsPolicy(tt.remoteClient, tt.trustedIPs, tt.clientIP, tt.policyResponse, tt.allowedMaxIPs, tt.allowedMaxHomeIPs, tt.guid)
+			got := checkIPsPolicy(tt.remoteClient, tt.trustedIPs, tt.clientIP, tt.policyResponse, tt.allowedMaxForeignIPs, tt.allowedMaxHomeIPs, tt.guid, false)
 			if got != tt.want {
 				t.Errorf("checkIPsPolicy() = %v, want %v", got, tt.want)
 			}
@@ -249,40 +255,41 @@ func TestCheckCountryPolicy(t *testing.T) {
 	logger = level.NewFilter(logger, level.AllowNone())
 
 	tests := []struct {
-		name                    string
-		remoteClient            *RemoteClient
-		trustedCountries        []string
-		countryCode             string
-		policyResponse          *PolicyResponse
-		expectedPolicyRespone   *PolicyResponse
-		allowedMaxCountries     int
-		allowedMaxHomeCountries int
-		guid                    string
-		want                    bool
+		name                       string
+		remoteClient               *RemoteClient
+		trustedCountries           []string
+		countryCode                string
+		policyResponse             *PolicyResponse
+		expectedPolicyRespone      *PolicyResponse
+		allowedMaxForeignCountries int
+		allowedMaxHomeCountries    int
+		guid                       string
+		want                       bool
+		isHome                     bool
 	}{
 		{
-			name:                    "Trusted Country",
-			remoteClient:            &RemoteClient{},
-			trustedCountries:        []string{"US"},
-			countryCode:             "US",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: false},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    false,
+			name:                       "Trusted Country",
+			remoteClient:               &RemoteClient{},
+			trustedCountries:           []string{"US"},
+			countryCode:                "US",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: false},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       false,
 		},
 		{
-			name:                    "Untrusted Country",
-			remoteClient:            &RemoteClient{},
-			trustedCountries:        []string{"US"},
-			countryCode:             "CA",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: true},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    true,
+			name:                       "Untrusted Country",
+			remoteClient:               &RemoteClient{},
+			trustedCountries:           []string{"US"},
+			countryCode:                "CA",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: true},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       true,
 		},
 		{
 			name: "Exceeding Max Home Countries",
@@ -291,68 +298,69 @@ func TestCheckCountryPolicy(t *testing.T) {
 					Countries: TTLStringMap{"US": 0, "CA": 0, "MX": 0},
 				},
 			},
-			trustedCountries:        []string{},
-			countryCode:             "US",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: true},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 2,
-			guid:                    "test_guid",
-			want:                    true,
+			trustedCountries:           []string{},
+			countryCode:                "US",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: true},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    2,
+			guid:                       "test_guid",
+			want:                       true,
+			isHome:                     true,
 		},
 		{
-			name:                    "Empty Countries",
-			remoteClient:            &RemoteClient{},
-			trustedCountries:        []string{},
-			countryCode:             "US",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: false},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    false,
+			name:                       "Empty Countries",
+			remoteClient:               &RemoteClient{},
+			trustedCountries:           []string{},
+			countryCode:                "US",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: false},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       false,
 		},
 		{
-			name:                    "All Countries Trusted",
-			remoteClient:            &RemoteClient{},
-			trustedCountries:        []string{"US", "CA", "MX", "JP", "DE"},
-			countryCode:             "DE",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: false},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    false,
+			name:                       "All Countries Trusted",
+			remoteClient:               &RemoteClient{},
+			trustedCountries:           []string{"US", "CA", "MX", "JP", "DE"},
+			countryCode:                "DE",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: false},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       false,
 		},
 		{
-			name:                    "Null Remote Client",
-			remoteClient:            nil,
-			trustedCountries:        []string{"US"},
-			countryCode:             "US",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: false},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    false,
+			name:                       "Null Remote Client",
+			remoteClient:               nil,
+			trustedCountries:           []string{"US"},
+			countryCode:                "US",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: false},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       false,
 		},
 		{
-			name:                    "Multiple Trusted Countries without Match",
-			remoteClient:            &RemoteClient{},
-			trustedCountries:        []string{"US", "CA", "MX"},
-			countryCode:             "JP",
-			policyResponse:          &PolicyResponse{fired: false},
-			expectedPolicyRespone:   &PolicyResponse{fired: true},
-			allowedMaxCountries:     10,
-			allowedMaxHomeCountries: 10,
-			guid:                    "test_guid",
-			want:                    true,
+			name:                       "Multiple Trusted ForeignCountries without Match",
+			remoteClient:               &RemoteClient{},
+			trustedCountries:           []string{"US", "CA", "MX"},
+			countryCode:                "JP",
+			policyResponse:             &PolicyResponse{fired: false},
+			expectedPolicyRespone:      &PolicyResponse{fired: true},
+			allowedMaxForeignCountries: 10,
+			allowedMaxHomeCountries:    10,
+			guid:                       "test_guid",
+			want:                       true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkCountryPolicy(tt.remoteClient, tt.trustedCountries, tt.countryCode, tt.policyResponse, tt.allowedMaxCountries, tt.allowedMaxHomeCountries, tt.guid); got != tt.want {
+			if got := checkCountryPolicy(tt.remoteClient, tt.trustedCountries, tt.countryCode, tt.policyResponse, tt.allowedMaxForeignCountries, tt.allowedMaxHomeCountries, tt.guid, tt.isHome); got != tt.want {
 				t.Errorf("checkCountryPolicy() = %v, want %v", got, tt.want)
 			}
 
@@ -363,6 +371,9 @@ func TestCheckCountryPolicy(t *testing.T) {
 	}
 }
 
+// initializeIfNil initializes the value with the defaultValue if it is nil. It supports
+// initializing pointers to int, slices of strings, and the HomeCountries struct.
+// If the value is not nil, it is returned unchanged.
 func initializeIfNil(value any, defaultValue any) any {
 	switch v := value.(type) {
 	case *int:
@@ -384,65 +395,65 @@ func initializeIfNil(value any, defaultValue any) any {
 
 func TestApplyCustomSettings(t *testing.T) {
 	tests := []struct {
-		name                            string
-		customSettings                  *CustomSettings
-		sender                          string
-		allowedMaxIPs                   *int
-		allowedMaxCountries             *int
-		trustedIPs                      *[]string
-		trustedCountries                *[]string
-		homeCountries                   *HomeCountries
-		allowedMaxHomeIPs               *int
-		allowedMaxHomeCountries         *int
-		dataCustomSettings              []Account
-		preDataAllowedMaxIPs            int
-		preDataAllowedMaxCountries      int
-		preDataAllowedMaxHomeIPs        int
-		preDataAllowedMaxHomeCountries  int
-		expectedAllowedMaxIPs           int
-		expectedAllowedMaxCountries     int
-		expectedAllowedMaxHomeIPs       int
-		expectedAllowedMaxHomeCountries int
-		expectedTrustedIPs              []string
-		expectedTrustedCountries        []string
-		expectedHomeCountries           *HomeCountries
+		name                               string
+		customSettings                     *CustomSettings
+		sender                             string
+		allowedMaxForeignIPs               *int
+		allowedMaxForeignCountries         *int
+		trustedIPs                         *[]string
+		trustedCountries                   *[]string
+		homeCountries                      *HomeCountries
+		allowedMaxHomeIPs                  *int
+		allowedMaxHomeCountries            *int
+		dataCustomSettings                 []Account
+		preDataallowedMaxForeignIPs        int
+		preDataallowedMaxForeignCountries  int
+		preDataAllowedMaxHomeIPs           int
+		preDataAllowedMaxHomeCountries     int
+		expectedallowedMaxForeignIPs       int
+		expectedallowedMaxForeignCountries int
+		expectedAllowedMaxHomeIPs          int
+		expectedAllowedMaxHomeCountries    int
+		expectedTrustedIPs                 []string
+		expectedTrustedCountries           []string
+		expectedHomeCountries              *HomeCountries
 	}{
 		{
-			name:                            "Nil Custom Settings",
-			customSettings:                  nil,
-			sender:                          "test@test.com",
-			dataCustomSettings:              nil,
-			preDataAllowedMaxIPs:            5,
-			preDataAllowedMaxCountries:      5,
-			preDataAllowedMaxHomeIPs:        5,
-			preDataAllowedMaxHomeCountries:  5,
-			expectedAllowedMaxIPs:           5,
-			expectedAllowedMaxCountries:     5,
-			expectedAllowedMaxHomeIPs:       5,
-			expectedAllowedMaxHomeCountries: 5,
-			expectedTrustedIPs:              []string{},
-			expectedTrustedCountries:        []string{},
-			expectedHomeCountries:           &HomeCountries{},
+			name:                               "Nil Custom Settings",
+			customSettings:                     nil,
+			sender:                             "test@test.com",
+			dataCustomSettings:                 nil,
+			preDataallowedMaxForeignIPs:        5,
+			preDataallowedMaxForeignCountries:  5,
+			preDataAllowedMaxHomeIPs:           5,
+			preDataAllowedMaxHomeCountries:     5,
+			expectedallowedMaxForeignIPs:       5,
+			expectedallowedMaxForeignCountries: 5,
+			expectedAllowedMaxHomeIPs:          5,
+			expectedAllowedMaxHomeCountries:    5,
+			expectedTrustedIPs:                 []string{},
+			expectedTrustedCountries:           []string{},
+			expectedHomeCountries:              &HomeCountries{},
 		},
 		{
-			name:                            "Empty Data in Custom Settings",
-			customSettings:                  &CustomSettings{},
-			sender:                          "test@test.com",
-			dataCustomSettings:              []Account{},
-			preDataAllowedMaxIPs:            10,
-			preDataAllowedMaxCountries:      10,
-			preDataAllowedMaxHomeIPs:        10,
-			preDataAllowedMaxHomeCountries:  10,
-			expectedAllowedMaxIPs:           10,
-			expectedAllowedMaxCountries:     10,
-			expectedAllowedMaxHomeIPs:       10,
-			expectedAllowedMaxHomeCountries: 10,
-			expectedTrustedIPs:              []string{},
-			expectedTrustedCountries:        []string{},
-			expectedHomeCountries:           &HomeCountries{},
+			name:                               "Empty Data in Custom Settings",
+			customSettings:                     &CustomSettings{},
+			sender:                             "test@test.com",
+			dataCustomSettings:                 []Account{},
+			preDataallowedMaxForeignIPs:        10,
+			preDataallowedMaxForeignCountries:  10,
+			preDataAllowedMaxHomeIPs:           10,
+			preDataAllowedMaxHomeCountries:     10,
+			expectedallowedMaxForeignIPs:       10,
+			expectedallowedMaxForeignCountries: 10,
+			expectedAllowedMaxHomeIPs:          10,
+			expectedAllowedMaxHomeCountries:    10,
+			expectedTrustedIPs:                 []string{},
+			expectedTrustedCountries:           []string{},
+			expectedHomeCountries:              &HomeCountries{},
 		},
 		{
-			name:           "Change Allowed Max IPs",
+			name:           "Change Allowed Max ForeignIPs",
 			customSettings: &CustomSettings{},
 			sender:         "test@test.com",
 			dataCustomSettings: []Account{
@@ -451,20 +462,20 @@ func TestApplyCustomSettings(t *testing.T) {
 					IPs:    12,
 				},
 			},
-			preDataAllowedMaxIPs:            8,
-			preDataAllowedMaxCountries:      8,
-			preDataAllowedMaxHomeIPs:        8,
-			preDataAllowedMaxHomeCountries:  8,
-			expectedAllowedMaxIPs:           12,
-			expectedAllowedMaxCountries:     8,
-			expectedAllowedMaxHomeIPs:       8,
-			expectedAllowedMaxHomeCountries: 8,
-			expectedTrustedIPs:              []string{},
-			expectedTrustedCountries:        []string{},
-			expectedHomeCountries:           &HomeCountries{},
+			preDataallowedMaxForeignIPs:        8,
+			preDataallowedMaxForeignCountries:  8,
+			preDataAllowedMaxHomeIPs:           8,
+			preDataAllowedMaxHomeCountries:     8,
+			expectedallowedMaxForeignIPs:       12,
+			expectedallowedMaxForeignCountries: 8,
+			expectedAllowedMaxHomeIPs:          8,
+			expectedAllowedMaxHomeCountries:    8,
+			expectedTrustedIPs:                 []string{},
+			expectedTrustedCountries:           []string{},
+			expectedHomeCountries:              &HomeCountries{},
 		},
 		{
-			name:           "Set Trusted IPs and Countries",
+			name:           "Set Trusted ForeignIPs and ForeignCountries",
 			customSettings: &CustomSettings{},
 			sender:         "example@example.com",
 			dataCustomSettings: []Account{
@@ -475,17 +486,17 @@ func TestApplyCustomSettings(t *testing.T) {
 					TrustedCountries: []string{"DE", "US"},
 				},
 			},
-			preDataAllowedMaxIPs:            8,
-			preDataAllowedMaxCountries:      8,
-			preDataAllowedMaxHomeIPs:        8,
-			preDataAllowedMaxHomeCountries:  8,
-			expectedAllowedMaxIPs:           10,
-			expectedAllowedMaxCountries:     8,
-			expectedAllowedMaxHomeIPs:       8,
-			expectedAllowedMaxHomeCountries: 8,
-			expectedTrustedIPs:              []string{"192.168.1.1", "192.168.1.2"},
-			expectedTrustedCountries:        []string{"DE", "US"},
-			expectedHomeCountries:           &HomeCountries{},
+			preDataallowedMaxForeignIPs:        8,
+			preDataallowedMaxForeignCountries:  8,
+			preDataAllowedMaxHomeIPs:           8,
+			preDataAllowedMaxHomeCountries:     8,
+			expectedallowedMaxForeignIPs:       10,
+			expectedallowedMaxForeignCountries: 8,
+			expectedAllowedMaxHomeIPs:          8,
+			expectedAllowedMaxHomeCountries:    8,
+			expectedTrustedIPs:                 []string{"192.168.1.1", "192.168.1.2"},
+			expectedTrustedCountries:           []string{"DE", "US"},
+			expectedHomeCountries:              &HomeCountries{},
 		},
 		{
 			name:           "Override Existing Settings",
@@ -502,17 +513,17 @@ func TestApplyCustomSettings(t *testing.T) {
 					},
 				},
 			},
-			preDataAllowedMaxIPs:            15,
-			preDataAllowedMaxCountries:      15,
-			preDataAllowedMaxHomeIPs:        15,
-			preDataAllowedMaxHomeCountries:  15,
-			expectedAllowedMaxIPs:           15,
-			expectedAllowedMaxCountries:     15,
-			expectedAllowedMaxHomeIPs:       15,
-			expectedAllowedMaxHomeCountries: 15,
-			expectedTrustedIPs:              []string{"172.16.0.1"},
-			expectedTrustedCountries:        []string{"FR"},
-			expectedHomeCountries:           &HomeCountries{Codes: []string{"US"}},
+			preDataallowedMaxForeignIPs:        15,
+			preDataallowedMaxForeignCountries:  15,
+			preDataAllowedMaxHomeIPs:           15,
+			preDataAllowedMaxHomeCountries:     15,
+			expectedallowedMaxForeignIPs:       15,
+			expectedallowedMaxForeignCountries: 15,
+			expectedAllowedMaxHomeIPs:          15,
+			expectedAllowedMaxHomeCountries:    15,
+			expectedTrustedIPs:                 []string{"172.16.0.1"},
+			expectedTrustedCountries:           []string{"FR"},
+			expectedHomeCountries:              &HomeCountries{Codes: []string{"US"}},
 		},
 		{
 			name:           "Multiple Entries in Custom Settings",
@@ -532,17 +543,17 @@ func TestApplyCustomSettings(t *testing.T) {
 					TrustedCountries: []string{"IN"},
 				},
 			},
-			preDataAllowedMaxIPs:            10,
-			preDataAllowedMaxCountries:      10,
-			preDataAllowedMaxHomeIPs:        10,
-			preDataAllowedMaxHomeCountries:  10,
-			expectedAllowedMaxIPs:           20,
-			expectedAllowedMaxCountries:     10,
-			expectedAllowedMaxHomeIPs:       10,
-			expectedAllowedMaxHomeCountries: 10,
-			expectedTrustedIPs:              []string{"10.0.0.1", "10.0.0.2"},
-			expectedTrustedCountries:        []string{"JP", "BR"},
-			expectedHomeCountries:           &HomeCountries{},
+			preDataallowedMaxForeignIPs:        10,
+			preDataallowedMaxForeignCountries:  10,
+			preDataAllowedMaxHomeIPs:           10,
+			preDataAllowedMaxHomeCountries:     10,
+			expectedallowedMaxForeignIPs:       20,
+			expectedallowedMaxForeignCountries: 10,
+			expectedAllowedMaxHomeIPs:          10,
+			expectedAllowedMaxHomeCountries:    10,
+			expectedTrustedIPs:                 []string{"10.0.0.1", "10.0.0.2"},
+			expectedTrustedCountries:           []string{"JP", "BR"},
+			expectedHomeCountries:              &HomeCountries{},
 		},
 	}
 
@@ -552,8 +563,8 @@ func TestApplyCustomSettings(t *testing.T) {
 				tt.customSettings.Data = tt.dataCustomSettings
 			}
 
-			tt.allowedMaxIPs = initializeIfNil(tt.allowedMaxIPs, new(int)).(*int)
-			tt.allowedMaxCountries = initializeIfNil(tt.allowedMaxCountries, new(int)).(*int)
+			tt.allowedMaxForeignIPs = initializeIfNil(tt.allowedMaxForeignIPs, new(int)).(*int)
+			tt.allowedMaxForeignCountries = initializeIfNil(tt.allowedMaxForeignCountries, new(int)).(*int)
 			tt.allowedMaxHomeCountries = initializeIfNil(tt.allowedMaxHomeCountries, new(int)).(*int)
 			tt.allowedMaxHomeIPs = initializeIfNil(tt.allowedMaxHomeIPs, new(int)).(*int)
 
@@ -561,27 +572,27 @@ func TestApplyCustomSettings(t *testing.T) {
 			tt.trustedCountries = initializeIfNil(tt.trustedCountries, &[]string{}).(*[]string)
 			tt.homeCountries = initializeIfNil(tt.homeCountries, &HomeCountries{}).(*HomeCountries)
 
-			*tt.allowedMaxIPs = tt.preDataAllowedMaxIPs
-			*tt.allowedMaxCountries = tt.preDataAllowedMaxCountries
+			*tt.allowedMaxForeignIPs = tt.preDataallowedMaxForeignIPs
+			*tt.allowedMaxForeignCountries = tt.preDataallowedMaxForeignCountries
 			*tt.allowedMaxHomeIPs = tt.preDataAllowedMaxHomeIPs
 			*tt.allowedMaxHomeCountries = tt.preDataAllowedMaxHomeCountries
 
-			applyCustomSettings(tt.customSettings, tt.sender, tt.allowedMaxIPs, tt.allowedMaxCountries, tt.trustedIPs, tt.trustedCountries, &tt.homeCountries.Codes, tt.allowedMaxHomeIPs, tt.allowedMaxHomeCountries)
+			applyCustomSettings(tt.customSettings, tt.sender, tt.allowedMaxForeignIPs, tt.allowedMaxForeignCountries, tt.trustedIPs, tt.trustedCountries, &tt.homeCountries.Codes, tt.allowedMaxHomeIPs, tt.allowedMaxHomeCountries)
 
-			if *tt.allowedMaxIPs != tt.expectedAllowedMaxIPs {
-				t.Errorf("Expected Allowed Max IPs = %v, got = %v", tt.expectedAllowedMaxIPs, *tt.allowedMaxIPs)
+			if *tt.allowedMaxForeignIPs != tt.expectedallowedMaxForeignIPs {
+				t.Errorf("Expected Allowed Max ForeignIPs = %v, got = %v", tt.expectedallowedMaxForeignIPs, *tt.allowedMaxForeignIPs)
 			}
 
-			if *tt.allowedMaxCountries != tt.expectedAllowedMaxCountries {
-				t.Errorf("Expected Allowed Max Countries = %v, got = %v", tt.expectedAllowedMaxCountries, *tt.allowedMaxCountries)
+			if *tt.allowedMaxForeignCountries != tt.expectedallowedMaxForeignCountries {
+				t.Errorf("Expected Allowed Max ForeignCountries = %v, got = %v", tt.expectedallowedMaxForeignCountries, *tt.allowedMaxForeignCountries)
 			}
 
 			if *tt.allowedMaxHomeIPs != tt.expectedAllowedMaxHomeIPs {
-				t.Errorf("Expected Allowed Max Home IPs = %v, got = %v", tt.expectedAllowedMaxHomeIPs, *tt.allowedMaxHomeIPs)
+				t.Errorf("Expected Allowed Max Home ForeignIPs = %v, got = %v", tt.expectedAllowedMaxHomeIPs, *tt.allowedMaxHomeIPs)
 			}
 
 			if *tt.allowedMaxHomeCountries != tt.expectedAllowedMaxHomeCountries {
-				t.Errorf("Expected Allowed Max Home Countries = %v, got = %v", tt.expectedAllowedMaxHomeCountries, *tt.allowedMaxHomeCountries)
+				t.Errorf("Expected Allowed Max Home ForeignCountries = %v, got = %v", tt.expectedAllowedMaxHomeCountries, *tt.allowedMaxHomeCountries)
 			}
 
 			if !reflect.DeepEqual(*tt.trustedIPs, tt.expectedTrustedIPs) {
