@@ -39,7 +39,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const version = "@@gittag@@-@@gitcommit@@"
+var version = "dev"
 
 var (
 	config              *CmdLineConfig
