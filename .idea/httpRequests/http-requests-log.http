@@ -1,3 +1,37 @@
+GET http://localhost:8080/custom-settings
+Content-Type: application/json
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+content-length: 0
+
+<> 2024-09-04T170120.200.json
+
+###
+
+PATCH http://localhost:8080/modify
+Content-Type: application/json
+Content-Length: 252
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+
+{
+  "key": "sender",
+  "value": {
+    "comment": "Test",
+    "sender": "christian@roessner.email",
+    "ips": 100,
+    "countries": 100,
+    "home_countries": {
+      "codes": ["DE", "FR", "AT", "CH", "NL", "PL", "LI", "LU"],
+      "ips": 2
+    }
+  }
+}
+
+###
+
 POST http://localhost:8080/query
 Accept: application/json
 Content-Type: application/json
@@ -876,46 +910,6 @@ Accept: */*
 {
   "key": "sender",
   "value": "christian@roessner.email"
-}
-
-###
-
-PATCH http://localhost:8080/modify
-Content-Type: application/json
-Content-Length: 141
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-
-{
-  "key": "sender",
-  "value": {
-    "comment": "Test",
-    "sender": "christian@roessner.email",
-    "ips": 100,
-    "countries": 100
-  }
-}
-
-###
-
-PUT http://localhost:8080/update
-Content-Type: application/json
-Content-Length: 168
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-
-{
-  "data": [
-    { "sender":"christian@roessner.email",
-      "ips": 3,
-      "countries": 1
-    },
-    {"sender":"test1@example.com",
-      "countries": 1
-    }
-  ]
 }
 
 ###

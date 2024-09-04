@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -556,159 +555,160 @@ func (h *HTTP) PUTUpdate() {
 }
 
 func (h *HTTP) PATCHModify() {
-	var requestData *Body
-
 	if !HasContentType(h.request, "application/json") {
-		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(errWrongCT)
+		h.respondWithError(http.StatusBadRequest, errWrongCT)
 
 		return
 	}
 
 	body, err := io.ReadAll(h.request.Body)
 	if err != nil {
-		h.responseWriter.WriteHeader(http.StatusInternalServerError)
-		h.LogError(err)
+		h.respondWithError(http.StatusInternalServerError, err)
 
 		return
 	}
 
-	requestData = &Body{}
-	//nolint:govet // Ignore
-	if err = json.Unmarshal(body, requestData); err != nil {
-		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(err)
+	var requestData Body
+	if err := json.Unmarshal(body, &requestData); err != nil {
+		h.respondWithError(http.StatusBadRequest, err)
 
 		return
 	}
 
-	if requestData.Key == Sender {
-		account, ok := requestData.Value.(map[string]any)
-		if !ok {
-			h.responseWriter.WriteHeader(http.StatusBadRequest)
-			h.LogError(err)
+	if requestData.Key != Sender {
+		return
+	}
 
-			return
+	accountData, ok := requestData.Value.(map[string]any)
+	if !ok {
+		h.respondWithError(http.StatusBadRequest, err)
+
+		return
+	}
+
+	comment, countries, ips, sender := h.extractAccountData(accountData)
+
+	if err = h.validateAccountData(countries, ips, sender); err != nil {
+		h.respondWithError(http.StatusBadRequest, err)
+
+		return
+	}
+
+	// TODO: Update home_countries settings
+	h.updateOrAddAccountData(comment, countries, ips, sender)
+	h.responseWriter.WriteHeader(http.StatusAccepted)
+	h.LogInfo("result", "success")
+}
+
+func (h *HTTP) respondWithError(statusCode int, err error) {
+	h.responseWriter.WriteHeader(statusCode)
+	h.LogError(err)
+}
+
+func (h *HTTP) extractAccountData(accountData map[string]any) (string, int, int, string) {
+	comment := h.extractString(accountData, "comment", errCommentNotString)
+	countries := h.extractInt(accountData, "countries", errCountriesNotFloat64)
+	ips := h.extractInt(accountData, "ips", errIPsNotFloat64)
+	sender := h.extractString(accountData, Sender, errSenderNotString)
+
+	return comment, countries, ips, sender
+}
+
+func (h *HTTP) extractInt(accountData map[string]any, key string, err error) int {
+	if value, ok := accountData[key]; ok {
+		if floatValue, ok := value.(float64); ok {
+			return int(floatValue)
 		}
 
-		var (
-			comment   string
-			countries int
-			ips       int
-			sender    string
-			tempFloat float64
-		)
+		h.respondWithError(http.StatusBadRequest, err)
+	}
 
-		if val, ok := account["comment"]; ok {
-			if comment, ok = val.(string); !ok {
-				h.responseWriter.WriteHeader(http.StatusBadRequest)
-				h.LogError(errCommentNotString)
+	return 0
+}
 
-				return
-			}
+func (h *HTTP) extractString(accountData map[string]any, key string, err error) string {
+	if value, ok := accountData[key]; ok {
+		if strValue, ok := value.(string); ok {
+			return strValue
 		}
 
-		if val, ok := account["countries"]; ok {
-			if tempFloat, ok = val.(float64); !ok {
-				log.Printf("%T: %v\n", account["countries"], account["countries"])
-				h.responseWriter.WriteHeader(http.StatusBadRequest)
-				h.LogError(errCountriesNotFloat64)
+		h.respondWithError(http.StatusBadRequest, err)
+	}
 
-				return
-			}
+	return ""
+}
 
-			countries = int(tempFloat)
+func (h *HTTP) extractHome(accountData map[string]any) *HomeCountries {
+	if home, ok := accountData["home_countries"]; ok {
+		homeCountries := &HomeCountries{}
+
+		err := json.Unmarshal([]byte(home.(string)), homeCountries)
+		if err != nil {
+			return nil
 		}
 
-		if val, ok := account["ips"]; ok {
-			if tempFloat, ok = val.(float64); !ok {
-				h.responseWriter.WriteHeader(http.StatusBadRequest)
-				h.LogError(errIPsNotFloat64)
+		return homeCountries
+	}
 
-				return
-			}
+	return nil
+}
 
-			ips = int(tempFloat)
-		}
+func (h *HTTP) validateAccountData(countries, ips int, sender string) error {
+	if countries <= 0 {
+		return errCountriesLowerThantZero
+	}
 
-		if val, ok := account[Sender]; ok {
-			if sender, ok = val.(string); !ok {
-				h.responseWriter.WriteHeader(http.StatusBadRequest)
-				h.LogError(errSenderNotString)
+	if ips <= 0 {
+		return errIPsLowerThanZero
+	}
 
-				return
-			}
-		}
+	if sender == "" {
+		return errSenderEmpty
+	}
 
-		if countries <= 0 {
-			h.responseWriter.WriteHeader(http.StatusBadRequest)
-			h.LogError(errCountriesLowerThantZero)
+	return nil
+}
 
-			return
-		}
-
-		if ips <= 0 {
-			h.responseWriter.WriteHeader(http.StatusBadRequest)
-			h.LogError(errIPsLowerThanZero)
-
-			return
-		}
-
-		if sender == "" {
-			h.responseWriter.WriteHeader(http.StatusBadRequest)
-			h.LogError(errSenderEmpty)
-
-			return
-		}
-
-		if val := os.Getenv("GO_TESTING"); val == "" {
-			customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
-			if customSettings != nil {
-				for index, record := range customSettings.Data {
-					if record.Sender != sender {
-						continue
-					}
-
-					// Update record
-					customSettings.Data[index].IPs = ips
-					customSettings.Data[index].Countries = countries
-					customSettings.Data[index].Comment = comment
-
+func (h *HTTP) updateOrAddAccountData(comment string, countries, ips int, sender string) {
+	if os.Getenv("GO_TESTING") == "" {
+		customSettings := customSettingsStore.Load().(*CustomSettings)
+		if customSettings != nil {
+			for index, record := range customSettings.Data {
+				if record.Sender == sender {
+					h.updateRecord(&customSettings.Data[index], comment, countries, ips)
 					customSettingsStore.Store(customSettings)
-					h.responseWriter.WriteHeader(http.StatusAccepted)
-					h.LogInfo("result", "success")
 
 					return
 				}
-
-				// Add record
-				accountRecord := Account{
-					Comment:   comment,
-					Sender:    sender,
-					IPs:       ips,
-					Countries: countries,
-				}
-
-				customSettings.Data = append(customSettings.Data, accountRecord)
-
-				customSettingsStore.Store(customSettings)
-				h.responseWriter.WriteHeader(http.StatusAccepted)
-				h.LogInfo("result", "success")
-			} else {
-				accountRecord := Account{
-					Comment:   comment,
-					Sender:    sender,
-					IPs:       ips,
-					Countries: countries,
-				}
-				customSettings = &CustomSettings{Data: []Account{accountRecord}}
-
-				customSettingsStore.Store(customSettings)
-				h.responseWriter.WriteHeader(http.StatusAccepted)
-				h.LogInfo("result", "success")
 			}
+
+			h.addAccountRecord(customSettings, comment, countries, ips, sender)
+		} else {
+			h.createAndStoreNewSettings(comment, countries, ips, sender)
 		}
+	} else {
+		h.responseWriter.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func (h *HTTP) updateRecord(record *Account, comment string, countries, ips int) {
+	record.Comment = comment
+	record.Countries = countries
+	record.IPs = ips
+}
+
+func (h *HTTP) addAccountRecord(settings *CustomSettings, comment string, countries, ips int, sender string) {
+	accountRecord := Account{Comment: comment, Sender: sender, Countries: countries, IPs: ips}
+	settings.Data = append(settings.Data, accountRecord)
+
+	customSettingsStore.Store(settings)
+}
+
+func (h *HTTP) createAndStoreNewSettings(comment string, countries, ips int, sender string) {
+	accountRecord := Account{Comment: comment, Sender: sender, Countries: countries, IPs: ips}
+	newSettings := &CustomSettings{Data: []Account{accountRecord}}
+
+	customSettingsStore.Store(newSettings)
 }
 
 func (h *HTTP) DELETERemove() {
