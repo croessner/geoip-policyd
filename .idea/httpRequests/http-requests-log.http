@@ -1,6 +1,518 @@
 POST http://localhost:8080/query
 Accept: application/json
 Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T154122.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 114
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "christian@roessner.email"
+  }
+}
+
+<> 2024-09-04T142521.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T142515.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 127
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "2003:a:a05:a600:858:7851:547f:8aed",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T142508.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "142.251.36.228",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T142453.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "142.251.36.228",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T142443.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.17",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T141645.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T141635.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "165.225.200.24",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T141621.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133448.202.json
+
+###
+
+DELETE http://localhost:8080/remove
+Content-Type: application/json
+Content-Length: 60
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+
+{
+  "key": "sender",
+  "value": "christian@roessner.email"
+}
+
+###
+
+PATCH http://localhost:8080/modify
+Content-Type: application/json
+Content-Length: 141
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+
+{
+  "key": "sender",
+  "value": {
+    "comment": "Test",
+    "sender": "christian@roessner.email",
+    "ips": 100,
+    "countries": 100
+  }
+}
+
+###
+
+PUT http://localhost:8080/update
+Content-Type: application/json
+Content-Length: 168
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+
+{
+  "data": [
+    { "sender":"christian@roessner.email",
+      "ips": 3,
+      "countries": 1
+    },
+    {"sender":"test1@example.com",
+      "countries": 1
+    }
+  ]
+}
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "142.251.36.228",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133321-1.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "103.49.80.17",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133321.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "109.199.0.56",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133320-4.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 107
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "165.225.200.24",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133320-3.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 106
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "102.129.65.37",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133320-2.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 127
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "2003:a:a05:a600:858:7851:547f:8aed",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133320-1.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 105
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "80.147.5.171",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133320.202.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 114
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "christian@roessner.email"
+  }
+}
+
+<> 2024-09-04T133319-1.202.json
+
+###
+
+POST http://localhost:8080/dovecotpolicy?command=report
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2024-09-04T133319-3.200.json
+
+###
+
+POST http://localhost:8080/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 51
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "login": "testuser1",
+  "remote": "127.1.0.1"
+}
+
+<> 2024-09-04T133319-2.200.json
+
+###
+
+POST http://localhost:8080/dovecotpolicy?command=allow
+Accept: application/json
+Content-Type: application/json
+Content-Length: 234
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "device_id": "",
+  "login": "christian@roessner.email",
+  "policy_reject": false,
+  "protocol": "imap",
+  "pwhash": "0049",
+  "remote": "127.1.0.1",
+  "session_id": "",
+  "success": true,
+  "t": 1695752457.0004661,
+  "tls": true
+}
+
+<> 2024-09-04T133319-1.200.json
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
+Content-Length: 108
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+
+{
+  "key": "client",
+  "value": {
+    "address": "134.255.226.248",
+    "sender": "de10000@srvint.net"
+  }
+}
+
+<> 2024-09-04T133319.202.json
+
+###
+
+POST http://localhost:8080/remove
+Content-Type: application/json
+Content-Length: 54
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+
+{
+  "key": "sender",
+  "value": "de10000@srvint.net"
+}
+
+###
+
+GET http://localhost:8080/custom-settings
+Content-Type: application/json
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+content-length: 0
+
+<> 2024-09-04T133319.200.json
+
+###
+
+GET http://localhost:8080/reload
+User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
+Accept-Encoding: br, deflate, gzip, x-gzip
+Accept: */*
+content-length: 0
+
+###
+
+POST http://localhost:8080/query
+Accept: application/json
+Content-Type: application/json
 Content-Length: 107
 User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
 Accept-Encoding: br, deflate, gzip, x-gzip
@@ -405,500 +917,6 @@ Accept-Encoding: br, deflate, gzip, x-gzip
 }
 
 <> 2024-08-30T111443-1.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "103.49.80.17",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111443.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "109.199.0.56",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442-6.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 107
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "165.225.200.24",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442-5.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 106
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "102.129.65.37",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442-4.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 127
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "2003:a:a05:a600:858:7851:547f:8aed",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442-3.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442-2.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 114
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
-}
-
-<> 2024-08-30T111442-1.202.json
-
-###
-
-POST http://localhost:8080/dovecotpolicy?command=report
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2024-08-30T111442-3.200.json
-
-###
-
-POST http://localhost:8080/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 51
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "login": "testuser1",
-  "remote": "127.1.0.1"
-}
-
-<> 2024-08-30T111442-2.200.json
-
-###
-
-POST http://localhost:8080/dovecotpolicy?command=allow
-Accept: application/json
-Content-Type: application/json
-Content-Length: 234
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "device_id": "",
-  "login": "christian@roessner.email",
-  "policy_reject": false,
-  "protocol": "imap",
-  "pwhash": "0049",
-  "remote": "127.1.0.1",
-  "session_id": "",
-  "success": true,
-  "t": 1695752457.0004661,
-  "tls": true
-}
-
-<> 2024-08-30T111442-1.200.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111442.202.json
-
-###
-
-POST http://localhost:8080/remove
-Content-Type: application/json
-Content-Length: 54
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
-
-###
-
-GET http://localhost:8080/custom-settings
-Content-Type: application/json
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-content-length: 0
-
-<> 2024-08-30T111442.200.json
-
-###
-
-GET http://localhost:8080/reload
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-content-length: 0
-
-###
-
-POST http://localhost:8080/remove
-Content-Type: application/json
-Content-Length: 54
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-
-{
-  "key": "sender",
-  "value": "de10000@srvint.net"
-}
-
-###
-
-GET http://localhost:8080/custom-settings
-Content-Type: application/json
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-content-length: 0
-
-<> 2024-08-30T111422.200.json
-
-###
-
-GET http://localhost:8080/reload
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-Accept: */*
-content-length: 0
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "103.49.80.17",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-30T111401.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 114
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "christian@roessner.email"
-  }
-}
-
-<> 2024-08-29T175939.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2.0.1
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-29T175854.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-23T115048.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.2
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-08-23T114914.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-07-22T084857.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-07-19T171453.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-User-Agent: IntelliJ HTTP Client/GoLand 2024.1.4
-Accept-Encoding: br, deflate, gzip, x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-07-19T171436.202.json
-
-###
-
-POST http://localhost:8080/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 108
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.9)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "134.255.226.248",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-02-09T102601.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 105
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.9)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "80.147.5.171",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-02-09T100648.202.json
-
-###
-
-POST https://localhost:8443/query
-Accept: application/json
-Content-Type: application/json
-Content-Length: 127
-Connection: Keep-Alive
-User-Agent: Apache-HttpClient/4.5.14 (Java/17.0.9)
-Accept-Encoding: br,deflate,gzip,x-gzip
-
-{
-  "key": "client",
-  "value": {
-    "address": "2003:a:a05:a600:858:7851:547f:8aed",
-    "sender": "de10000@srvint.net"
-  }
-}
-
-<> 2024-02-09T090443.202.json
 
 ###
 

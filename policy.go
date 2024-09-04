@@ -1045,7 +1045,7 @@ func updateRedisCache(sender string, remoteClient *RemoteClient) error {
 // total countries, allowed max foreign countries, allowed max home countries, foreign ForeignIPs seen,
 // home ForeignIPs seen, trusted ForeignIPs defined, total ForeignIPs, allowed max foreign ForeignIPs, allowed max home ForeignIPs,
 // and action status.
-func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient, sender string, trustedCountries, trustedIPs []string, guid string) {
+func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient, sender string, trustedCountries, trustedIPs []string, allowedMaxForeignIPs, allowedMaxHomeIPs, allowedMaxForeignCountries, allowedMaxHomeCountries int, guid string) {
 	level.Info(logger).Log("guid", guid,
 		getUserAttribute(), sender,
 		"current_client_ip", policyResponse.currentClientIP,
@@ -1055,14 +1055,14 @@ func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient,
 		"home_countries_defined", getHouseCountries(),
 		"trusted_countries_defined", getTrustedCountries(trustedCountries),
 		"total_countries", getTotalCountries(remoteClient, policyResponse),
-		"allowed_max_foreign_countries", config.MaxCountries,
-		"allowed_max_home_countries", config.MaxHomeCountries,
+		"allowed_max_foreign_countries", allowedMaxForeignCountries,
+		"allowed_max_home_countries", allowedMaxHomeCountries,
 		"foreign_ips_seen", getForeignIPsSeen(remoteClient),
 		"home_ips_seen", getHomeIPsSeen(remoteClient),
 		"trusted_ips_defined", getTrustedIPs(trustedIPs),
 		"total_ips", getTotalIPs(remoteClient, policyResponse),
-		"allowed_max_foreign_ips", config.MaxIPs,
-		"allowed_max_home_ips", config.MaxHomeIPs,
+		"allowed_max_foreign_ips", allowedMaxForeignIPs,
+		"allowed_max_home_ips", allowedMaxHomeIPs,
 		"action", getActionStatus(policyResponse),
 	)
 }
@@ -1268,9 +1268,9 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 	var (
 		trustedCountries           []string
 		trustedIPs                 []string
+		homeCountries              = config.HomeCountries
 		allowedMaxForeignIPs       = config.MaxIPs
 		allowedMaxForeignCountries = config.MaxCountries
-		homeCountries              = config.HomeCountries
 		allowedMaxHomeIPs          = config.MaxHomeIPs
 		allowedMaxHomeCountries    = config.MaxHomeCountries
 	)
@@ -1342,7 +1342,19 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 	}
 
 	updatePolicyResponse(policyResponse, remoteClient)
-	logPolicyResult(policyResponse, remoteClient, sender, trustedCountries, trustedIPs, guid)
+
+	logPolicyResult(
+		policyResponse,
+		remoteClient,
+		sender,
+		trustedCountries,
+		trustedIPs,
+		allowedMaxForeignIPs,
+		allowedMaxHomeIPs,
+		allowedMaxForeignCountries,
+		allowedMaxHomeCountries,
+		guid,
+	)
 
 	return policyResponse, nil
 }
