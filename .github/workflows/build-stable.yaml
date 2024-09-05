@@ -48,6 +48,10 @@ jobs:
 
   build-linux-packages:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [ linux ]
+        goarch: [ amd64, arm64 ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -84,13 +88,13 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: artifact-deb
+          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}-deb
           path: |
             ./*.deb
 
       - uses: actions/upload-artifact@v4
         with:
-          name: artifact-rpm
+          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}-rpm
           path: |
             ./*.rpm
             !./*-debuginfo-*.rpm
@@ -143,7 +147,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: artifact-linux-amd64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifact-linux-arm64
 
       - uses: actions/download-artifact@v4
         with:
@@ -177,7 +185,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: artifact-${{ matrix.pkg }}
+          name: artifact-linux-amd64-${{ matrix.pkg }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifact-linux-arm64-${{ matrix.pkg }}
 
       - uses: actions/download-artifact@v4
         with:
