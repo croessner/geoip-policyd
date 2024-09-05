@@ -28,7 +28,7 @@ jobs:
       - name: Create artifact
         run: |
           os="${{ runner.os }}"
-          assets="${{ env.APP_NAME }}_$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')"
+          assets="${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           echo "$assets"
           mkdir -p "dist/$assets"
           cp -r ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} LICENSE README.* "dist/$assets/"
@@ -59,10 +59,10 @@ jobs:
 
       - name: Copy binaries
         run: |
-          mkdir -p .debpkg/usr/bin
-          mkdir -p .rpmpkg/usr/bin
-          cp ${{ env.APP_NAME }}-${{ matrix.goos }} .debpkg/usr/sbin/
-          cp ${{ env.APP_NAME }}-${{ matrix.goos }} .rpmpkg/usr/sbin/
+          mkdir -p .debpkg/usr/sbin
+          mkdir -p .rpmpkg/usr/sbin
+          cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .debpkg/usr/sbin/
+          cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .rpmpkg/usr/sbin/
       - uses: jiro4989/build-deb-action@v3
         with:
           package: ${{ env.APP_NAME }}
