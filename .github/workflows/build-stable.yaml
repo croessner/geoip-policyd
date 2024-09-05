@@ -42,7 +42,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-${{ matrix.goos }}
+          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
             dist/*.tar.gz
 
@@ -143,7 +143,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: artifact-${{ matrix.goos }}
+          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - uses: actions/download-artifact@v4
         with:
