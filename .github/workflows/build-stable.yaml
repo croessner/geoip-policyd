@@ -126,7 +126,7 @@ jobs:
           body_path: ./changelog
           repository: croessner/${{ env.APP_NAME }}
           token:  ${{ secrets.GEOIP_POLICYD_RELEASE }}
-          name: Release ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
 
