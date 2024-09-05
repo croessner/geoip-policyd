@@ -3,7 +3,7 @@ name: Release Build
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 env:
   APP_NAME: 'geoip-policyd'
