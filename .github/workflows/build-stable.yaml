@@ -59,7 +59,7 @@ jobs:
           go-version: 1.22.x
       - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-          go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/heads/})-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}
+          go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/heads/})-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - name: Copy binaries
         run: |
