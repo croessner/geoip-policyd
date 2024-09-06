@@ -102,7 +102,7 @@ jobs:
 
       - name: Generate changelog
         run: |
-          wget https://github.com/git-chglog/git-chglog/releases/download/v${{ env.CHGELOG_VERSION }}/git-chglog_linux_amd64.tar.gz
+          wget https://github.com/git-chglog/git-chglog/releases/download/v${{ env.CHGELOG_VERSION }}/git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           tar xzf git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           chmod +x git-chglog_linux_amd64
           mv git-chglog_linux_amd64 git-chglog
