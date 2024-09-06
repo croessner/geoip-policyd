@@ -66,17 +66,13 @@ jobs:
       - name: Copy binaries
         run: |
           mkdir -p .debpkg/usr/sbin
-          mkdir -p .rpmpkg/usr/sbin
-          cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .debpkg/usr/sbin/
-          cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .rpmpkg/usr/sbin/
           mkdir -p .debpkg/usr/lib/systemd/system
-          cp systemd/geoip-policyd.service .debpkg/usr/lib/systemd/system/
           mkdir -p .debpkg/etc/default
-          cp systemd/geoip-policyd .debpkg/etc/default/
-          mkdir -p .rpmpkg/usr/lib/systemd/system
-          cp systemd/geoip-policyd.service .rpmpkg/usr/lib/systemd/system/
-          mkdir -p .rpmpkg/etc/sysconfig
-          cp systemd/geoip-policyd .rpmpkg/etc/sysconfig/
+          mkdir -p .debpkg/usr/share/doc/${{ env.APP_NAME }}
+          cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .debpkg/usr/sbin/
+          cp systemd/${{ env.APP_NAME }}.service .debpkg/usr/lib/systemd/system/
+          cp systemd/${{ env.APP_NAME }} .debpkg/etc/default/
+          cp LICENSE README.md .debpkg/usr/share/doc/${{ env.APP_NAME }}/
 
       - uses: jiro4989/build-deb-action@v3
         with:
@@ -87,43 +83,13 @@ jobs:
           arch: 'amd64'
           desc: '${{ env.DESC }}'
 
-      - name: Adjust EnvironmentFile path in systemd service file
-        run: sed -i 's|EnvironmentFile=-/etc/default/geoip-policyd|EnvironmentFile=-/etc/sysconfig/geoip-policyd|' .rpmpkg/usr/lib/systemd/system/geoip-policyd.service
-
-      - uses: jiro4989/build-rpm-action@v2
-        with:
-          summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
-          package_root: .rpmpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'x86_64'
-          vendor: 'el8'
-          desc: '${{ env.DESC }}'
-
-      - uses: jiro4989/build-rpm-action@v2
-        with:
-          summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
-          package_root: .rpmpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'x86_64'
-          vendor: 'el9'
-          desc: '${{ env.DESC }}'
+      # TODO: RPM packages
 
       - uses: actions/upload-artifact@v4
         with:
           name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}-deb
           path: |
             ./*.deb
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}-rpm
-          path: |
-            ./*.rpm
-            !./*-debuginfo-*.rpm
 
   create-release:
     runs-on: ubuntu-latest
@@ -207,8 +173,6 @@ jobs:
         include:
           - pkg: deb
             asset_content_type: application/vnd.debian.binary-package
-          - pkg: rpm
-            asset_content_type: application/x-rpm
     steps:
       - uses: actions/download-artifact@v4
         with:
