@@ -141,7 +141,7 @@ jobs:
       - name: Upload Asset
         env:
           GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh release upload ${{ github.ref }} ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.asset_suffix }}
+        run: gh release upload ${{ github.ref_name }} ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.asset_suffix }}
 
   upload-linux-packages:
     runs-on: ubuntu-latest
@@ -170,4 +170,4 @@ jobs:
       - name: Upload Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh release upload ${{ github.ref }} $ASSET_NAME
+        run: gh release upload ${{ github.ref_name }} $ASSET_NAME
