@@ -126,6 +126,10 @@ jobs:
           - os: ubuntu-latest
             asset_suffix: .tar.gz
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install -y gh
 
@@ -149,6 +153,10 @@ jobs:
         include:
           - pkg: deb
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install -y gh
 
