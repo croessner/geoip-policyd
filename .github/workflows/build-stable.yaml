@@ -112,15 +112,8 @@ jobs:
 
       - name: Create Release
         env:
-          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_RELEASE }}
-        run: |
-          gh release create ${{ github.ref_name }} \
-            ./changelog \
-            --title "Release ${{ github.ref_name }}" \
-            --target ${{ github.ref }} \
-            --notes-file ./changelog \
-            --draft=false \
-            --prerelease=false
+          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
+        run: gh release create ${{ github.ref_name }} ./changelog --title "Release ${{ github.ref_name }}" --target ${{ github.ref }} --notes-file ./changelog --draft=false --prerelease=false
 
   upload-release:
     runs-on: ubuntu-latest
@@ -138,15 +131,13 @@ jobs:
 
       - name: Download Artifact
         env:
-          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_RELEASE }}
-        run: |
-          gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}
+          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
+        run: gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - name: Upload Asset
         env:
-          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_RELEASE }}
-        run: |
-          gh release upload ${{ github.ref }} ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.asset_suffix }} 
+          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
+        run: gh release upload ${{ github.ref }} ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.asset_suffix }}
 
   upload-linux-packages:
     runs-on: ubuntu-latest
@@ -163,14 +154,12 @@ jobs:
 
       - name: Download Artifact
         env:
-          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_RELEASE }}
-        run: |
-          gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.pkg }}
+          GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
+        run: gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.pkg }}
 
       - run: echo "ASSET_NAME=$(ls *.${{ matrix.pkg }} | head -n 1)" >> "$GITHUB_ENV"
 
       - name: Upload Asset
         env:
-          GITHUB_TOKEN: ${{ secrets.GEOIP_POLICYD_RELEASE }}
-        run: |
-          gh release upload ${{ github.ref }} $ASSET_NAME
+          GITHUB_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
+        run: gh release upload ${{ github.ref }} $ASSET_NAME
