@@ -72,7 +72,12 @@ jobs:
           mkdir -p .debpkg/usr/lib/systemd/system
           cp systemd/geoip-policyd.service .debpkg/usr/lib/systemd/system/
           mkdir -p .debpkg/etc/default
-          cp systemd/geoip-policyd .debpkg/etc/default/geoip-policyd/
+          cp systemd/geoip-policyd .debpkg/etc/default/
+          mkdir -p .rpmpkg/usr/lib/systemd/system
+          cp systemd/geoip-policyd.service .rpmpkg/usr/lib/systemd/system/
+          mkdir -p .rpmpkg/etc/sysconfig
+          cp systemd/geoip-policyd .rpmpkg/etc/sysconfig/
+
       - uses: jiro4989/build-deb-action@v3
         with:
           package: ${{ env.APP_NAME }}
@@ -81,6 +86,9 @@ jobs:
           version: ${{ github.ref }}
           arch: 'amd64'
           desc: '${{ env.DESC }}'
+
+      - name: Adjust EnvironmentFile path in systemd service file
+        run: sed -i 's|EnvironmentFile=-/etc/default/geoip-policyd|EnvironmentFile=-/etc/sysconfig/geoip-policyd|' .rpmpkg/usr/lib/systemd/system/geoip-policyd.service
 
       - uses: jiro4989/build-rpm-action@v2
         with:
