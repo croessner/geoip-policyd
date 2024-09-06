@@ -32,6 +32,8 @@ jobs:
           echo "$assets"
           mkdir -p "dist/$assets"
           cp -r ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} LICENSE README.* "dist/$assets/"
+          cp systemd/geoip-policyd.service "dist/$assets/"
+          cp systemd/geoip-policyd "dist/$assets/"
           (
             cd dist
             tar czf "$assets.tar.gz" "$assets"
@@ -67,6 +69,10 @@ jobs:
           mkdir -p .rpmpkg/usr/sbin
           cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .debpkg/usr/sbin/
           cp ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .rpmpkg/usr/sbin/
+          mkdir -p .debpkg/usr/lib/systemd/system
+          cp systemd/geoip-policyd.service .debpkg/usr/lib/systemd/system/
+          mkdir -p .debpkg/etc/default
+          cp systemd/geoip-policyd .debpkg/etc/default/geoip-policyd/
       - uses: jiro4989/build-deb-action@v3
         with:
           package: ${{ env.APP_NAME }}
@@ -84,6 +90,18 @@ jobs:
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ github.ref }}
           arch: 'x86_64'
+          vendor: 'el8'
+          desc: '${{ env.DESC }}'
+
+      - uses: jiro4989/build-rpm-action@v2
+        with:
+          summary: '${{ env.DESC }}'
+          package: ${{ env.APP_NAME }}
+          package_root: .rpmpkg
+          maintainer: ${{ env.MAINTAINER }}
+          version: ${{ github.ref }}
+          arch: 'x86_64'
+          vendor: 'el9'
           desc: '${{ env.DESC }}'
 
       - uses: actions/upload-artifact@v4

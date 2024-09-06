@@ -7,10 +7,10 @@ options:
   commits:
     filters:
       Type:
-        - feat
-        - fix
-        - perf
-        - refactor
+        - Feat
+        - Fix
+        - Perf
+        - Refactor
   commit_groups:
     # title_maps:
     #   feat: Features
