@@ -80,7 +80,7 @@ jobs:
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ github.ref }}
-          arch: 'amd64'
+          arch: '${{ matrix.goarch }}'
           desc: '${{ env.DESC }}'
 
       # TODO: RPM packages
