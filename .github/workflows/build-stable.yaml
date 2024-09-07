@@ -32,9 +32,9 @@ jobs:
           assets="${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           echo "$assets"
           mkdir -p "dist/$assets"
-          cp -r ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} LICENSE README.* "dist/$assets/"
-          cp systemd/geoip-policyd.service "dist/$assets/"
-          cp systemd/geoip-policyd "dist/$assets/"
+          cp -r ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} LICENSE README.md "dist/$assets/"
+          cp systemd/${{ env.APP_NAME }}.service "dist/$assets/"
+          cp systemd/${{ env.APP_NAME }} "dist/$assets/"
           (
             cd dist
             tar czf "$assets.tar.gz" "$assets"
