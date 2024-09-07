@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine3.20 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine3.20 AS builder
 
 WORKDIR /build
 
@@ -17,11 +17,13 @@ RUN GIT_TAG=$(git describe --tags --abbrev=0) && echo "tag="${GIT_TAG}"" && \
 
 RUN cd ./stresstest && go build -mod vendor -v -ldflags="-s" -o stresstest main.go
 
-FROM alpine:3.20
+FROM --platform=$BUILDPLATFORM alpine:3.20
 
 LABEL org.opencontainers.image.authors="christian@roessner.email"
+LABEL org.opencontainers.image.source="https://github.com/croessner/geoip-policyd"
+LABEL org.opencontainers.image.description="Policy server that blocks senders based on country and IP diversity"
+LABEL org.opencontainers.image.licenses=AGPL-3
 LABEL com.roessner-network-solutions.vendor="Rößner-Network-Solutions"
-LABEL description="Postfix policy service that blocks clients, if they come from too many countires or IP addresses."
 
 WORKDIR /usr/app
 
