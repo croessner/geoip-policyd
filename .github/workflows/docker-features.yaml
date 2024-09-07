@@ -33,3 +33,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/geoip-policyd:dev
+          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Policy server that blocks senders based on country and IP diversity
