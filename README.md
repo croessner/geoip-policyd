@@ -590,4 +590,11 @@ If you do so, you also have to modify your custom.json file, if you use one:
 
 Back to [table of contents](#table-of-contents)
 
-Hope you enjoy :-)
+## License
+
+This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
+
+> Note
+>
+> The license has changed from AGPL-3 to GPL-3! This step is required to provide docker images.
+> 
