@@ -32,7 +32,7 @@ github.com/google/uuid
 # github.com/oschwald/maxminddb-golang v1.13.1
 ## explicit; go 1.21
 github.com/oschwald/maxminddb-golang
-# github.com/redis/go-redis/v9 v9.6.1
+# github.com/redis/go-redis/v9 v9.7.0
 ## explicit; go 1.18
 github.com/redis/go-redis/v9
 github.com/redis/go-redis/v9/internal

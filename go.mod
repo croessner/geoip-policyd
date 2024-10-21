@@ -8,7 +8,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/go-ldap/ldap/v3 v3.4.8
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/redis/go-redis/v9 v9.6.1
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/segmentio/ksuid v1.0.4
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
