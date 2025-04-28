@@ -74,7 +74,7 @@ func handleConnection(client net.Conn) {
 				policyResponse *PolicyResponse
 			)
 
-			policyResponse, err = getPolicyResponse(policyRequest, ksuid.New().String())
+			policyResponse, err = getPolicyResponse(policyRequest, ksuid.New().String(), false)
 
 			if err != nil {
 				prefix = "DEFER "

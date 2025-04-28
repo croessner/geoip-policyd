@@ -338,7 +338,11 @@ func (h *HTTP) POSTQuery() {
 					userAttribute:    clientRequest[Sender].(string),
 				}
 
-				policyResponse, err = getPolicyResponse(policyRequest, h.guid)
+				// Check if info parameter is present in the query string
+				infoParam := h.request.URL.Query().Get("info")
+				info := infoParam == "1"
+
+				policyResponse, err = getPolicyResponse(policyRequest, h.guid, info)
 			}
 		}
 
@@ -498,7 +502,11 @@ func (h *HTTP) POSTDovecotPolicy() {
 		userAttribute:    sender,
 	}
 
-	policyResponse, err = getPolicyResponse(policyRequest, h.guid)
+	// Check if info parameter is present in the query string
+	infoParam := h.request.URL.Query().Get("info")
+	info := infoParam == "1"
+
+	policyResponse, err = getPolicyResponse(policyRequest, h.guid, info)
 
 	if err == nil {
 		if policyResponse.fired {

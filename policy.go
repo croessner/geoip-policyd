@@ -1252,19 +1252,12 @@ func setCurrentClientInfo(ip string, code string, policyResponse *PolicyResponse
 	policyResponse.currentCountryCode = code
 }
 
-// getPolicyResponse is a function that takes a policyRequest map and a guid string as input parameters
-// and returns a policyResponse pointer and an error as output. It initializes a PolicyResponse object,
-// initializes the sender, clientIP, and err variables by calling the initializePolicy function with the
-// policyRequest map, checks if the clientIP should be ignored based on the ignoreNets configuration, checks
-// if the sender is known by calling the checkUserKnown function, gets the country code of the clientIP by
-// calling the getCountryCode function, fetches and logs the remote client by calling the fetchAndLogRemoteClient
-// function, applies custom settings based on the sender by calling the applyCustomSettings function, determines
-// if the client is at home by calling the checkHomeCountry function, processes the remote client's countries
-// by calling the evaluatePolicy function, handles the client actions based on the remoteClient, sender,
-// userKnown, and requireActions variables by calling the handleClientActions function, updates the Redis cache
-// by calling the updateRedisCache function, logs the policy result by calling the logPolicyResult function,
-// and finally returns the policyResponse and nil error.
-func getPolicyResponse(policyRequest map[string]string, guid string) (policyResponse *PolicyResponse, err error) {
+// getPolicyResponse evaluates the policy request and generates a structured policy response object.
+// It initializes the request, validates input, handles ignored networks, evaluates user information,
+// processes client data, and applies custom settings to determine policy actions.
+// Returns a pointer to PolicyResponse and an error if any issue occurs during processing.
+// If info is true, it only determines the country code and returns early with just the necessary data.
+func getPolicyResponse(policyRequest map[string]string, guid string, info bool) (policyResponse *PolicyResponse, err error) {
 	var (
 		trustedCountries           []string
 		trustedIPs                 []string
@@ -1288,14 +1281,19 @@ func getPolicyResponse(policyRequest map[string]string, guid string) (policyResp
 		return
 	}
 
+	countryCode := getCountryCode(clientIP)
+
+	setCurrentClientInfo(clientIP, countryCode, policyResponse)
+
+	// If info flag is true, return early with just the country code information
+	if info {
+		return policyResponse, nil
+	}
+
 	userKnown, err := checkUserKnown(sender, guid)
 	if err != nil {
 		return policyResponse, err
 	}
-
-	countryCode := getCountryCode(clientIP)
-
-	setCurrentClientInfo(clientIP, countryCode, policyResponse)
 
 	remoteClient, err := fetchAndLogRemoteClient(sender, clientIP, countryCode, guid)
 	if err != nil {

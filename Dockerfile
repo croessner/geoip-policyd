@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine3.20 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 WORKDIR /build
 
@@ -17,7 +17,7 @@ RUN GIT_TAG=$(git describe --tags --abbrev=0) && echo "tag="${GIT_TAG}"" && \
 
 RUN cd ./stresstest && go build -mod vendor -v -ldflags="-s" -o stresstest main.go
 
-FROM --platform=$BUILDPLATFORM alpine:3.20
+FROM --platform=$BUILDPLATFORM alpine
 
 LABEL org.opencontainers.image.authors="christian@roessner.email"
 LABEL org.opencontainers.image.source="https://github.com/croessner/geoip-policyd"
