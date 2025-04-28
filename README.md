@@ -378,6 +378,8 @@ Forbidden policy response example:
 }
 ````
 
+If "?info=1" is appended to the query-string of the HTTP request, the service will only return the country code for the current client IP address.
+
 Back to [table of contents](#table-of-contents)
 
 ## PUT request /update
