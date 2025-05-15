@@ -7,6 +7,7 @@ require (
 	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 	github.com/go-kit/log v0.2.1
 	github.com/go-ldap/ldap/v3 v3.4.11
+	github.com/json-iterator/go v1.1.12
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/segmentio/ksuid v1.0.4
@@ -20,6 +21,8 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
