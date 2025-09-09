@@ -18,7 +18,6 @@ package main
 import (
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -29,9 +28,12 @@ import (
 
 	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
+	"github.com/json-iterator/go"
 	"github.com/oschwald/maxminddb-golang"
 	"github.com/segmentio/ksuid"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 const (
 	GET    = "GET"
