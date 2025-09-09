@@ -1,6 +1,6 @@
 module geoip-policyd
 
-go 1.24.3
+go 1.25
 
 require (
 	github.com/akamensky/argparse v1.4.0
@@ -9,7 +9,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/json-iterator/go v1.1.12
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/redis/go-redis/v9 v9.8.0
+	github.com/redis/go-redis/v9 v9.13.0
 	github.com/segmentio/ksuid v1.0.4
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
@@ -23,7 +23,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
