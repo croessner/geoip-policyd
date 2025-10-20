@@ -630,6 +630,10 @@ func (c *baseClient) generalProcessPipeline(
 			return err
 		})
 		if lastErr == nil || !canRetry || !shouldRetry(lastErr, true) {
+			// The error should be set here only when failing to obtain the conn.
+			if !isRedisError(lastErr) {
+				setCmdsErr(cmds, lastErr)
+			}
 			return lastErr
 		}
 	}
@@ -703,9 +707,12 @@ func txPipelineReadQueued(rd *proto.Reader, statusCmd *StatusCmd, cmds []Cmder) 
 	}
 
 	// Parse +QUEUED.
-	for range cmds {
-		if err := statusCmd.readReply(rd); err != nil && !isRedisError(err) {
-			return err
+	for _, cmd := range cmds {
+		if err := statusCmd.readReply(rd); err != nil {
+			cmd.SetErr(err)
+			if !isRedisError(err) {
+				return err
+			}
 		}
 	}
 
