@@ -9,7 +9,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/json-iterator/go v1.1.12
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/redis/go-redis/v9 v9.13.0
+	github.com/redis/go-redis/v9 v9.17.1
 	github.com/segmentio/ksuid v1.0.4
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
