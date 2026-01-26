@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9/auth"
+	"github.com/redis/go-redis/v9/maintnotifications"
 )
 
 // UniversalOptions information is required by UniversalClient to establish
@@ -83,8 +84,9 @@ type UniversalOptions struct {
 	MinIdleConns    int
 	MaxIdleConns    int
 	MaxActiveConns  int
-	ConnMaxIdleTime time.Duration
-	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime       time.Duration
+	ConnMaxLifetime       time.Duration
+	ConnMaxLifetimeJitter time.Duration
 
 	TLSConfig *tls.Config
 
@@ -122,6 +124,9 @@ type UniversalOptions struct {
 
 	// IsClusterMode can be used when only one Addrs is provided (e.g. Elasticache supports setting up cluster mode with configuration endpoint).
 	IsClusterMode bool
+
+	// MaintNotificationsConfig provides configuration for maintnotifications upgrades.
+	MaintNotificationsConfig *maintnotifications.Config
 }
 
 // Cluster returns cluster options created from the universal options.
@@ -167,16 +172,18 @@ func (o *UniversalOptions) Cluster() *ClusterOptions {
 		MinIdleConns:    o.MinIdleConns,
 		MaxIdleConns:    o.MaxIdleConns,
 		MaxActiveConns:  o.MaxActiveConns,
-		ConnMaxIdleTime: o.ConnMaxIdleTime,
-		ConnMaxLifetime: o.ConnMaxLifetime,
+		ConnMaxIdleTime:       o.ConnMaxIdleTime,
+		ConnMaxLifetime:       o.ConnMaxLifetime,
+		ConnMaxLifetimeJitter: o.ConnMaxLifetimeJitter,
 
 		TLSConfig: o.TLSConfig,
 
-		DisableIdentity:       o.DisableIdentity,
-		DisableIndentity:      o.DisableIndentity,
-		IdentitySuffix:        o.IdentitySuffix,
-		FailingTimeoutSeconds: o.FailingTimeoutSeconds,
-		UnstableResp3:         o.UnstableResp3,
+		DisableIdentity:          o.DisableIdentity,
+		DisableIndentity:         o.DisableIndentity,
+		IdentitySuffix:           o.IdentitySuffix,
+		FailingTimeoutSeconds:    o.FailingTimeoutSeconds,
+		UnstableResp3:            o.UnstableResp3,
+		MaintNotificationsConfig: o.MaintNotificationsConfig,
 	}
 }
 
@@ -226,8 +233,9 @@ func (o *UniversalOptions) Failover() *FailoverOptions {
 		MinIdleConns:    o.MinIdleConns,
 		MaxIdleConns:    o.MaxIdleConns,
 		MaxActiveConns:  o.MaxActiveConns,
-		ConnMaxIdleTime: o.ConnMaxIdleTime,
-		ConnMaxLifetime: o.ConnMaxLifetime,
+		ConnMaxIdleTime:       o.ConnMaxIdleTime,
+		ConnMaxLifetime:       o.ConnMaxLifetime,
+		ConnMaxLifetimeJitter: o.ConnMaxLifetimeJitter,
 
 		TLSConfig: o.TLSConfig,
 
@@ -237,6 +245,7 @@ func (o *UniversalOptions) Failover() *FailoverOptions {
 		DisableIndentity: o.DisableIndentity,
 		IdentitySuffix:   o.IdentitySuffix,
 		UnstableResp3:    o.UnstableResp3,
+		// Note: MaintNotificationsConfig not supported for FailoverOptions
 	}
 }
 
@@ -284,10 +293,11 @@ func (o *UniversalOptions) Simple() *Options {
 
 		TLSConfig: o.TLSConfig,
 
-		DisableIdentity:  o.DisableIdentity,
-		DisableIndentity: o.DisableIndentity,
-		IdentitySuffix:   o.IdentitySuffix,
-		UnstableResp3:    o.UnstableResp3,
+		DisableIdentity:          o.DisableIdentity,
+		DisableIndentity:         o.DisableIndentity,
+		IdentitySuffix:           o.IdentitySuffix,
+		UnstableResp3:            o.UnstableResp3,
+		MaintNotificationsConfig: o.MaintNotificationsConfig,
 	}
 }
 
