@@ -2,9 +2,6 @@
 ## explicit; go 1.24
 github.com/Azure/go-ntlmssp
 github.com/Azure/go-ntlmssp/internal/md4
-# github.com/akamensky/argparse v1.4.0
-## explicit; go 1.13
-github.com/akamensky/argparse
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
