@@ -18,15 +18,13 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 
-	"github.com/akamensky/argparse"
-	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const Localhost4 = "127.0.0.1"
@@ -67,45 +65,45 @@ const (
 
 type CmdLineConfig struct {
 	// Listen address for the policy service
-	ServerAddress string
+	ServerAddress string `validate:"ip|hostname_rfc1123"`
 
 	// Prt number for the policy service
-	ServerPort int
+	ServerPort int `validate:"min=1,max=65535"`
 
 	// REST interface of the policy service
-	HTTPAddress string
-	HTTPPort    int
+	HTTPAddress string `validate:"ip|hostname_rfc1123"`
+	HTTPPort    int    `validate:"min=1,max=65535"`
 	HTTPApp
 
 	// Use 'sender' or 'sasl_username' attribute?
 	UseSASLUsername bool
 
 	// Redis settings for a reading and/or writing server pool
-	RedisAddress  string
-	RedisPort     int
+	RedisAddress  string `validate:"ip|hostname_rfc1123"`
+	RedisPort     int    `validate:"min=1,max=65535"`
 	RedisUsername string
 	RedisPassword string
 
 	// Redis for a replica (read-only) server pool
-	RedisAddressRO string
-	RedisPortRO    int
+	RedisAddressRO string `validate:"ip|hostname_rfc1123"`
+	RedisPortRO    int    `validate:"min=1,max=65535"`
 
 	RedisSentinels          []string
 	RedisSentinelMasterName string
 	RedisSentinelUsername   string
 	RedisSentinelPassword   string
 
-	RedisPrefix string
-	RedisDB     int
-	RedisTTL    int
+	RedisPrefix string `validate:"required"`
+	RedisDB     int    `validate:"min=0"`
+	RedisTTL    int    `validate:"min=0"`
 
-	GeoipPath        string
-	MaxCountries     int
-	MaxIPs           int
-	HomeCountries    []string
-	MaxHomeCountries int
-	MaxHomeIPs       int
-	IgnoreNets       []string
+	GeoipPath        string   `validate:"required,file"`
+	MaxCountries     int      `validate:"min=0"`
+	MaxIPs           int      `validate:"min=0"`
+	HomeCountries    []string `validate:"dive,iso3166_1_alpha2"`
+	MaxHomeCountries int      `validate:"min=0"`
+	MaxHomeIPs       int      `validate:"min=0"`
+	IgnoreNets       []string `validate:"dive,cidr_or_ip"`
 	BlockPermanent   bool
 	VerboseLevel     int
 
@@ -113,13 +111,13 @@ type CmdLineConfig struct {
 	CommandServer bool
 
 	UseCDB  bool
-	CDBPath string
+	CDBPath string `validate:"required_if=UseCDB true,omitempty,file"`
 
 	UseLDAP bool
 	*LdapConf
 
 	LogFormatJSON      bool
-	CustomSettingsPath string
+	CustomSettingsPath string `validate:"omitempty,file"`
 
 	// Global flag that indicates if any action should be taken
 	RunActions bool
@@ -128,16 +126,16 @@ type CmdLineConfig struct {
 	RunActionOperator bool
 
 	// Action that sends a notification to an operator
-	EmailOperatorTo          string
-	EmailOperatorFrom        string
+	EmailOperatorTo          string `validate:"required_if=RunActionOperator true,omitempty,email"`
+	EmailOperatorFrom        string `validate:"required_if=RunActionOperator true,omitempty,email"`
 	EmailOperatorSubject     string
 	EmailOperatorMessageCT   string
-	EmailOperatorMessagePath string
+	EmailOperatorMessagePath string `validate:"required_if=RunActionOperator true,omitempty,file"`
 
 	// Global mail server configuration parameters
 	MailServer   string
 	MailHelo     string
-	MailPort     int
+	MailPort     int `validate:"min=1,max=65535"`
 	MailUsername string
 	MailPassword string
 	MailSSL      bool
@@ -184,619 +182,151 @@ func (c *CmdLineConfig) String() string {
 	return result[1:]
 }
 
+// splitSpace splits a space-separated string into a slice, returning nil for empty input.
+func splitSpace(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	return strings.Split(s, " ")
+}
+
+// splitComma splits a comma-separated string into a trimmed slice, returning nil for empty input.
+func splitComma(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	parts := strings.Split(s, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+
+	return parts
+}
+
 //nolint:gocognit,gocyclo,maintidx // Ignore complexity
 func (c *CmdLineConfig) Init(args []string) {
-	parser := argparse.NewParser("geoip-policyd", "Detect compromised e-mail accounts")
+	// Detect "server" subcommand (must appear before any flags).
+	subCmdIdx := -1
 
-	commandServer := parser.NewCommand("server", "Run a geoip policy server")
+	for i := 1; i < len(args); i++ {
+		if args[i] == "server" {
+			subCmdIdx = i
+
+			break
+		}
+
+		if strings.HasPrefix(args[i], "-") {
+			break
+		}
+	}
+
+	c.CommandServer = subCmdIdx >= 0
+
+	// Create a unified pflag FlagSet for all flags.
+	flags := pflag.NewFlagSet(args[0], pflag.ContinueOnError)
+
+	// Root flags
+	argVerbose := flags.CountP("verbose", "v", "Verbose mode. Repeat this for an increased log level")
+	argVersion := flags.Bool("version", false, "Current version")
 
 	/*
 	 * GeoIP policy server options
 	 */
-	argServerAddress := commandServer.String(
-		"a", "server-address", &argparse.Options{
-			Required: false,
-			Default:  serverAddress,
-			Validate: func(opt []string) error {
-				if addr := net.ParseIP(opt[0]); addr == nil {
-					if _, err := net.LookupHost(opt[0]); err != nil {
-						return errNotIPOrHostname
-					}
-				}
-
-				return nil
-			},
-			Help: "IPv4 or IPv6 address for the policy service",
-		})
-	argServerPort := commandServer.Int(
-		"p", "server-port", &argparse.Options{
-			Required: false,
-			Default:  serverPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if !(arg > 0 && arg <= 65535) {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "Port for the policy service",
-		})
-	argServerHTTPAddress := commandServer.String(
-		"", "http-address", &argparse.Options{
-			Required: false,
-			Default:  httpAddress,
-			Help:     "HTTP address for incoming requests",
-		})
-	argHTTPPort := commandServer.Int(
-		"", "http-port", &argparse.Options{
-			Required: false,
-			Default:  httpPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if !(arg > 0 && arg <= 65535) {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "HTTP port for incoming requests",
-		})
-
-	argServerUseSASLUsername := commandServer.Flag(
-		"", "sasl-username", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Use 'sasl_username' instead of the 'sender' attribute",
-		})
+	argServerAddress := flags.StringP("server-address", "a", serverAddress, "IPv4 or IPv6 address for the policy service")
+	argServerPort := flags.IntP("server-port", "p", serverPort, "Port for the policy service")
+	argServerHTTPAddress := flags.String("http-address", httpAddress, "HTTP address for incoming requests")
+	argHTTPPort := flags.Int("http-port", httpPort, "HTTP port for incoming requests")
+	argServerUseSASLUsername := flags.Bool("sasl-username", false, "Use 'sasl_username' instead of the 'sender' attribute")
 
 	/*
 	 * Redis options for read and/or write requests
 	 */
-	argServerRedisAddress := commandServer.String(
-		"A", "redis-address", &argparse.Options{
-			Required: false,
-			Default:  redisAddress,
-			Validate: func(opt []string) error {
-				if addr := net.ParseIP(opt[0]); addr == nil {
-					if _, err := net.LookupHost(opt[0]); err != nil {
-						return errNotIPOrHostname
-					}
-				}
-
-				return nil
-			},
-			Help: "IPv4 or IPv6 address for the Redis service",
-		})
-	argServerRedisPort := commandServer.Int(
-		"P", "redis-port", &argparse.Options{
-			Required: false,
-			Default:  redisPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if !(arg > 0 && arg <= 65535) {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "Port for the Redis service",
-		})
-	argServerRedisDB := commandServer.Int(
-		"", "redis-database-number", &argparse.Options{
-			Required: false,
-			Default:  0,
-			Help:     "Redis database number",
-		})
-	argServerRedisUsername := commandServer.String(
-		"", "redis-username", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis username",
-		})
-	argServerRedisPassword := commandServer.String(
-		"", "redis-password", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis password",
-		})
+	argServerRedisAddress := flags.StringP("redis-address", "A", redisAddress, "IPv4 or IPv6 address for the Redis service")
+	argServerRedisPort := flags.IntP("redis-port", "P", redisPort, "Port for the Redis service")
+	argServerRedisDB := flags.Int("redis-database-number", 0, "Redis database number")
+	argServerRedisUsername := flags.String("redis-username", "", "Redis username")
+	argServerRedisPassword := flags.String("redis-password", "", "Redis password")
 
 	/*
 	 * Redis options for replica (read-only) requests
 	 */
-	argServerRedisAddressRO := commandServer.String(
-		"", "redis-replica-address", &argparse.Options{
-			Required: false,
-			Default:  redisAddress,
-			Validate: func(opt []string) error {
-				if addr := net.ParseIP(opt[0]); addr == nil {
-					if _, err := net.LookupHost(opt[0]); err != nil {
-						return errNotIPOrHostname
-					}
-				}
-
-				return nil
-			},
-			Help: "IPv4 or IPv6 address for a Redis service (replica)",
-		})
-	argServerRedisPortRO := commandServer.Int(
-		"", "redis-replica-port", &argparse.Options{
-			Required: false,
-			Default:  redisPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if !(arg > 0 && arg <= 65535) {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "Port for a Redis service (replica)",
-		})
+	argServerRedisAddressRO := flags.String("redis-replica-address", redisAddress, "IPv4 or IPv6 address for a Redis service (replica)")
+	argServerRedisPortRO := flags.Int("redis-replica-port", redisPort, "Port for a Redis service (replica)")
 
 	/*
 	 * Common Redis options
 	 */
-	argServerRedisSentinels := commandServer.StringList(
-		"", "redis-sentinels", &argparse.Options{
-			Required: false,
-			Default:  []string{},
-			Help:     "List of space separated sentinel servers",
-		})
-	argServerRedisSentinelMasterName := commandServer.String(
-		"", "redis-sentinel-master-name", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Sentinel master name",
-		})
-	argServerRedisSentinelUsername := commandServer.String(
-		"", "redis-sentinel-username", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis sentinel username",
-		})
-	argServerRedisSentinelPassword := commandServer.String(
-		"", "redis-sentinel-password", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Redis sentinel password",
-		})
-	argServerRedisPrefix := commandServer.String(
-		"", "redis-prefix", &argparse.Options{
-			Required: false,
-			Default:  redisPrefix,
-			Help:     "Redis prefix",
-		})
-	argServerRedisTTL := commandServer.Int(
-		"", "redis-ttl", &argparse.Options{
-			Required: false,
-			Default:  redisTTL,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 1 {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "Redis TTL in seconds",
-		})
+	argServerRedisSentinels := flags.StringArray("redis-sentinels", []string{}, "List of space separated sentinel servers")
+	argServerRedisSentinelMasterName := flags.String("redis-sentinel-master-name", "", "Sentinel master name")
+	argServerRedisSentinelUsername := flags.String("redis-sentinel-username", "", "Redis sentinel username")
+	argServerRedisSentinelPassword := flags.String("redis-sentinel-password", "", "Redis sentinel password")
+	argServerRedisPrefix := flags.String("redis-prefix", redisPrefix, "Redis prefix")
+	argServerRedisTTL := flags.Int("redis-ttl", redisTTL, "Redis TTL in seconds")
 
 	/*
 	 * Other config options
 	 */
-	argServerGeoIPDB := commandServer.String(
-		"g", "geoip-path", &argparse.Options{
-			Required: false,
-			Default:  geoipPath,
-			Validate: func(opt []string) error {
-				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return errFileNotFound
-				}
+	argServerGeoIPDB := flags.StringP("geoip-path", "g", geoipPath, "Full path to the GeoIP database file")
+	argServerMaxCountries := flags.Int("max-countries", maxCountries, "Maximum number of countries before rejecting e-mails")
+	argServerMaxIPs := flags.Int("max-ips", maxIPs, "Maximum number of IP addresses before rejecting e-mails")
+	argServerHomeCountries := flags.StringArray("home-countries", []string{}, "List of known home country codes")
+	argServerMaxHomeCountries := flags.Int("max-home-countries", maxCountries, "Maximum number home of countries before rejecting e-mails")
+	argServerMaxHomeIPs := flags.Int("max-home-ips", maxIPs, "Maximum number of home IP addresses before rejecting e-mails")
+	argServerIgnoreNets := flags.StringArray("ignore-network", []string{}, "List of IP addresses and networks to ignore")
+	argServerBlockedNoExpire := flags.Bool("block-permanent", false, "Do not expire senders from Redis, if they were blocked in the past")
+	argServerForceUserKnown := flags.Bool("force-user-known", false, "Senders are already known by an upstream service")
+	argServerCustomSettingsPath := flags.StringP("custom-settings-path", "c", "", "Custom settings with different IP and country limits")
+	argServerHTTPUseBasicAuth := flags.Bool("http-use-basic-auth", false, "Enable basic HTTP auth")
+	argServerHTTPUseSSL := flags.Bool("http-use-ssl", false, "Enable HTTPS")
+	argServerHTTPBasicAuthUsername := flags.String("http-basic-auth-username", "", "HTTP basic auth username")
+	argServerHTTPBasicAuthPassword := flags.String("http-basic-auth-password", "", "HTTP basic auth password")
+	argServerHTTPTLSCert := flags.String("http-tls-cert", httpX509Cert, "HTTP TLS server certificate (full chain)")
+	argServerHTTPTLSKey := flags.String("http-tls-key", httpX509Key, "HTTP TLS server key")
+	argServerUseCDB := flags.Bool("use-cdb", false, "Enable CDB support")
+	argServerCDBPath := flags.String("cdb-path", "", "Full path to the cdb file")
+	argServerUseLDAP := flags.Bool("use-ldap", false, "Enable LDAP support")
+	argServerLDAPServerURIs := flags.StringArray("ldap-server-uri", []string{"ldap://127.0.0.1:389/"}, "Server URI. Specify multiple times, if you need more than one server")
+	argServerLDAPBaseDN := flags.String("ldap-basedn", "", "Base DN")
+	argServerLDAPBindDN := flags.String("ldap-binddn", "", "bind DN")
+	argServerLDAPBindPWPATH := flags.String("ldap-bindpw", "", "bind password")
+	argServerLDAPFilter := flags.String("ldap-filter", "(&(objectClass=*)(mailAlias=%s))", "Filter with %s placeholder")
+	argServerLDAPResultAttr := flags.String("ldap-result-attribute", "mailAccount", "Result attribute for the requested mail sender")
+	argServerLDAPStartTLS := flags.Bool("ldap-starttls", false, "If this option is given, use StartTLS")
+	argServerLDAPTLSVerify := flags.Bool("ldap-tls-skip-verify", false, "Skip TLS server name verification")
+	argServerLDAPTLSCAFile := flags.String("ldap-tls-cafile", "", "File containing TLS CA certificate(s)")
+	argServerLDAPTLSClientCert := flags.String("ldap-tls-client-cert", "", "File containing a TLS client certificate")
+	argServerLDAPTLSClientKey := flags.String("ldap-tls-client-key", "", "File containing a TLS client key")
+	argServerLDAPSASLExternal := flags.Bool("ldap-sasl-external", false, "Use SASL/EXTERNAL instead of a simple bind")
+	argServerLDAPScope := flags.String("ldap-scope", "sub", "LDAP search scope [base, one, sub]")
+	argServerLDAPIdlePoolSize := flags.Int("ldap-idle-pool-size", int(ldapPoolSize*0.3), "LDAP pre-forked (idle) pool size")
+	argServerLDAPPoolSize := flags.Int("ldap-pool-size", ldapPoolSize, "LDAP max pool size")
+	argServerLogFormatJSON := flags.Bool("log-json", false, "Enable JSON log format")
+	argServerRunActions := flags.Bool("run-actions", false, "Run actions, if a sender is over limits")
+	argServerRunActionOperator := flags.Bool("run-action-operator", false, "Run the operator action")
+	argServerOperatorTo := flags.String("operator-to", "", "E-Mail To-header for the operator action")
+	argServerOperatorFrom := flags.String("operator-from", "", "E-Mail From-header for the operator action")
+	argServerOperatorSubject := flags.String("operator-subject", mailSubject, "E-Mail Subject-header for the operator action")
+	argServerOperatorMessageCT := flags.String("operator-message-ct", "text/plain", "E-Mail Content-Type-header for the operator action")
+	argServerOperatorMessagePath := flags.String("operator-message-path", "", "Full path to the e-mail message file for the operator action")
+	argServerMailServer := flags.String("mail-server-address", "", "E-mail server address for notifications")
+	argServerMailPort := flags.Int("mail-server-port", mailPort, "E-mail server port number")
+	argServerMailHelo := flags.String("mail-helo", mailHelo, "E-mail server HELO/EHLO hostname")
+	argServerMailUsername := flags.String("mail-username", "", "E-mail server username")
+	argServerMailPasswordPath := flags.String("mail-password", "", "E-mail server password")
+	argServerMailSSL := flags.Bool("mail-ssl-on-connect", false, "Use SSL/TLS on connect for the e-mail server")
 
-				return nil
-			},
-			Help: "Full path to the GeoIP database file",
-		})
-	argServerMaxCountries := commandServer.Int(
-		"", "max-countries", &argparse.Options{
-			Required: false,
-			Default:  maxCountries,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 0 { //nolint:gomnd // Threshold value
-					return errMaxCountries
-				}
-
-				return nil
-			},
-			Help: "Maximum number of countries before rejecting e-mails",
-		})
-	argServerMaxIPs := commandServer.Int(
-		"", "max-ips", &argparse.Options{
-			Required: false,
-			Default:  maxIPs,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 0 {
-					return errMaxIPs
-				}
-
-				return nil
-			},
-			Help: "Maximum number of IP addresses before rejecting e-mails",
-		})
-	argServerHomeCountries := commandServer.StringList(
-		"", "home-countries", &argparse.Options{
-			Required: false,
-			Default:  []string{},
-			Help:     "List of known home country codes",
-		})
-	argServerMaxHomeCountries := commandServer.Int(
-		"", "max-home-countries", &argparse.Options{
-			Required: false,
-			Default:  maxCountries,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 0 { //nolint:gomnd // Threshold value
-					return errMaxCountries
-				}
-
-				return nil
-			},
-			Help: "Maximum number home of countries before rejecting e-mails",
-		})
-	argServerMaxHomeIPs := commandServer.Int(
-		"", "max-home-ips", &argparse.Options{
-			Required: false,
-			Default:  maxIPs,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 0 {
-					return errMaxIPs
-				}
-
-				return nil
-			},
-			Help: "Maximum number of home IP addresses before rejecting e-mails",
-		})
-	argServerIgnoreNets := commandServer.StringList(
-		"", "ignore-network", &argparse.Options{
-			Required: false,
-			Default:  []string{},
-			Help:     "List of IP addresses and networks to ignore",
-		})
-	argServerBlockedNoExpire := commandServer.Flag(
-		"", "block-permanent", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Do not expire senders from Redis, if they were blocked in the past",
-		})
-	argServerForceUserKnown := commandServer.Flag(
-		"", "force-user-known", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Senders are already known by an upstream service",
-		})
-	argServerCustomSettingsPath := commandServer.String(
-		"c", "custom-settings-path", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Custom settings with different IP and country limits",
-		})
-	argServerHTTPUseBasicAuth := commandServer.Flag(
-		"", "http-use-basic-auth", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Enable basic HTTP auth",
-		})
-	argServerHTTPUseSSL := commandServer.Flag(
-		"", "http-use-ssl", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Enable HTTPS",
-		})
-	argServerHTTPBasicAuthUsername := commandServer.String(
-		"", "http-basic-auth-username", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "HTTP basic auth username",
-		})
-	argServerHTTPBasicAuthPassword := commandServer.String(
-		"", "http-basic-auth-password", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "HTTP basic auth password",
-		})
-	argServerHTTPTLSCert := commandServer.String(
-		"", "http-tls-cert", &argparse.Options{
-			Required: false,
-			Default:  httpX509Cert,
-			Help:     "HTTP TLS server certificate (full chain)",
-		})
-	argServerHTTPTLSKey := commandServer.String(
-		"", "http-tls-key", &argparse.Options{
-			Required: false,
-			Default:  httpX509Key,
-			Help:     "HTTP TLS server key",
-		})
-	argServerUseCDB := commandServer.Flag(
-		"", "use-cdb", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Enable CDB support",
-		})
-	argServerCDBPath := commandServer.String(
-		"", "cdb-path", &argparse.Options{
-			Required: false,
-			Validate: func(opt []string) error {
-				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return errFileNotFound
-				}
-
-				return nil
-			},
-			Help: "Full path to the cdb file",
-		})
-	argServerUseLDAP := commandServer.Flag(
-		"", "use-ldap", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Enable LDAP support",
-		})
-	argServerLDAPServerURIs := commandServer.StringList(
-		"", "ldap-server-uri", &argparse.Options{
-			Required: false,
-			Default:  []string{"ldap://127.0.0.1:389/"},
-			Help:     "Server URI. Specify multiple times, if you need more than one server",
-		})
-	argServerLDAPBaseDN := commandServer.String(
-		"", "ldap-basedn", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "Base DN",
-		})
-	argServerLDAPBindDN := commandServer.String(
-		"", "ldap-binddn", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "bind DN",
-		})
-	argServerLDAPBindPWPATH := commandServer.String(
-		"", "ldap-bindpw", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "bind password",
-		})
-	argServerLDAPFilter := commandServer.String(
-		"", "ldap-filter", &argparse.Options{
-			Required: false,
-			Default:  "(&(objectClass=*)(mailAlias=%s))",
-			Help:     "Filter with %s placeholder",
-		})
-	argServerLDAPResultAttr := commandServer.String(
-		"", "ldap-result-attribute", &argparse.Options{
-			Required: false,
-			Default:  "mailAccount",
-			Help:     "Result attribute for the requested mail sender",
-		})
-	argServerLDAPStartTLS := commandServer.Flag(
-		"", "ldap-starttls", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "If this option is given, use StartTLS",
-		})
-	argServerLDAPTLSVerify := commandServer.Flag(
-		"", "ldap-tls-skip-verify", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Skip TLS server name verification",
-		})
-	argServerLDAPTLSCAFile := commandServer.String(
-		"", "ldap-tls-cafile", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "File containing TLS CA certificate(s)",
-		})
-	argServerLDAPTLSClientCert := commandServer.String(
-		"", "ldap-tls-client-cert", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "File containing a TLS client certificate",
-		})
-	argServerLDAPTLSClientKey := commandServer.String(
-		"", "ldap-tls-client-key", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "File containing a TLS client key",
-		})
-	argServerLDAPSASLExternal := commandServer.Flag(
-		"", "ldap-sasl-external", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Use SASL/EXTERNAL instead of a simple bind",
-		})
-	argServerLDAPScope := commandServer.String(
-		"", "ldap-scope", &argparse.Options{
-			Required: false,
-			Default:  "sub",
-			Validate: func(opt []string) error {
-				switch opt[0] {
-				case BASE, ONE, SUB:
-					return nil
-				default:
-					return errLDAPScope
-				}
-			},
-			Help: "LDAP search scope [base, one, sub]",
-		})
-	argServerLDAPIdlePoolSize := commandServer.Int(
-		"", "ldap-idle-pool-size", &argparse.Options{
-			Required: false,
-			Default:  int(ldapPoolSize * 0.3),
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 0 {
-					return errIdlePoolSize
-				}
-
-				return nil
-			},
-			Help: "LDAP pre-forked (idle) pool size",
-		})
-	argServerLDAPPoolSize := commandServer.Int(
-		"", "ldap-pool-size", &argparse.Options{
-			Required: false,
-			Default:  ldapPoolSize,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if arg < 1 {
-					return errPoolSize
-				}
-
-				return nil
-			},
-			Help: "LDAP max pool size",
-		})
-
-	if *argServerLDAPIdlePoolSize > *argServerLDAPPoolSize {
-		*argServerLDAPIdlePoolSize = *argServerLDAPPoolSize
+	// Parse flags from args following the optional subcommand.
+	var parseArgs []string
+	if subCmdIdx >= 0 {
+		parseArgs = args[subCmdIdx+1:]
+	} else {
+		parseArgs = args[1:]
 	}
 
-	argVerbose := parser.FlagCounter(
-		"v", "verbose", &argparse.Options{
-			Help: "Verbose mode. Repeat this for an increased log level",
-		})
-	argServerLogFormatJSON := commandServer.Flag(
-		"", "log-json", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Enable JSON log format",
-		})
-	argVersion := parser.Flag(
-		"", "version", &argparse.Options{
-			Help: "Current version",
-		})
-
-	argServerRunActions := commandServer.Flag(
-		"", "run-actions", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Run actions, if a sender is over limits",
-		})
-	argServerRunActionOperator := commandServer.Flag(
-		"", "run-action-operator", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Run the operator action",
-		})
-	argServerOperatorTo := commandServer.String(
-		"", "operator-to", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "E-Mail To-header for the operator action",
-		})
-	argServerOperatorFrom := commandServer.String(
-		"", "operator-from", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "E-Mail From-header for the operator action",
-		})
-	argServerOperatorSubject := commandServer.String(
-		"", "operator-subject", &argparse.Options{
-			Required: false,
-			Default:  mailSubject,
-			Help:     "E-Mail Subject-header for the operator action",
-		})
-	argServerOperatorMessageCT := commandServer.String(
-		"", "operator-message-ct", &argparse.Options{
-			Required: false,
-			Default:  "text/plain",
-			Help:     "E-Mail Content-Type-header for the operator action",
-		})
-	argServerOperatorMessagePath := commandServer.String(
-		"", "operator-message-path", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Validate: func(opt []string) error {
-				if _, err := os.Stat(opt[0]); os.IsNotExist(err) {
-					return errFileNotFound
-				}
-
-				return nil
-			},
-			Help: "Full path to the e-mail message file for the operator action",
-		})
-
-	argServerMailServer := commandServer.String(
-		"", "mail-server-address", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Validate: func(opt []string) error {
-				if addr := net.ParseIP(opt[0]); addr == nil {
-					if _, err := net.LookupHost(opt[0]); err != nil {
-						return errNotIPOrHostname
-					}
-				}
-
-				return nil
-			},
-			Help: "E-mail server address for notifications",
-		})
-	argServerMailPort := commandServer.Int(
-		"", "mail-server-port", &argparse.Options{
-			Required: false,
-			Default:  mailPort,
-			Validate: func(opt []string) error {
-				if arg, err := strconv.Atoi(opt[0]); err != nil {
-					return errNotInteger
-				} else if !(arg > 0 && arg <= 65535) {
-					return errNotValidPortNumber
-				}
-
-				return nil
-			},
-			Help: "E-mail server port number",
-		})
-	argServerMailHelo := commandServer.String(
-		"", "mail-helo", &argparse.Options{
-			Required: false,
-			Default:  mailHelo,
-			Help:     "E-mail server HELO/EHLO hostname",
-		})
-	argServerMailUsername := commandServer.String(
-		"", "mail-username", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "E-mail server username",
-		})
-	argServerMailPasswordPath := commandServer.String(
-		"", "mail-password", &argparse.Options{
-			Required: false,
-			Default:  "",
-			Help:     "E-mail server password",
-		})
-	argServerMailSSL := commandServer.Flag(
-		"", "mail-ssl-on-connect", &argparse.Options{
-			Required: false,
-			Default:  false,
-			Help:     "Use SSL/TLS on connect for the e-mail server",
-		})
-
-	err := parser.Parse(args)
-	if err != nil {
-		log.Fatalln(parser.Usage(err.Error()))
+	if err := flags.Parse(parseArgs); err != nil {
+		log.Fatalln(err)
 	}
 
 	if *argVersion {
@@ -804,601 +334,305 @@ func (c *CmdLineConfig) Init(args []string) {
 		os.Exit(0)
 	}
 
-	if val := os.Getenv("GEOIPPOLICYD_VERBOSE_LEVEL"); val != "" {
-		switch val {
-		case "none":
-			c.VerboseLevel = logLevelNone
-		case "info":
-			c.VerboseLevel = logLevelInfo
-		case "debug":
-			c.VerboseLevel = logLevelDebug
-		}
-	} else {
-		switch *argVerbose {
-		case logLevelNone:
-			c.VerboseLevel = logLevelNone
-		case logLevelInfo:
-			c.VerboseLevel = logLevelInfo
-		case logLevelDebug:
-			c.VerboseLevel = logLevelDebug
-		default:
-			c.VerboseLevel = logLevelInfo
-		}
+	// Cap idle pool size to pool size (CLI values only; env vars are not capped).
+	if *argServerLDAPIdlePoolSize > *argServerLDAPPoolSize {
+		*argServerLDAPIdlePoolSize = *argServerLDAPPoolSize
 	}
 
-	if val := os.Getenv("GEOIPPOLICYD_LOG_JSON"); val != "" {
-		param, err := strconv.ParseBool(val)
-		if err != nil {
-			log.Fatalln("Error:", err.Error())
-		}
+	// ---------------------------------------------------------------------------
+	// Viper: env vars override CLI defaults. Priority: env var > CLI arg > built-in default.
+	// Env var names are derived automatically: key "server_address" → GEOIPPOLICYD_SERVER_ADDRESS.
+	// ---------------------------------------------------------------------------
+	v := viper.New()
+	v.SetEnvPrefix("GEOIPPOLICYD")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-		c.LogFormatJSON = param
-	} else {
-		c.LogFormatJSON = *argServerLogFormatJSON
+	// --- Verbose level (special: string none/info/debug → int) ---
+	var verbDefault string
+
+	switch *argVerbose {
+	case logLevelNone:
+		verbDefault = "none"
+	case logLevelInfo:
+		verbDefault = "info"
+	case logLevelDebug:
+		verbDefault = "debug"
+	default:
+		verbDefault = "info"
 	}
 
-	c.CommandServer = commandServer.Happened()
+	v.SetDefault("verbose_level", verbDefault)
 
-	if commandServer.Happened() {
-		if val := os.Getenv("GEOIPPOLICYD_SERVER_ADDRESS"); val != "" {
-			c.ServerAddress = val
+	switch v.GetString("verbose_level") {
+	case "none":
+		c.VerboseLevel = logLevelNone
+	case "info":
+		c.VerboseLevel = logLevelInfo
+	case "debug":
+		c.VerboseLevel = logLevelDebug
+	}
+
+	// --- Log format JSON ---
+	v.SetDefault("log_json", *argServerLogFormatJSON)
+	c.LogFormatJSON = v.GetBool("log_json")
+
+	if c.CommandServer {
+		// --- Server ---
+		v.SetDefault("server_address", *argServerAddress)
+		c.ServerAddress = v.GetString("server_address")
+
+		v.SetDefault("server_port", *argServerPort)
+		c.ServerPort = v.GetInt("server_port")
+
+		v.SetDefault("http_address", *argServerHTTPAddress)
+		c.HTTPAddress = v.GetString("http_address")
+
+		v.SetDefault("http_port", *argHTTPPort)
+		c.HTTPPort = v.GetInt("http_port")
+
+		v.SetDefault("use_sasl_username", *argServerUseSASLUsername)
+		c.UseSASLUsername = v.GetBool("use_sasl_username")
+
+		// --- Redis (read/write) ---
+		v.SetDefault("redis_address", *argServerRedisAddress)
+		c.RedisAddress = v.GetString("redis_address")
+
+		v.SetDefault("redis_port", *argServerRedisPort)
+		c.RedisPort = v.GetInt("redis_port")
+
+		v.SetDefault("redis_database_number", *argServerRedisDB)
+		c.RedisDB = v.GetInt("redis_database_number")
+
+		v.SetDefault("redis_username", *argServerRedisUsername)
+		c.RedisUsername = v.GetString("redis_username")
+
+		v.SetDefault("redis_password", *argServerRedisPassword)
+		c.RedisPassword = v.GetString("redis_password")
+
+		// --- Redis replica ---
+		v.SetDefault("redis_replica_address", *argServerRedisAddressRO)
+		c.RedisAddressRO = v.GetString("redis_replica_address")
+
+		v.SetDefault("redis_replica_port", *argServerRedisPortRO)
+		c.RedisPortRO = v.GetInt("redis_replica_port")
+
+		// --- Redis sentinel (space-separated list in env var) ---
+		v.SetDefault("redis_sentinels", strings.Join(*argServerRedisSentinels, " "))
+
+		if sentinelsStr := v.GetString("redis_sentinels"); sentinelsStr != "" {
+			c.RedisSentinels = strings.Split(sentinelsStr, " ")
 		} else {
-			c.ServerAddress = *argServerAddress
+			c.RedisSentinels = []string{}
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_SERVER_PORT"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_SERVER_PORT an not be used:", parser.Usage(err.Error()))
-			}
+		v.SetDefault("redis_sentinel_master_name", *argServerRedisSentinelMasterName)
+		c.RedisSentinelMasterName = v.GetString("redis_sentinel_master_name")
 
-			c.ServerPort = param
+		v.SetDefault("redis_sentinel_username", *argServerRedisSentinelUsername)
+		c.RedisSentinelUsername = v.GetString("redis_sentinel_username")
+
+		v.SetDefault("redis_sentinel_password", *argServerRedisSentinelPassword)
+		c.RedisSentinelPassword = v.GetString("redis_sentinel_password")
+
+		// --- Redis common ---
+		v.SetDefault("redis_prefix", *argServerRedisPrefix)
+		c.RedisPrefix = v.GetString("redis_prefix")
+
+		v.SetDefault("redis_ttl", *argServerRedisTTL)
+		c.RedisTTL = v.GetInt("redis_ttl")
+
+		// --- GeoIP ---
+		v.SetDefault("geoip_path", *argServerGeoIPDB)
+		c.GeoipPath = v.GetString("geoip_path")
+
+		// --- Country / IP limits ---
+		v.SetDefault("max_countries", *argServerMaxCountries)
+		c.MaxCountries = v.GetInt("max_countries")
+
+		v.SetDefault("max_ips", *argServerMaxIPs)
+		c.MaxIPs = v.GetInt("max_ips")
+
+		// Home countries (space-separated list in env var)
+		v.SetDefault("home_countries", strings.Join(*argServerHomeCountries, " "))
+
+		if homeStr := v.GetString("home_countries"); homeStr != "" {
+			c.HomeCountries = strings.Split(homeStr, " ")
 		} else {
-			c.ServerPort = *argServerPort
+			c.HomeCountries = []string{}
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_HTTP_ADDRESS"); val != "" {
-			c.HTTPAddress = val
+		v.SetDefault("max_home_countries", *argServerMaxHomeCountries)
+		c.MaxHomeCountries = v.GetInt("max_home_countries")
+
+		v.SetDefault("max_home_ips", *argServerMaxHomeIPs)
+		c.MaxHomeIPs = v.GetInt("max_home_ips")
+
+		// Ignore networks (space-separated list in env var)
+		v.SetDefault("ignore_networks", strings.Join(*argServerIgnoreNets, " "))
+
+		if ignoreStr := v.GetString("ignore_networks"); ignoreStr != "" {
+			c.IgnoreNets = strings.Split(ignoreStr, " ")
 		} else {
-			c.HTTPAddress = *argServerHTTPAddress
+			c.IgnoreNets = []string{}
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_HTTP_PORT"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_HTTP_PORT an not be used:", parser.Usage(err.Error()))
-			}
+		v.SetDefault("block_permanent", *argServerBlockedNoExpire)
+		c.BlockPermanent = v.GetBool("block_permanent")
 
-			c.HTTPPort = param
-		} else {
-			c.HTTPPort = *argHTTPPort
-		}
+		v.SetDefault("force_user_known", *argServerForceUserKnown)
+		c.ForceUserKnown = v.GetBool("force_user_known")
 
-		if val := os.Getenv("GEOIPPOLICYD_USE_SASL_USERNAME"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
+		v.SetDefault("custom_settings_path", *argServerCustomSettingsPath)
+		c.CustomSettingsPath = v.GetString("custom_settings_path")
 
-			c.UseSASLUsername = param
-		} else {
-			c.UseSASLUsername = *argServerUseSASLUsername
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_ADDRESS"); val != "" {
-			c.RedisAddress = val
-		} else {
-			c.RedisAddress = *argServerRedisAddress
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_PORT"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_PORT can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.RedisPort = param
-		} else {
-			c.RedisPort = *argServerRedisPort
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_DATABASE_NUMBER"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_DATABASE_NUMBER can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.RedisDB = param
-		} else {
-			c.RedisDB = *argServerRedisDB
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_USERNAME"); val != "" {
-			c.RedisUsername = val
-		} else {
-			c.RedisUsername = *argServerRedisUsername
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_PASSWORD"); val != "" {
-			c.RedisPassword = val
-		} else {
-			c.RedisPassword = *argServerRedisPassword
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_ADDRESS"); val != "" {
-			c.RedisAddressRO = val
-		} else {
-			c.RedisAddressRO = *argServerRedisAddressRO
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_REPLICA_PORT"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_REPLICA_PORT can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.RedisPortRO = param
-		} else {
-			c.RedisPortRO = *argServerRedisPortRO
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINELS"); val != "" {
-			c.RedisSentinels = strings.Split(val, " ")
-		} else {
-			c.RedisSentinels = *argServerRedisSentinels
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME"); val != "" {
-			c.RedisSentinelMasterName = val
-		} else {
-			c.RedisSentinelMasterName = *argServerRedisSentinelMasterName
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_USERNAME"); val != "" {
-			c.RedisSentinelUsername = val
-		} else {
-			c.RedisSentinelUsername = *argServerRedisSentinelUsername
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD"); val != "" {
-			c.RedisSentinelPassword = val
-		} else {
-			c.RedisSentinelPassword = *argServerRedisSentinelPassword
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_PREFIX"); val != "" {
-			c.RedisPrefix = val
-		} else {
-			c.RedisPrefix = *argServerRedisPrefix
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_REDIS_TTL"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_REDIS_TTL can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.RedisTTL = param
-		} else {
-			c.RedisTTL = *argServerRedisTTL
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_GEOIP_PATH"); val != "" {
-			c.GeoipPath = val
-		} else {
-			c.GeoipPath = *argServerGeoIPDB
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAX_COUNTRIES"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_MAX_COUNTRIES can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.MaxCountries = param
-		} else {
-			c.MaxCountries = *argServerMaxCountries
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAX_IPS"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_MAX_IPS can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.MaxIPs = param
-		} else {
-			c.MaxIPs = *argServerMaxIPs
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_HOME_COUNTRIES"); val != "" {
-			c.HomeCountries = strings.Split(val, " ")
-		} else {
-			c.HomeCountries = *argServerHomeCountries
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAX_HOME_COUNTRIES"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_MAX_HOME_COUNTRIES can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.MaxHomeCountries = param
-		} else {
-			c.MaxHomeCountries = *argServerMaxHomeCountries
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAX_HOME_IPS"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_MAX_HOME_IPS can not be used:", parser.Usage(err.Error()))
-			}
-
-			c.MaxHomeIPs = param
-		} else {
-			c.MaxHomeIPs = *argServerMaxHomeIPs
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_BLOCK_PERMANENT"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.BlockPermanent = param
-		} else {
-			c.BlockPermanent = *argServerBlockedNoExpire
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_FORCE_USER_KNOWN"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.ForceUserKnown = param
-		} else {
-			c.ForceUserKnown = *argServerForceUserKnown
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_IGNORE_NETWORKS"); val != "" {
-			c.IgnoreNets = strings.Split(val, " ")
-		} else {
-			c.IgnoreNets = *argServerIgnoreNets
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_CUSTOM_SETTINGS_PATH"); val != "" {
-			c.CustomSettingsPath = val
-		} else {
-			c.CustomSettingsPath = *argServerCustomSettingsPath
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_HTTP_USE_BASIC_AUTH"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				level.Error(logger).Log("error", err.Error())
-			}
-
-			c.HTTPApp.useBasicAuth = param
-		} else {
-			c.HTTPApp.useBasicAuth = *argServerHTTPUseBasicAuth
-		}
+		// --- HTTP app ---
+		v.SetDefault("http_use_basic_auth", *argServerHTTPUseBasicAuth)
+		c.HTTPApp.useBasicAuth = v.GetBool("http_use_basic_auth")
 
 		if c.HTTPApp.useBasicAuth {
-			if val := os.Getenv("GEOIPPOLICYD_HTTP_BASIC_AUTH_USERNAME"); val != "" {
-				c.HTTPApp.auth.username = val
-			} else {
-				c.HTTPApp.auth.username = *argServerHTTPBasicAuthUsername
-			}
+			v.SetDefault("http_basic_auth_username", *argServerHTTPBasicAuthUsername)
+			c.HTTPApp.auth.username = v.GetString("http_basic_auth_username")
 
-			if val := os.Getenv("GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD"); val != "" {
-				c.HTTPApp.auth.password = val
-			} else {
-				c.HTTPApp.auth.password = *argServerHTTPBasicAuthPassword
-			}
+			v.SetDefault("http_basic_auth_password", *argServerHTTPBasicAuthPassword)
+			c.HTTPApp.auth.password = v.GetString("http_basic_auth_password")
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_HTTP_USE_SSL"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.HTTPApp.useSSL = param
-		} else {
-			c.HTTPApp.useSSL = *argServerHTTPUseSSL
-		}
+		v.SetDefault("http_use_ssl", *argServerHTTPUseSSL)
+		c.HTTPApp.useSSL = v.GetBool("http_use_ssl")
 
 		if c.HTTPApp.useSSL {
-			if val := os.Getenv("GEOIPPOLICYD_HTTP_TLS_CERT"); val != "" {
-				c.HTTPApp.x509.cert = val
-			} else {
-				c.HTTPApp.x509.cert = *argServerHTTPTLSCert
-			}
+			v.SetDefault("http_tls_cert", *argServerHTTPTLSCert)
+			c.HTTPApp.x509.cert = v.GetString("http_tls_cert")
 
-			if val := os.Getenv("GEOIPPOLICYD_HTTP_TLS_KEY"); val != "" {
-				c.HTTPApp.x509.key = val
-			} else {
-				c.HTTPApp.x509.key = *argServerHTTPTLSKey
-			}
+			v.SetDefault("http_tls_key", *argServerHTTPTLSKey)
+			c.HTTPApp.x509.key = v.GetString("http_tls_key")
 		}
 
-		if val := os.Getenv("GEOIPPOLICYD_USE_CDB"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
+		// --- CDB ---
+		v.SetDefault("use_cdb", *argServerUseCDB)
+		c.UseCDB = v.GetBool("use_cdb")
 
-			c.UseCDB = param
-		} else {
-			c.UseCDB = *argServerUseCDB
-		}
+		v.SetDefault("cdb_path", *argServerCDBPath)
+		c.CDBPath = v.GetString("cdb_path")
 
-		if val := os.Getenv("GEOIPPOLICYD_CDB_PATH"); val != "" {
-			c.CDBPath = val
-		} else {
-			c.CDBPath = *argServerCDBPath
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_USE_LDAP"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.UseLDAP = param
-		} else {
-			c.UseLDAP = *argServerUseLDAP
-		}
+		// --- LDAP ---
+		v.SetDefault("use_ldap", *argServerUseLDAP)
+		c.UseLDAP = v.GetBool("use_ldap")
 
 		if c.UseLDAP {
 			c.LdapConf = &LdapConf{}
 
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_SERVER_URIS"); val != "" {
-				param := strings.Split(val, ",")
-				for i, uri := range param {
-					param[i] = strings.TrimSpace(uri)
-				}
+			// LDAP URIs (comma-separated list in env var)
+			v.SetDefault("ldap_server_uris", strings.Join(*argServerLDAPServerURIs, ","))
 
-				c.LdapConf.ServerURIs = param
+			if urisStr := v.GetString("ldap_server_uris"); urisStr != "" {
+				c.LdapConf.ServerURIs = splitComma(urisStr)
 			} else {
-				c.LdapConf.ServerURIs = *argServerLDAPServerURIs
+				c.LdapConf.ServerURIs = []string{}
 			}
 
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_BASEDN"); val != "" {
-				c.LdapConf.BaseDN = val
-			} else {
-				c.LdapConf.BaseDN = *argServerLDAPBaseDN
+			v.SetDefault("ldap_basedn", *argServerLDAPBaseDN)
+			c.LdapConf.BaseDN = v.GetString("ldap_basedn")
+
+			v.SetDefault("ldap_binddn", *argServerLDAPBindDN)
+			c.LdapConf.BindDN = v.GetString("ldap_binddn")
+
+			v.SetDefault("ldap_bindpw", *argServerLDAPBindPWPATH)
+			c.LdapConf.BindPW = v.GetString("ldap_bindpw")
+
+			v.SetDefault("ldap_filter", *argServerLDAPFilter)
+			c.LdapConf.Filter = v.GetString("ldap_filter")
+
+			v.SetDefault("ldap_result_attribute", *argServerLDAPResultAttr)
+			c.LdapConf.SearchAttributes = []string{v.GetString("ldap_result_attribute")}
+
+			v.SetDefault("ldap_starttls", *argServerLDAPStartTLS)
+			c.LdapConf.StartTLS = v.GetBool("ldap_starttls")
+
+			v.SetDefault("ldap_tls_skip_verify", *argServerLDAPTLSVerify)
+			c.LdapConf.TLSSkipVerify = v.GetBool("ldap_tls_skip_verify")
+
+			v.SetDefault("ldap_tls_cafile", *argServerLDAPTLSCAFile)
+			c.LdapConf.TLSCAFile = v.GetString("ldap_tls_cafile")
+
+			v.SetDefault("ldap_tls_client_cert", *argServerLDAPTLSClientCert)
+			c.LdapConf.TLSClientCert = v.GetString("ldap_tls_client_cert")
+
+			v.SetDefault("ldap_tls_client_key", *argServerLDAPTLSClientKey)
+			c.LdapConf.TLSClientKey = v.GetString("ldap_tls_client_key")
+
+			v.SetDefault("ldap_sasl_external", *argServerLDAPSASLExternal)
+			c.LdapConf.SASLExternal = v.GetBool("ldap_sasl_external")
+
+			// LDAP scope (special: string base/one/sub → int)
+			v.SetDefault("ldap_scope", *argServerLDAPScope)
+
+			switch v.GetString("ldap_scope") {
+			case BASE:
+				c.LdapConf.Scope = ldap.ScopeBaseObject
+			case ONE:
+				c.LdapConf.Scope = ldap.ScopeSingleLevel
+			case SUB:
+				c.LdapConf.Scope = ldap.ScopeWholeSubtree
+			default:
+				log.Fatalf("ldap-scope value '%s' must be one of: base, one, sub\n", v.GetString("ldap_scope"))
 			}
 
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDDN"); val != "" {
-				c.LdapConf.BindDN = val
-			} else {
-				c.LdapConf.BindDN = *argServerLDAPBindDN
-			}
+			// Idle pool size (capped to pool size for CLI values; env vars are not capped).
+			idleDefault := *argServerLDAPIdlePoolSize
+			poolDefault := *argServerLDAPPoolSize
 
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_BINDPW"); val != "" {
-				c.LdapConf.BindPW = val
-			} else {
-				c.LdapConf.BindPW = *argServerLDAPBindPWPATH
-			}
+			v.SetDefault("ldap_idle_pool_size", idleDefault)
+			v.SetDefault("ldap_pool_size", poolDefault)
 
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_FILTER"); val != "" {
-				c.LdapConf.Filter = val
-			} else {
-				c.LdapConf.Filter = *argServerLDAPFilter
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE"); val != "" {
-				c.LdapConf.SearchAttributes = []string{val}
-			} else {
-				c.LdapConf.SearchAttributes = []string{*argServerLDAPResultAttr}
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_STARTTLS"); val != "" {
-				param, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err.Error())
-				}
-
-				c.LdapConf.StartTLS = param
-			} else {
-				c.LdapConf.StartTLS = *argServerLDAPStartTLS
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY"); val != "" {
-				param, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err.Error())
-				}
-
-				c.LdapConf.TLSSkipVerify = param
-			} else {
-				c.LdapConf.TLSSkipVerify = *argServerLDAPTLSVerify
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CAFILE"); val != "" {
-				c.LdapConf.TLSCAFile = val
-			} else {
-				c.LdapConf.TLSCAFile = *argServerLDAPTLSCAFile
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT"); val != "" {
-				c.LdapConf.TLSClientCert = val
-			} else {
-				c.LdapConf.TLSClientCert = *argServerLDAPTLSClientCert
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY"); val != "" {
-				c.LdapConf.TLSClientKey = val
-			} else {
-				c.LdapConf.TLSClientKey = *argServerLDAPTLSClientKey
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_SASL_EXTERNAL"); val != "" {
-				param, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err.Error())
-				}
-
-				c.LdapConf.SASLExternal = param
-			} else {
-				c.LdapConf.SASLExternal = *argServerLDAPSASLExternal
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_SCOPE"); val != "" {
-				switch val {
-				case BASE:
-					c.LdapConf.Scope = ldap.ScopeBaseObject
-				case ONE:
-					c.LdapConf.Scope = ldap.ScopeSingleLevel
-				case SUB:
-					c.LdapConf.Scope = ldap.ScopeWholeSubtree
-				default:
-					log.Fatalln(parser.Usage(fmt.Sprintf("value '%s' must be one of: one, base or sub", val)))
-				}
-			} else {
-				switch *argServerLDAPScope {
-				case BASE:
-					c.LdapConf.Scope = ldap.ScopeBaseObject
-				case ONE:
-					c.LdapConf.Scope = ldap.ScopeSingleLevel
-				case SUB:
-					c.LdapConf.Scope = ldap.ScopeWholeSubtree
-				}
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE"); val != "" {
-				param, err := strconv.Atoi(val)
-				if err != nil {
-					log.Fatalln("Error: GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE can not be used:", parser.Usage(err.Error()))
-				}
-
-				c.LdapConf.IdlePoolSize = param
-			} else {
-				c.LdapConf.IdlePoolSize = *argServerLDAPIdlePoolSize
-			}
-
-			if val := os.Getenv("GEOIPPOLICYD_LDAP_POOL_SIZE"); val != "" {
-				param, err := strconv.Atoi(val)
-				if err != nil {
-					log.Fatalln("Error: GEOIPPOLICYD_LDAP_POOL_SIZE can not be used:", parser.Usage(err.Error()))
-				}
-
-				c.LdapConf.PoolSize = param
-			} else {
-				c.LdapConf.PoolSize = *argServerLDAPPoolSize
-			}
+			c.LdapConf.IdlePoolSize = v.GetInt("ldap_idle_pool_size")
+			c.LdapConf.PoolSize = v.GetInt("ldap_pool_size")
 		}
 
-		/*
-		 * Actions
-		 */
-
-		if val := os.Getenv("GEOIPPOLICYD_RUN_ACTIONS"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.RunActions = param
-		} else {
-			c.RunActions = *argServerRunActions
-		}
+		// --- Actions ---
+		v.SetDefault("run_actions", *argServerRunActions)
+		c.RunActions = v.GetBool("run_actions")
 
 		if c.RunActions {
-			if val := os.Getenv("GEOIPPOLICYD_RUN_ACTION_OPERATOR"); val != "" {
-				param, err := strconv.ParseBool(val)
-				if err != nil {
-					log.Fatalln("Error:", err.Error())
-				}
-
-				c.RunActionOperator = param
-			} else {
-				c.RunActionOperator = *argServerRunActionOperator
-			}
+			v.SetDefault("run_action_operator", *argServerRunActionOperator)
+			c.RunActionOperator = v.GetBool("run_action_operator")
 
 			if c.RunActionOperator {
-				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_TO"); val != "" {
-					c.EmailOperatorTo = val
-				} else {
-					c.EmailOperatorTo = *argServerOperatorTo
-				}
+				v.SetDefault("operator_to", *argServerOperatorTo)
+				c.EmailOperatorTo = v.GetString("operator_to")
 
-				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_FROM"); val != "" {
-					c.EmailOperatorFrom = val
-				} else {
-					c.EmailOperatorFrom = *argServerOperatorFrom
-				}
+				v.SetDefault("operator_from", *argServerOperatorFrom)
+				c.EmailOperatorFrom = v.GetString("operator_from")
 
-				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_SUBJECT"); val != "" {
-					c.EmailOperatorSubject = val
-				} else {
-					c.EmailOperatorSubject = *argServerOperatorSubject
-				}
+				v.SetDefault("operator_subject", *argServerOperatorSubject)
+				c.EmailOperatorSubject = v.GetString("operator_subject")
 
-				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_MESSAGE_CT"); val != "" {
-					c.EmailOperatorMessageCT = val
-				} else {
-					c.EmailOperatorMessageCT = *argServerOperatorMessageCT
-				}
+				v.SetDefault("operator_message_ct", *argServerOperatorMessageCT)
+				c.EmailOperatorMessageCT = v.GetString("operator_message_ct")
 
-				if val := os.Getenv("GEOIPPOLICYD_OPERATOR_MESSAGE_PATH"); val != "" {
-					c.EmailOperatorMessagePath = val
-				} else {
-					c.EmailOperatorMessagePath = *argServerOperatorMessagePath
-				}
+				v.SetDefault("operator_message_path", *argServerOperatorMessagePath)
+				c.EmailOperatorMessagePath = v.GetString("operator_message_path")
 			}
 		}
 
-		/*
-		 * Mail server settings
-		 */
+		// --- Mail server ---
+		v.SetDefault("mail_server_address", *argServerMailServer)
+		c.MailServer = v.GetString("mail_server_address")
 
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_SERVER_ADDRESS"); val != "" {
-			c.MailServer = val
-		} else {
-			c.MailServer = *argServerMailServer
-		}
+		v.SetDefault("mail_helo", *argServerMailHelo)
+		c.MailHelo = v.GetString("mail_helo")
 
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_HELO"); val != "" {
-			c.MailHelo = val
-		} else {
-			c.MailHelo = *argServerMailHelo
-		}
+		v.SetDefault("mail_server_port", *argServerMailPort)
+		c.MailPort = v.GetInt("mail_server_port")
 
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_SERVER_PORT"); val != "" {
-			param, err := strconv.Atoi(val)
-			if err != nil {
-				log.Fatalln("Error: GEOIPPOLICYD_MAIL_SERVER_PORT can not be used:", parser.Usage(err.Error()))
-			}
+		v.SetDefault("mail_username", *argServerMailUsername)
+		c.MailUsername = v.GetString("mail_username")
 
-			c.MailPort = param
-		} else {
-			c.MailPort = *argServerMailPort
-		}
+		v.SetDefault("mail_password", *argServerMailPasswordPath)
+		c.MailPassword = v.GetString("mail_password")
 
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_USERNAME"); val != "" {
-			c.MailUsername = val
-		} else {
-			c.MailUsername = *argServerMailUsername
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_PASSWORD"); val != "" {
-			c.MailPassword = val
-		} else {
-			c.MailPassword = *argServerMailPasswordPath
-		}
-
-		if val := os.Getenv("GEOIPPOLICYD_MAIL_SSL_ON_CONNECT"); val != "" {
-			param, err := strconv.ParseBool(val)
-			if err != nil {
-				log.Fatalln("Error:", err.Error())
-			}
-
-			c.MailSSL = param
-		} else {
-			c.MailSSL = *argServerMailSSL
-		}
+		v.SetDefault("mail_ssl_on_connect", *argServerMailSSL)
+		c.MailSSL = v.GetBool("mail_ssl_on_connect")
 	}
 }
