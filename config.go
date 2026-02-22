@@ -65,45 +65,45 @@ const (
 
 type CmdLineConfig struct {
 	// Listen address for the policy service
-	ServerAddress string
+	ServerAddress string `validate:"ip|hostname_rfc1123"`
 
 	// Prt number for the policy service
-	ServerPort int
+	ServerPort int `validate:"min=1,max=65535"`
 
 	// REST interface of the policy service
-	HTTPAddress string
-	HTTPPort    int
+	HTTPAddress string `validate:"ip|hostname_rfc1123"`
+	HTTPPort    int    `validate:"min=1,max=65535"`
 	HTTPApp
 
 	// Use 'sender' or 'sasl_username' attribute?
 	UseSASLUsername bool
 
 	// Redis settings for a reading and/or writing server pool
-	RedisAddress  string
-	RedisPort     int
+	RedisAddress  string `validate:"ip|hostname_rfc1123"`
+	RedisPort     int    `validate:"min=1,max=65535"`
 	RedisUsername string
 	RedisPassword string
 
 	// Redis for a replica (read-only) server pool
-	RedisAddressRO string
-	RedisPortRO    int
+	RedisAddressRO string `validate:"ip|hostname_rfc1123"`
+	RedisPortRO    int    `validate:"min=1,max=65535"`
 
 	RedisSentinels          []string
 	RedisSentinelMasterName string
 	RedisSentinelUsername   string
 	RedisSentinelPassword   string
 
-	RedisPrefix string
-	RedisDB     int
-	RedisTTL    int
+	RedisPrefix string `validate:"required"`
+	RedisDB     int    `validate:"min=0"`
+	RedisTTL    int    `validate:"min=0"`
 
-	GeoipPath        string
-	MaxCountries     int
-	MaxIPs           int
-	HomeCountries    []string
-	MaxHomeCountries int
-	MaxHomeIPs       int
-	IgnoreNets       []string
+	GeoipPath        string   `validate:"required,file"`
+	MaxCountries     int      `validate:"min=0"`
+	MaxIPs           int      `validate:"min=0"`
+	HomeCountries    []string `validate:"dive,iso3166_1_alpha2"`
+	MaxHomeCountries int      `validate:"min=0"`
+	MaxHomeIPs       int      `validate:"min=0"`
+	IgnoreNets       []string `validate:"dive,cidr_or_ip"`
 	BlockPermanent   bool
 	VerboseLevel     int
 
@@ -111,13 +111,13 @@ type CmdLineConfig struct {
 	CommandServer bool
 
 	UseCDB  bool
-	CDBPath string
+	CDBPath string `validate:"required_if=UseCDB true,omitempty,file"`
 
 	UseLDAP bool
 	*LdapConf
 
 	LogFormatJSON      bool
-	CustomSettingsPath string
+	CustomSettingsPath string `validate:"omitempty,file"`
 
 	// Global flag that indicates if any action should be taken
 	RunActions bool
@@ -126,16 +126,16 @@ type CmdLineConfig struct {
 	RunActionOperator bool
 
 	// Action that sends a notification to an operator
-	EmailOperatorTo          string
-	EmailOperatorFrom        string
+	EmailOperatorTo          string `validate:"required_if=RunActionOperator true,omitempty,email"`
+	EmailOperatorFrom        string `validate:"required_if=RunActionOperator true,omitempty,email"`
 	EmailOperatorSubject     string
 	EmailOperatorMessageCT   string
-	EmailOperatorMessagePath string
+	EmailOperatorMessagePath string `validate:"required_if=RunActionOperator true,omitempty,file"`
 
 	// Global mail server configuration parameters
 	MailServer   string
 	MailHelo     string
-	MailPort     int
+	MailPort     int `validate:"min=1,max=65535"`
 	MailUsername string
 	MailPassword string
 	MailSSL      bool

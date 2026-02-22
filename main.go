@@ -469,6 +469,12 @@ func main() {
 
 	config.Init(os.Args)
 
+	if config.CommandServer {
+		if err := config.Validate(); err != nil {
+			stdLibLog.Fatalln(err)
+		}
+	}
+
 	initializeLogger()
 	setTimeZone()
 

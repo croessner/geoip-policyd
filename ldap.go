@@ -45,20 +45,20 @@ type LdapConf struct {
 
 	Scope int
 
-	IdlePoolSize int
-	PoolSize     int
+	IdlePoolSize int `validate:"min=0"`
+	PoolSize     int `validate:"min=1"`
 
-	BaseDN        string
+	BaseDN        string   `validate:"required"`
 	BindDN        string
 	BindPW        string
-	Filter        string
-	TLSCAFile     string
-	TLSClientCert string
-	TLSClientKey  string
+	Filter        string   `validate:"required,contains=%s"`
+	TLSCAFile     string   `validate:"omitempty,file"`
+	TLSClientCert string   `validate:"omitempty,file"`
+	TLSClientKey  string   `validate:"omitempty,file"`
 
-	SearchAttributes []string
+	SearchAttributes []string `validate:"required,min=1"`
 
-	ServerURIs []string
+	ServerURIs []string `validate:"required,min=1,dive,ldap_uri"`
 }
 
 type LdapPool struct {
