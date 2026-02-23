@@ -182,15 +182,6 @@ func (c *CmdLineConfig) String() string {
 	return result[1:]
 }
 
-// splitSpace splits a space-separated string into a slice, returning nil for empty input.
-func splitSpace(s string) []string {
-	if s == "" {
-		return nil
-	}
-
-	return strings.Split(s, " ")
-}
-
 // splitComma splits a comma-separated string into a trimmed slice, returning nil for empty input.
 func splitComma(s string) []string {
 	if s == "" {
