@@ -7,7 +7,7 @@ toolchain go1.24.7
 require (
 	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 	github.com/go-kit/log v0.2.1
-	github.com/go-ldap/ldap/v3 v3.4.12
+	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/json-iterator/go v1.1.12
 	github.com/oschwald/maxminddb-golang v1.13.1
