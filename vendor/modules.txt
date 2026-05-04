@@ -8,9 +8,6 @@ github.com/cespare/xxhash/v2
 # github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 ## explicit
 github.com/colinmarc/cdb
-# github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
-## explicit
-github.com/dgryski/go-rendezvous
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
@@ -90,8 +87,8 @@ github.com/pelletier/go-toml/v2/internal/characters
 github.com/pelletier/go-toml/v2/internal/danger
 github.com/pelletier/go-toml/v2/internal/tracker
 github.com/pelletier/go-toml/v2/unstable
-# github.com/redis/go-redis/v9 v9.18.0
-## explicit; go 1.21
+# github.com/redis/go-redis/v9 v9.19.0
+## explicit; go 1.24
 github.com/redis/go-redis/v9
 github.com/redis/go-redis/v9/auth
 github.com/redis/go-redis/v9/internal
