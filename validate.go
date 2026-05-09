@@ -154,5 +154,29 @@ func (c *CmdLineConfig) Validate() error {
 		}
 	}
 
+	if c.Observability.PrometheusEnabled {
+		if c.Observability.PrometheusPath == "" || !strings.HasPrefix(c.Observability.PrometheusPath, "/") {
+			return errors.New("'prometheus-path' must start with '/' when prometheus is enabled")
+		}
+
+		if c.Observability.PrometheusPath == "/" {
+			return errors.New("'prometheus-path' must not be '/'")
+		}
+	}
+
+	if c.Observability.OTelSampleRatio < 0 || c.Observability.OTelSampleRatio > 1 {
+		return errors.New("'otel-sample-ratio' must be between 0.0 and 1.0")
+	}
+
+	if c.Observability.OTelEnabled {
+		if !c.Observability.OTelTracesEnabled && !c.Observability.OTelMetricsEnabled {
+			return errors.New("at least one of 'otel-traces-enabled' or 'otel-metrics-enabled' must be enabled when otel is enabled")
+		}
+
+		if c.Observability.OTLPEndpoint == "" {
+			return errors.New("'otel-exporter-otlp-endpoint' is required when otel is enabled")
+		}
+	}
+
 	return nil
 }

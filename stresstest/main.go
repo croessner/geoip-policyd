@@ -27,7 +27,7 @@ type SimultaneousConnections struct {
 	current int32
 }
 
-//nolint:gocognit,gocyclo,forbidigo,maintidx,gomnd,forcetypeassert // This is a q&d stress test...
+//nolint:gocognit,gocyclo,forbidigo,maintidx,forcetypeassert // This is a q&d stress test...
 func main() {
 	if len(os.Args) < 5 || len(os.Args) > 6 {
 		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests> [optional test]")
@@ -228,10 +228,9 @@ func main() {
 			}
 		}()
 
-		for connection := 0; connection < MaxConnections; connection++ {
-			waitGroup.Add(1)
+		for range MaxConnections {
 
-			go func() {
+			waitGroup.Go(func() {
 				var (
 					conn   net.Conn
 					err    error
@@ -309,8 +308,7 @@ func main() {
 			abort:
 
 				failed.Store(failed.Load().(int) + (requestsPerConnection - requestCounter))
-				waitGroup.Done()
-			}()
+			})
 		}
 
 		waitGroup.Wait()

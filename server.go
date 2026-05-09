@@ -17,6 +17,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -31,10 +32,22 @@ func clientConnections(listener net.Listener) chan net.Conn {
 	go func() {
 		for {
 			client, err := listener.Accept()
-			if client == nil {
+			if err != nil {
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveTCPConnection(context.Background(), eventAccept, resultError, 0)
+				}
+
 				level.Error(logger).Log("error", err.Error())
 
 				continue
+			}
+
+			if client == nil {
+				continue
+			}
+
+			if obs := currentObservability(); obs != nil {
+				obs.ObserveTCPConnection(context.Background(), eventAccept, resultOK, 1)
 			}
 
 			level.Debug(logger).Log("msg", "Client connected", "client_ip", client.RemoteAddr().String())
@@ -48,6 +61,12 @@ func clientConnections(listener net.Listener) chan net.Conn {
 
 //goland:noinspection GoUnhandledErrorResult
 func handleConnection(client net.Conn) {
+	defer func() {
+		if obs := currentObservability(); obs != nil {
+			obs.ObserveTCPConnection(context.Background(), eventClose, resultOK, -1)
+		}
+	}()
+
 	b := bufio.NewReader(client)
 	policyRequest := make(map[string]string)
 
@@ -61,10 +80,8 @@ func handleConnection(client net.Conn) {
 		}
 
 		lineStr := strings.TrimSpace(string(lineBytes))
-		//nolint:gomnd // Split into key and "list" of values
 		items := strings.SplitN(lineStr, "=", 2)
 
-		//nolint:gomnd // Either items is a key=value pair or it is empty, indicating the end of the request
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
@@ -74,7 +91,7 @@ func handleConnection(client net.Conn) {
 				policyResponse *PolicyResponse
 			)
 
-			policyResponse, err = getPolicyResponse(policyRequest, ksuid.New().String(), false)
+			policyResponse, err = getObservedPolicyResponse(context.Background(), sourcePostfixTCP, policyRequest, ksuid.New().String(), false)
 
 			if err != nil {
 				prefix = "DEFER "
@@ -95,7 +112,9 @@ func handleConnection(client net.Conn) {
 				}
 			}
 
-			client.Write([]byte(fmt.Sprintf("action=%s%s\n\n", prefix, actionText)))
+			if _, err = client.Write(fmt.Appendf(nil, "action=%s%s\n\n", prefix, actionText)); err != nil {
+				_ = level.Error(logger).Log("error", err.Error())
+			}
 
 			// Clear policy request for next connection
 			policyRequest = make(map[string]string)

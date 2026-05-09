@@ -71,8 +71,35 @@ type HTTPApp struct {
 }
 
 type Body struct {
-	Key   string      `json:"key"`
-	Value interface{} `json:"value"`
+	Key   string `json:"key"`
+	Value any    `json:"value"`
+}
+
+// QueryRequest is the typed JSON contract accepted by the /query route.
+type QueryRequest struct {
+	Key   string          `json:"key"`
+	Value QueryClientData `json:"value"`
+}
+
+// QueryClientData contains the client identity that is translated into a policy input.
+type QueryClientData struct {
+	Address string `json:"address"`
+	Sender  string `json:"sender"`
+}
+
+// QueryResponseObject is the detailed /query response payload returned unless compact mode is requested.
+type QueryResponseObject struct {
+	RemoteAddr           string   `json:"remote_addr"`
+	PolicyReject         bool     `json:"policy_reject"`
+	Whitelisted          bool     `json:"whitelisted"`
+	CurrentClientIP      string   `json:"current_client_ip"`
+	CurrentCountryCode   string   `json:"current_country_code"`
+	TotalIPs             int      `json:"total_ips"`
+	TotalCountries       int      `json:"total_countries"`
+	HomeIPsSeen          []string `json:"home_ips_seen"`
+	ForeignIPsSeen       []string `json:"foreign_ips_seen"`
+	HomeCountriesSeen    []string `json:"home_countries_seen"`
+	ForeignCountriesSeen []string `json:"foreign_countries_seen"`
 }
 
 type RESTResult struct {
@@ -97,7 +124,7 @@ type DovecotPolicyResponse struct {
 func HasContentType(request *http.Request, mimetype string) bool {
 	contentType := request.Header.Get("Content-type")
 
-	for _, v := range strings.Split(contentType, ",") {
+	for v := range strings.SplitSeq(contentType, ",") {
 		t, _, err := mime.ParseMediaType(v)
 		if err != nil {
 			break
@@ -134,6 +161,7 @@ func (h *HTTP) LogError(err error) {
 		"error", err)
 }
 
+// GETReload reloads GeoIP, CDB, and custom settings resources without restarting the HTTP service.
 func (h *HTTP) GETReload() {
 	var (
 		err               error
@@ -141,18 +169,22 @@ func (h *HTTP) GETReload() {
 		newCustomSettings *CustomSettings
 	)
 
-	geoIP.mu.Lock()
-
-	defer geoIP.mu.Unlock()
-
-	geoIP.Reader.Close()
-
-	geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+	reader, err := maxminddb.Open(config.GeoipPath)
 	if err != nil {
+		if obs := currentObservability(); obs != nil {
+			obs.ObserveGeoIPReload(h.request.Context(), resultError)
+		}
+
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
 		return
+	}
+
+	geoIP.SwapReader(reader)
+
+	if obs := currentObservability(); obs != nil {
+		obs.ObserveGeoIPReload(h.request.Context(), resultOK)
 	}
 
 	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
@@ -176,11 +208,10 @@ func (h *HTTP) GETReload() {
 		cdbStore.Store(db)
 	}
 
-	//nolint:forcetypeassert // Global variable
-	if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
-		newCustomSettings = initCustomSettings(config)
+	if customSettings = loadCustomSettings(); customSettings != nil {
+		newCustomSettings = NewCustomSettingsService(config, redisHandle, logger).Load()
 		if newCustomSettings != nil {
-			customSettingsStore.Store(newCustomSettings)
+			storeCustomSettings(newCustomSettings)
 
 			h.LogInfo("file", config.CustomSettingsPath, "result", "reloaded")
 		}
@@ -192,8 +223,7 @@ func (h *HTTP) GETReload() {
 func (h *HTTP) GETCustomSettings() {
 	h.responseWriter.Header().Set("Content-Type", "application/json")
 
-	//nolint:forcetypeassert // Global variable
-	if customSettings := customSettingsStore.Load().(*CustomSettings); customSettings != nil {
+	if customSettings := loadCustomSettings(); customSettings != nil {
 		if err := json.NewEncoder(h.responseWriter).Encode(customSettings.Data); err != nil {
 			h.LogError(err)
 
@@ -256,6 +286,7 @@ func (h *HTTP) POSTRemove() {
 
 			ldapRequest = &LdapRequest{}
 
+			ldapRequest.ctx = h.request.Context()
 			ldapRequest.username = sender
 			ldapRequest.guid = &h.guid
 			ldapRequest.replyChan = ldapReplyChan
@@ -283,10 +314,12 @@ func (h *HTTP) POSTRemove() {
 	}
 }
 
+// POSTQuery handles the public JSON policy query route and translates it into the typed policy hotpath.
 func (h *HTTP) POSTQuery() {
 	var (
+		policyErr   error
 		result      bool
-		requestData *Body
+		requestData *QueryRequest
 	)
 
 	policyResponse := &PolicyResponse{}
@@ -298,16 +331,8 @@ func (h *HTTP) POSTQuery() {
 		return
 	}
 
-	body, err := io.ReadAll(h.request.Body)
-	if err != nil {
-		h.responseWriter.WriteHeader(http.StatusInternalServerError)
-		h.LogError(err)
-
-		return
-	}
-
-	requestData = &Body{}
-	if err = json.Unmarshal(body, requestData); err != nil {
+	requestData = &QueryRequest{}
+	if err := json.NewDecoder(h.request.Body).Decode(requestData); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
 
@@ -315,45 +340,16 @@ func (h *HTTP) POSTQuery() {
 	}
 
 	if requestData.Key == Client {
-		clientRequest, ok := requestData.Value.(map[string]any)
-		if !ok {
-			h.responseWriter.WriteHeader(http.StatusBadRequest)
-			h.LogError(errValueFormat)
-
-			return
-		}
-
-		userAttribute := Sender
-		if config.UseSASLUsername {
-			userAttribute = SASLUsername
-		}
-
-		requiredFieldsFound := false
-
-		if _, addressFound := clientRequest["address"].(string); addressFound {
-			if _, senderFound := clientRequest[Sender]; senderFound {
-				requiredFieldsFound = true
-
-				policyRequest := map[string]string{
-					"request":        "smtpd_access_policy",
-					"client_address": clientRequest["address"].(string),
-					userAttribute:    clientRequest[Sender].(string),
-				}
-
-				// Check if info parameter is present in the query string
-				infoParam := h.request.URL.Query().Get("info")
-				info := infoParam == "1"
-
-				policyResponse, err = getPolicyResponse(policyRequest, h.guid, info)
-			}
-		}
-
-		if !requiredFieldsFound {
+		policyInput, inputErr := NewPolicyInput(requestData.Value.Sender, requestData.Value.Address)
+		if inputErr != nil {
 			h.responseWriter.WriteHeader(http.StatusBadRequest)
 			h.LogError(errNoAddressNORSender)
 
 			return
 		}
+
+		info := h.request.URL.Query().Get("info") == "1"
+		policyResponse, policyErr = getObservedPolicyResponseFor(h.request.Context(), sourceRestQuery, policyInput, h.guid, info)
 	} else {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoClient)
@@ -361,14 +357,14 @@ func (h *HTTP) POSTQuery() {
 		return
 	}
 
-	if err == nil {
+	if policyErr == nil {
 		if policyResponse.fired {
 			result = false
 		} else {
 			result = true
 		}
 	} else {
-		level.Error(logger).Log("error", err.Error())
+		_ = level.Error(logger).Log("error", policyErr.Error())
 
 		// Do not block on errors.
 		result = true
@@ -378,31 +374,21 @@ func (h *HTTP) POSTQuery() {
 
 	if policyResponse == nil {
 		object = nil
+	} else if h.request.URL.Query().Get("compact") == "1" {
+		object = Client
 	} else {
-		object = struct {
-			RemoteAddr           string   `json:"remote_addr"`
-			PolicyReject         bool     `json:"policy_reject"`
-			Whitelisted          bool     `json:"whitelisted"`
-			CurrentClientIP      string   `json:"current_client_ip"`
-			CurrentCountryCode   string   `json:"current_country_code"`
-			ToalIPs              int      `json:"total_ips"`
-			ToalCountries        int      `json:"total_countries"`
-			HomeIPsSeen          []string `json:"home_ips_seen"`
-			ForeignIPsSeen       []string `json:"foreign_ips_seen"`
-			HomeCountriesSeen    []string `json:"home_countries_seen"`
-			ForeignCountriesSeen []string `json:"foreign_countries_seen"`
-		}{
-			h.request.RemoteAddr,
-			policyResponse.fired,
-			policyResponse.whitelisted,
-			policyResponse.currentClientIP,
-			policyResponse.currentCountryCode,
-			policyResponse.totalIPs,
-			policyResponse.totalCountries,
-			policyResponse.homeIPsSeen,
-			policyResponse.foreignIPsSeen,
-			policyResponse.homeCountriesSeen,
-			policyResponse.foreignCountriesSeen,
+		object = QueryResponseObject{
+			RemoteAddr:           h.request.RemoteAddr,
+			PolicyReject:         policyResponse.fired,
+			Whitelisted:          policyResponse.whitelisted,
+			CurrentClientIP:      policyResponse.currentClientIP,
+			CurrentCountryCode:   policyResponse.currentCountryCode,
+			TotalIPs:             policyResponse.totalIPs,
+			TotalCountries:       policyResponse.totalCountries,
+			HomeIPsSeen:          policyResponse.homeIPsSeen,
+			ForeignIPsSeen:       policyResponse.foreignIPsSeen,
+			HomeCountriesSeen:    policyResponse.homeCountriesSeen,
+			ForeignCountriesSeen: policyResponse.foreignCountriesSeen,
 		}
 	}
 
@@ -410,7 +396,7 @@ func (h *HTTP) POSTQuery() {
 		GUID:      h.guid,
 		Object:    object,
 		Operation: "query",
-		Error:     err,
+		Error:     policyErr,
 		Result:    result,
 	})
 
@@ -508,14 +494,14 @@ func (h *HTTP) POSTDovecotPolicy() {
 	infoParam := h.request.URL.Query().Get("info")
 	info := infoParam == "1"
 
-	policyResponse, err = getPolicyResponse(policyRequest, h.guid, info)
+	policyResponse, err = getObservedPolicyResponse(h.request.Context(), sourceDovecot, policyRequest, h.guid, info)
 
 	if err == nil {
 		if policyResponse.fired {
 			result = rejectText
 			resultCode = DovecotPolicyReject
 		} else {
-			result = "ok"
+			result = resultOK
 			resultCode = DovecotPolicyAccept
 		}
 	} else {
@@ -554,7 +540,7 @@ func (h *HTTP) PUTUpdate() {
 			h.LogError(err)
 		} else {
 			h.responseWriter.WriteHeader(http.StatusAccepted)
-			customSettingsStore.Store(customSettings)
+			storeCustomSettings(customSettings)
 
 			h.LogInfo("result", "success")
 		}
@@ -678,12 +664,13 @@ func (h *HTTP) validateAccountData(countries, ips int, sender string) error {
 
 func (h *HTTP) updateOrAddAccountData(comment string, countries, ips int, sender string) {
 	if os.Getenv("GO_TESTING") == "" {
-		customSettings := customSettingsStore.Load().(*CustomSettings)
+		customSettings := loadCustomSettings()
 		if customSettings != nil {
+			customSettings = customSettings.Clone()
 			for index, record := range customSettings.Data {
 				if record.Sender == sender {
 					h.updateRecord(&customSettings.Data[index], comment, countries, ips)
-					customSettingsStore.Store(customSettings)
+					storeCustomSettings(customSettings)
 
 					return
 				}
@@ -708,14 +695,14 @@ func (h *HTTP) addAccountRecord(settings *CustomSettings, comment string, countr
 	accountRecord := Account{Comment: comment, Sender: sender, Countries: countries, IPs: ips}
 	settings.Data = append(settings.Data, accountRecord)
 
-	customSettingsStore.Store(settings)
+	storeCustomSettings(settings)
 }
 
 func (h *HTTP) createAndStoreNewSettings(comment string, countries, ips int, sender string) {
 	accountRecord := Account{Comment: comment, Sender: sender, Countries: countries, IPs: ips}
 	newSettings := &CustomSettings{Data: []Account{accountRecord}}
 
-	customSettingsStore.Store(newSettings)
+	storeCustomSettings(newSettings)
 }
 
 func (h *HTTP) DELETERemove() {
@@ -761,8 +748,9 @@ func (h *HTTP) DELETERemove() {
 		}
 
 		if val := os.Getenv("GO_TESTING"); val == "" {
-			customSettings := customSettingsStore.Load().(*CustomSettings) //nolint:forcetypeassert // Global variable
+			customSettings := loadCustomSettings()
 			if customSettings != nil {
+				customSettings = customSettings.Clone()
 				if len(customSettings.Data) > 0 {
 					for index, record := range customSettings.Data {
 						if record.Sender != sender {
@@ -775,7 +763,7 @@ func (h *HTTP) DELETERemove() {
 							return s[:len(s)-1]
 						}(customSettings.Data, index)
 
-						customSettingsStore.Store(customSettings)
+						storeCustomSettings(customSettings)
 						h.responseWriter.WriteHeader(http.StatusAccepted)
 						h.LogInfo("result", "success")
 
@@ -878,22 +866,37 @@ func (a *HTTPApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 func httpApp() {
 	var err error
 
-	app := &config.HTTPApp
+	var (
+		app         = &config.HTTPApp
+		mux         = http.NewServeMux()
+		rootHandler = http.Handler(http.HandlerFunc(app.httpRootPage))
+	)
 
-	mux := http.NewServeMux()
 	if app.useBasicAuth {
-		mux.HandleFunc("/", app.basicAuth(app.httpRootPage))
-	} else {
-		mux.HandleFunc("/", app.httpRootPage)
+		rootHandler = http.HandlerFunc(app.basicAuth(rootHandler.ServeHTTP))
 	}
+
+	if obs := currentObservability(); obs != nil {
+		rootHandler = obs.InstrumentHTTP(rootHandler)
+		if obs.PrometheusEnabled() {
+			metricsHandler := obs.PrometheusHandler()
+			if app.useBasicAuth {
+				metricsHandler = http.HandlerFunc(app.basicAuth(metricsHandler.ServeHTTP))
+			}
+
+			mux.Handle(obs.PrometheusPath(), metricsHandler)
+		}
+	}
+
+	mux.Handle("/", rootHandler)
 
 	www := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", config.HTTPAddress, config.HTTPPort),
 		Handler:           mux,
 		IdleTimeout:       time.Minute,
-		ReadTimeout:       10 * time.Second, //nolint:gomnd // Time factor
-		ReadHeaderTimeout: 10 * time.Second, //nolint:gomnd // Time factor
-		WriteTimeout:      30 * time.Second, //nolint:gomnd // Time factor
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 
 	level.Info(logger).Log("msg", "Starting geoip-policyd HTTP service", "address", www.Addr)

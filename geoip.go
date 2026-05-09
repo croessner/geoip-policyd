@@ -16,54 +16,139 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
-	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/go-kit/log/level"
 	"github.com/oschwald/maxminddb-golang"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
+const geoIPReaderCloseDelay = time.Minute
+
+// GeoIP owns the active MaxMind reader and swaps it atomically during reloads.
 type GeoIP struct {
-	Reader *maxminddb.Reader
-	mu     sync.RWMutex
+	reader     atomic.Pointer[maxminddb.Reader]
+	closeDelay time.Duration
 }
 
-// getCountryCode returns the ISO code of the country associated with the given IP address.
-// It retrieves the geoIP.Reader and acquires a read lock on it. It then calls the Lookup function
-// on the geoIP.Reader to find the country associated with the IP address. If an error occurs,
-// it logs the error. Finally, it releases the read lock and returns the ISO code of the country.
-func getCountryCode(ipAddress string) string {
-	var (
-		err    error
-		record struct {
-			Country struct {
-				ISOCode string `maxminddb:"iso_code"`
-			} `maxminddb:"country"`
-		}
-	)
+// geoIPCountryRecord maps the MaxMind country response fields used by the policy engine.
+type geoIPCountryRecord struct {
+	Country struct {
+		ISOCode string `maxminddb:"iso_code"`
+	} `maxminddb:"country"`
+}
 
-	if geoIP == nil {
+// NewGeoIP initializes a GeoIP holder with an active reader and the default close grace period.
+func NewGeoIP(reader *maxminddb.Reader) *GeoIP {
+	geoIP := &GeoIP{closeDelay: geoIPReaderCloseDelay}
+	geoIP.reader.Store(reader)
+
+	return geoIP
+}
+
+// LookupCountryCode returns the ISO country code for an IP address without taking a global reader lock.
+func (g *GeoIP) LookupCountryCode(ipAddress string) string {
+	return g.LookupCountryCodeContext(context.Background(), ipAddress)
+}
+
+// LookupCountryCodeContext returns the ISO country code while recording request-local telemetry.
+func (g *GeoIP) LookupCountryCodeContext(ctx context.Context, ipAddress string) string {
+	start := time.Now()
+	result := resultMiss
+	obs := currentObservability()
+
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "geoip.lookup", attribute.String("geoip.operation", "lookup"))
+		defer span.End()
+		defer func() {
+			obs.ObserveGeoIPLookup(ctx, result, time.Since(start))
+		}()
+	}
+
+	if g == nil || g.reader.Load() == nil {
+		result = resultUnavailable
 		level.Error(logger).Log("error", "no GeoIP database file available")
 
 		return ""
 	}
 
 	if val := os.Getenv("GO_TESTING"); val == "" {
-		ip := net.ParseIP(ipAddress)
-		if ip != nil {
-			geoIP.mu.RLock()
-
-			err = geoIP.Reader.Lookup(ip, &record)
-			if err != nil {
-				level.Error(logger).Log("error", err.Error())
-			}
-
-			geoIP.mu.RUnlock()
-
-			return record.Country.ISOCode
-		}
+		return g.lookupCountryCode(ctx, obs, ipAddress, &result)
 	}
 
 	return ""
+}
+
+// lookupCountryCode performs the MaxMind lookup and updates the caller-owned result label.
+func (g *GeoIP) lookupCountryCode(ctx context.Context, obs *Observability, ipAddress string, result *string) string {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		*result = resultInvalid
+
+		return ""
+	}
+
+	reader := g.reader.Load()
+	if reader == nil {
+		*result = resultUnavailable
+
+		return ""
+	}
+
+	record := &geoIPCountryRecord{}
+	if err := reader.Lookup(ip, record); err != nil {
+		*result = resultError
+
+		if obs != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+		}
+
+		_ = level.Error(logger).Log("error", err.Error())
+	}
+
+	if record.Country.ISOCode != "" {
+		*result = resultHit
+	}
+
+	return record.Country.ISOCode
+}
+
+// SwapReader publishes a replacement reader and closes the previous reader after a short grace period.
+func (g *GeoIP) SwapReader(reader *maxminddb.Reader) {
+	if g == nil {
+		return
+	}
+
+	previous := g.reader.Swap(reader)
+	g.closeReaderAfterGrace(previous)
+}
+
+// closeReaderAfterGrace delays closing the old mmap-backed reader so in-flight lock-free lookups can finish.
+func (g *GeoIP) closeReaderAfterGrace(reader *maxminddb.Reader) {
+	if reader == nil {
+		return
+	}
+
+	go func() {
+		time.Sleep(g.closeDelay)
+
+		_ = reader.Close()
+	}()
+}
+
+// getCountryCode returns the ISO code of the country associated with the given IP address.
+func getCountryCode(ipAddress string) string {
+	return geoIP.LookupCountryCode(ipAddress)
+}
+
+// getCountryCodeWithContext returns the ISO code with request context propagation.
+func getCountryCodeWithContext(ctx context.Context, ipAddress string) string {
+	return geoIP.LookupCountryCodeContext(ctx, ipAddress)
 }

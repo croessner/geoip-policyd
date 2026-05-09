@@ -19,9 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +31,8 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -87,6 +91,45 @@ type PolicyResponse struct {
 	// foreignCountriesSeen represents a slice of strings containing the country codes of foreign countries seen by a
 	// remote client.
 	foreignCountriesSeen []string
+}
+
+// PolicyInput is the typed internal representation shared by HTTP and socket policy requests.
+type PolicyInput struct {
+	Sender   string
+	ClientIP string
+}
+
+// NewPolicyInput validates sender and client IP values before they enter the policy hotpath.
+func NewPolicyInput(sender, clientIP string) (PolicyInput, error) {
+	input := PolicyInput{
+		Sender:   sender,
+		ClientIP: clientIP,
+	}
+
+	if err := input.Validate(); err != nil {
+		return PolicyInput{}, err
+	}
+
+	return input, nil
+}
+
+// NewPolicyInputFromMap translates the Postfix-style policy request map into the typed policy input.
+func NewPolicyInputFromMap(policyRequest map[string]string) (PolicyInput, error) {
+	sender, clientIP, err := initializePolicy(policyRequest)
+	if err != nil {
+		return PolicyInput{}, err
+	}
+
+	return NewPolicyInput(sender, clientIP)
+}
+
+// Validate enforces the minimal policy input contract required by all policy evaluators.
+func (p PolicyInput) Validate() error {
+	if p.Sender == "" || p.ClientIP == "" {
+		return errPolicyProtocol
+	}
+
+	return nil
 }
 
 // RemoteClient represents a remote client and its related information.
@@ -383,6 +426,16 @@ func date2String(date int64) string {
 	).String()
 }
 
+// isDebugLoggingEnabled avoids preparing expensive debug log values when debug output is disabled.
+func isDebugLoggingEnabled() bool {
+	return config != nil && config.VerboseLevel >= logLevelDebug
+}
+
+// isInfoLoggingEnabled avoids preparing expensive info log values when info output is disabled.
+func isInfoLoggingEnabled() bool {
+	return config != nil && config.VerboseLevel >= logLevelInfo
+}
+
 // logNetworkCheck logs a debug message indicating that a network check is being performed.
 // The function takes three parameters: ip (the IP address being checked), network (the network being checked against the IP),
 // and guid (a unique identifier for the network check).
@@ -391,6 +444,10 @@ func date2String(date int64) string {
 // The logger variable should be properly initialized before invoking this function.
 // The function does not return any value.
 func logNetworkCheck(ip, network, guid string) {
+	if !isDebugLoggingEnabled() {
+		return
+	}
+
 	level.Debug(logger).Log("guid", guid, "msg", fmt.Sprintf("Checking: %s -> %s", ip, network))
 }
 
@@ -431,57 +488,26 @@ func initializePolicy(policyRequest map[string]string) (string, string, error) {
 	return sender, clientIP, nil
 }
 
-// checkIgnoreNets checks if the clientIP should be ignored based on the ignoreNets configuration.
-// It iterates through the ignoreNets list and performs the following checks:
-//   - If the ignoreNet is a valid IP address, it compares it with the clientIP. If they are equal, it logs the IP address
-//     found in ignore-networks and returns true.
-//   - If the ignoreNet is a valid CIDR notation, it checks if the clientIP is within the network. If it is, it logs the IP
-//     address found in ignore-networks and returns true.
-//   - If the ignoreNet is neither a valid IP address nor a valid CIDR notation, it calls the handleError function with
-//     the errorHandlerGUID, ignoreNet, and the error indicating that ignoreNet is not a network. It then continues to the
-//     next iteration.
-//
-// If none of the ignoreNets matches the clientIP, it returns false.
+// checkIgnoreNets keeps the legacy helper API and delegates matching to a compiled network matcher.
+// It logs the matched ignore-network entry only when info logging is enabled.
 func checkIgnoreNets(ignoreNets []string, clientIP, guid string) bool {
-	for _, ignoreNet := range ignoreNets {
-		ip := net.ParseIP(ignoreNet)
-		if ip == nil {
-			_, network, err := net.ParseCIDR(ignoreNet)
-			if err != nil {
-				handleError(guid, ignoreNet, err)
+	ignoreMatcher := NewNetworkMatcher(ignoreNets)
 
-				continue
-			}
-
-			logNetworkCheck(clientIP, network.String(), guid)
-
-			if network.Contains(net.ParseIP(clientIP)) {
-				level.Info(logger).Log(
-					"guid", guid,
-					"msg", "IP address found in ignore-networks",
-					"client_address", clientIP,
-					"ignore_networks", ignoreNet,
-				)
-
-				return true
-			}
-		}
-
-		logNetworkCheck(clientIP, ignoreNet, guid)
-
-		if clientIP == ignoreNet {
-			level.Info(logger).Log(
-				"guid", guid,
-				"msg", "IP address found in ignore-networks",
-				"client_address", clientIP,
-				"ignore_networks", ignoreNet,
-			)
-
-			return true
-		}
+	ignoreNet, found := ignoreMatcher.MatchString(clientIP, guid)
+	if !found {
+		return false
 	}
 
-	return false
+	if isInfoLoggingEnabled() {
+		_ = level.Info(logger).Log(
+			"guid", guid,
+			"msg", "IP address found in ignore-networks",
+			"client_address", clientIP,
+			"ignore_networks", ignoreNet,
+		)
+	}
+
+	return true
 }
 
 // checkUserInLDAP checks if the user is known in the LDAP.
@@ -499,12 +525,32 @@ func checkIgnoreNets(ignoreNets []string, clientIP, guid string) bool {
 // with the GUID and the sender's name. It then returns true with nil error.
 // If the UseLDAP configuration value is false, the function returns false with nil error.
 func checkUserInLDAP(sender, guid string) (bool, error) {
+	return checkUserInLDAPContext(context.Background(), sender, guid)
+}
+
+// checkUserInLDAPContext checks LDAP user state while preserving trace context for the request.
+func checkUserInLDAPContext(ctx context.Context, sender, guid string) (bool, error) {
 	if !config.UseLDAP {
 		return false, nil
 	}
 
+	start := time.Now()
+	result := resultUnknown
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "ldap.user_check", attribute.String("ldap.operation", "user_check"))
+		defer span.End()
+		defer func() {
+			obs.ObserveLDAPOperation(ctx, "user_check", result, time.Since(start))
+		}()
+	}
+
 	ldapReplyChan := make(chan *LdapReply)
 	ldapRequest := &LdapRequest{
+		ctx:       ctx,
 		username:  sender,
 		guid:      &guid,
 		replyChan: ldapReplyChan,
@@ -517,9 +563,16 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 	if ldapReply.err != nil {
 		var ldapError *ldap.Error
 		if errors.As(ldapReply.err, &ldapError) && ldapError.ResultCode == uint16(ldap.LDAPResultNoSuchObject) {
+			result = resultNotFound
 			level.Info(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' does not exist", sender))
 
 			return false, nil
+		}
+
+		result = resultError
+
+		if obs != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), ldapReply.err)
 		}
 
 		level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
@@ -527,13 +580,14 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 		return true, ldapReply.err
 	}
 
-	if resultAttr, mapKeyFound := ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+	if _, mapKeyFound := ldapReply.result[config.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+		result = resultFound
 		level.Debug(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' found in LDAP", sender))
-
-		sender = resultAttr[ldapSingleValue].(string)
 
 		return true, nil
 	}
+
+	result = resultNotFound
 
 	return false, nil
 }
@@ -548,17 +602,43 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 // The function returns an error if there is an error while getting the user data from the CDB.
 // If the UseCDB configuration value is false, the function returns false and nil error.
 func checkUserInCDB(sender string, guid string) (bool, error) {
+	return checkUserInCDBContext(context.Background(), sender, guid)
+}
+
+// checkUserInCDBContext checks CDB user state while preserving trace context for the request.
+func checkUserInCDBContext(ctx context.Context, sender string, guid string) (bool, error) {
 	if !config.UseCDB {
 		return false, nil
+	}
+
+	start := time.Now()
+	result := resultNotFound
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "cdb.lookup", attribute.String("cdb.operation", "get"))
+		defer span.End()
+		defer func() {
+			obs.ObserveCDBLookup(ctx, result, time.Since(start))
+		}()
 	}
 
 	if db := cdbStore.Load().(*cdb.CDB); db != nil {
 		value, err := db.Get([]byte(sender))
 		if err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return false, err
 		}
 
 		if value != nil {
+			result = resultFound
 			level.Debug(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' found in CDB", sender))
 
 			return true, nil
@@ -573,6 +653,11 @@ func checkUserInCDB(sender string, guid string) (bool, error) {
 // If the object is found in Redis, it is unmarshaled into a RemoteClient object.
 // The function returns the fetched RemoteClient object and any encountered errors.
 func fetchRemoteClient(sender string) (*RemoteClient, error) {
+	return fetchRemoteClientContext(context.Background(), sender)
+}
+
+// fetchRemoteClientContext loads the cached policy state with the request context.
+func fetchRemoteClientContext(ctx context.Context, sender string) (*RemoteClient, error) {
 	key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
 	remoteClient := &RemoteClient{}
 
@@ -601,6 +686,10 @@ func fetchRemoteClient(sender string) (*RemoteClient, error) {
 // and logs the GUID, home IP address, and timestamp.
 // The function does not return any values.
 func logClientDetails(remoteClient *RemoteClient, guid string) {
+	if !isDebugLoggingEnabled() {
+		return
+	}
+
 	if remoteClient.haveForeignIPs() {
 		for ipAddress, date := range remoteClient.ForeignIPs {
 			level.Debug(logger).Log("guid", guid, "ip_address", ipAddress, "timestamp", date2String(date))
@@ -619,6 +708,10 @@ func logClientDetails(remoteClient *RemoteClient, guid string) {
 // If the remote client has countries, it logs the country codes and timestamps.
 // If the remote client has home countries, it logs the home country codes and timestamps.
 func logCountryDetails(remoteClient *RemoteClient, countryCode, clientIP, guid string) {
+	if !isDebugLoggingEnabled() {
+		return
+	}
+
 	if countryCode == "" {
 		level.Debug(logger).Log("guid", guid, "msg", "No country code present", "client_address", clientIP)
 	} else {
@@ -694,163 +787,35 @@ func applyCustomSettings(customSettings *CustomSettings, sender string, allowedM
 //
 // Returns true, if the IP or country matched home settings
 func checkHomeCountry(remoteClient *RemoteClient, homeCountries []string, countryCode, clientIP, guid string) bool {
-	for _, homeCountry := range homeCountries {
-		level.Debug(logger).Log("guid", guid, "msg", "Checking", "home_country", homeCountry)
+	settings := NewPolicySettings(nil, nil, homeCountries, 0, 0, 0, 0)
 
-		if strings.ToUpper(homeCountry) != countryCode {
-			continue
-		}
-
-		level.Debug(logger).Log("guid", guid, "msg", "Country matched", "home_country", homeCountry)
-
-		remoteClient.AddHomeIPAddress(clientIP)
-		remoteClient.AddHomeCountryCode(countryCode)
-
-		return true
-	}
-
-	return false
+	return settings.CheckHomeCountry(remoteClient, countryCode, clientIP, guid)
 }
 
-// checkCountryPolicy checks if the country policy allows the remote client to proceed.
-// It compares the given countryCode with the trustedCountries slice to determine if the country is trusted.
-// If the country is trusted, or the number of countries in the remote client exceeds the allowed maximum countries,
-// or the number of home countries in the remote client exceeds the allowed maximum home countries, the function returns true.
-// If the policy allows permanent blocking, the function sets the locked status of the remote client to true.
-// Returns a boolean indicating whether the country triggered the policy check or not.
+// checkCountryPolicy keeps the legacy helper API and evaluates country rules through request-local policy settings.
 func checkCountryPolicy(remoteClient *RemoteClient, trustedCountries []string, countryCode string, policyResponse *PolicyResponse, allowedMaxForeignCountries, allowedMaxHomeCountries int, guid string, isHome bool) bool {
-	if countryCode == "" {
-		return false
-	}
+	settings := NewPolicySettings(nil, trustedCountries, nil, 0, 0, allowedMaxForeignCountries, allowedMaxHomeCountries)
 
-	if len(trustedCountries) > 0 {
-		if isTrustedCountry(trustedCountries, countryCode, guid) {
-			// client country code is trusted, ignore other checks
-			return false
-		}
-
-		// client country code is not trusted
-		policyResponse.fired = true
-		if config.BlockPermanent {
-			remoteClient.Locked = true
-		}
-
-		return true
-	}
-
-	if !isHome {
-		remoteClient.AddForeignCountryCode(countryCode)
-	}
-
-	// Proceed with other checks if no trusted country codes
-	if len(remoteClient.ForeignCountries) > allowedMaxForeignCountries ||
-		(remoteClient.haveHomeCountries() && len(remoteClient.HomeCountries.Countries) > allowedMaxHomeCountries) {
-
-		policyResponse.fired = true
-		if config.BlockPermanent {
-			remoteClient.Locked = true
-		}
-
-		return true
-	}
-
-	return false
+	return settings.CheckCountryPolicy(remoteClient, countryCode, policyResponse, guid, isHome)
 }
 
-// checkIPsPolicy checks if the client's IP address matches the policy criteria.
-// It takes the client's remoteClient object, a list of trusted IP addresses,
-// the client's IP address, a policyResponse object, and the maximum number of allowed IP addresses and home IP addresses as input.
-// If the client's IP address is not trusted or the number of IP addresses or home IP addresses exceeds the allowed maximums,
-// the function updates the policyResponse object and locks the remoteClient account if necessary.
-// It returns true if the policy is violated, false otherwise.
+// checkIPsPolicy keeps the legacy helper API and evaluates IP rules through request-local policy settings.
 func checkIPsPolicy(remoteClient *RemoteClient, trustedIPs []string, clientIP string, policyResponse *PolicyResponse, allowedMaxForeignIPs, allowedMaxHomeIPs int, guid string, isHome bool) bool {
-	if clientIP == "" {
-		return false
-	}
+	settings := NewPolicySettings(trustedIPs, nil, nil, allowedMaxForeignIPs, allowedMaxHomeIPs, 0, 0)
 
-	// Check if clientIP is in trustedIPs
-	if len(trustedIPs) > 0 {
-		if isTrustedIP(trustedIPs, clientIP, guid) {
-			// clientIP is trusted, ignore other checks
-			return false
-		}
-
-		// clientIP is not trusted
-		policyResponse.fired = true
-		if config.BlockPermanent {
-			remoteClient.Locked = true
-		}
-
-		return true
-	}
-
-	if !isHome {
-		remoteClient.AddForeignIPAddress(clientIP)
-	}
-
-	// Proceed with other checks if no trusted ForeignIPs
-	if len(remoteClient.ForeignIPs) > allowedMaxForeignIPs ||
-		(remoteClient.haveHomeIPs() && len(remoteClient.HomeCountries.IPs) > allowedMaxHomeIPs) {
-
-		policyResponse.fired = true
-		if config.BlockPermanent {
-			remoteClient.Locked = true
-		}
-
-		return true
-	}
-
-	return false
+	return settings.CheckIPPolicy(remoteClient, clientIP, policyResponse, guid, isHome)
 }
 
-// isTrustedCountry checks if the given countryCode is in the list of trusted countries.
-// It iterates over the trustedCountries slice and compares each country code with the countryCode.
-// If a match is found, it returns true, otherwise false.
-// The function logs debug messages for each checked country.
-// Returns a boolean indicating whether the country is trusted or not.
+// isTrustedCountry keeps the legacy helper API and checks a country code through a normalized set.
 func isTrustedCountry(trustedCountries []string, countryCode, guid string) bool {
-	for _, trustedCountry := range trustedCountries {
-		level.Debug(logger).Log("guid", guid, "msg", "Checking", "trusted_country", trustedCountry)
+	_ = guid
 
-		if strings.ToUpper(trustedCountry) != countryCode {
-			continue
-		}
-
-		level.Debug(logger).Log("guid", guid, "msg", "Country matched", "trusted_country", trustedCountry)
-
-		return true
-	}
-
-	return false
+	return NewCountrySet(trustedCountries).Contains(countryCode)
 }
 
-// isTrustedIP is a function that checks if the client's IP address is considered trusted.
-// It takes a list of trusted IP addresses, the client's IP address, and a GUID as input.
-// It iterates through the list of trusted IP addresses and checks if the client's IP address matches any of them.
-// If an IP address is found, it returns true. Otherwise, it returns false.
-// The function also calls the networkContainsIP function to check if the client's IP address is within a trusted network range.
-// If the trusted IP address cannot be parsed, it logs an error and returns false.
-// If the IP address is found within the trusted network, it logs a success message and returns true.
-// The function makes use of the net package to parse IP addresses and networks.
+// isTrustedIP keeps the legacy helper API and checks an IP address through a compiled matcher.
 func isTrustedIP(trustedIPs []string, clientIP string, guid string) bool {
-	matchIP := false
-	ipAddress := net.ParseIP(clientIP)
-
-	for _, trustedIPOrNet := range trustedIPs {
-		if net.ParseIP(trustedIPOrNet) != nil {
-			matchIP = ipAddress.String() == trustedIPOrNet
-		} else {
-			if networkContainsIP(trustedIPOrNet, ipAddress, guid) {
-				matchIP = true
-			}
-		}
-
-		if matchIP {
-			break
-		}
-	}
-
-	return matchIP
+	return NewNetworkMatcher(trustedIPs).ContainsString(clientIP, guid)
 }
 
 // networkContainsIP checks if the provided IP address is within the trusted network range.
@@ -867,10 +832,14 @@ func networkContainsIP(trustedIPOrNet string, ipAddress net.IP, guid string) boo
 		return false
 	}
 
-	level.Debug(logger).Log("guid", guid, "msg", "Checking", "ip_address", ipAddress.String(), "trusted_network", network.String())
+	if isDebugLoggingEnabled() {
+		_ = level.Debug(logger).Log("guid", guid, "msg", "Checking", "ip_address", ipAddress.String(), "trusted_network", network.String())
+	}
 
 	if network.Contains(ipAddress) {
-		level.Debug(logger).Log("guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+		if isDebugLoggingEnabled() {
+			_ = level.Debug(logger).Log("guid", guid, "msg", "IP matched", "ip_address", ipAddress.String())
+		}
 
 		return true
 	}
@@ -924,17 +893,22 @@ func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []s
 // If the user is not known in CDB, it returns false and nil error.
 // If there is an error while checking in LDAP or CDB, it returns false and the error.
 func checkUserKnown(sender, guid string) (bool, error) {
+	return checkUserKnownContext(context.Background(), sender, guid)
+}
+
+// checkUserKnownContext checks all configured user directories with request context propagation.
+func checkUserKnownContext(ctx context.Context, sender, guid string) (bool, error) {
 	if config.ForceUserKnown {
 		return true, nil
 	}
 
-	userKnown, err := checkUserInLDAP(sender, guid)
+	userKnown, err := checkUserInLDAPContext(ctx, sender, guid)
 	if err != nil {
 		return false, err
 	}
 
 	if !userKnown {
-		userKnown, err = checkUserInCDB(sender, guid)
+		userKnown, err = checkUserInCDBContext(ctx, sender, guid)
 		if err != nil {
 			return false, err
 		}
@@ -947,7 +921,12 @@ func checkUserKnown(sender, guid string) (bool, error) {
 // logs the client details and country details using the provided sender, client IP, country code, and GUID.
 // It returns the fetched remote client and any errors encountered.
 func fetchAndLogRemoteClient(sender, clientIP, countryCode, guid string) (*RemoteClient, error) {
-	remoteClient, err := fetchRemoteClient(sender)
+	return fetchAndLogRemoteClientContext(context.Background(), sender, clientIP, countryCode, guid)
+}
+
+// fetchAndLogRemoteClientContext fetches cached state with request context propagation.
+func fetchAndLogRemoteClientContext(ctx context.Context, sender, clientIP, countryCode, guid string) (*RemoteClient, error) {
+	remoteClient, err := fetchRemoteClientContext(ctx, sender)
 	if err != nil {
 		return nil, err
 	}
@@ -964,8 +943,13 @@ func fetchAndLogRemoteClient(sender, clientIP, countryCode, guid string) (*Remot
 // If runOperatorAction returns an error, it logs the error message with the guid value.
 // Note that handleClientActions does not return any value.
 func handleClientActions(remoteClient *RemoteClient, sender string, userKnown bool, guid string, requireActions bool) {
+	handleClientActionsContext(context.Background(), remoteClient, sender, userKnown, guid, requireActions)
+}
+
+// handleClientActionsContext runs side-effect actions with request context propagation.
+func handleClientActionsContext(ctx context.Context, remoteClient *RemoteClient, sender string, userKnown bool, guid string, requireActions bool) {
 	if config.RunActions && requireActions {
-		err := runOperatorAction(remoteClient, sender, userKnown, guid)
+		err := runOperatorActionContext(ctx, remoteClient, sender, userKnown, guid)
 		if err != nil {
 			level.Error(logger).Log("guid", guid, "error", err.Error())
 		}
@@ -979,9 +963,34 @@ func handleClientActions(remoteClient *RemoteClient, sender string, userKnown bo
 // After successfully running the action, the "operator" action is appended to the actions list of the remote client.
 // Returns nil if the action is not run or if it is run successfully.
 func runOperatorAction(remoteClient *RemoteClient, sender string, userKnown bool, guid string) error {
+	return runOperatorActionContext(context.Background(), remoteClient, sender, userKnown, guid)
+}
+
+// runOperatorActionContext processes the operator action with metrics and tracing.
+func runOperatorActionContext(ctx context.Context, remoteClient *RemoteClient, sender string, userKnown bool, guid string) error {
 	if userKnown && config.RunActionOperator && shouldRunOperator(remoteClient) {
 		action := &EmailOperator{}
+		start := time.Now()
+		result := resultOK
+
+		obs := currentObservability()
+		if obs != nil {
+			var span trace.Span
+
+			ctx, span = obs.StartSpan(ctx, "action.operator", attribute.String("action.name", "operator"))
+			defer span.End()
+			defer func() {
+				obs.ObserveAction(ctx, "operator", result, time.Since(start))
+			}()
+		}
+
 		if err := action.Call(sender); err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return err
 		}
 
@@ -998,13 +1007,26 @@ func runOperatorAction(remoteClient *RemoteClient, sender string, userKnown bool
 // If it does, it returns false to indicate that the action should not be run.
 // If it doesn't, it returns true to indicate that the action should be run.
 func shouldRunOperator(remoteClient *RemoteClient) bool {
-	for _, actionItem := range remoteClient.Actions {
-		if actionItem == "operator" {
-			return false
-		}
+	return !slices.Contains(remoteClient.Actions, "operator")
+}
+
+// redisCacheWritePlan describes the minimal Redis commands needed after the JSON value is written.
+type redisCacheWritePlan struct {
+	expiration        time.Duration
+	deleteImmediately bool
+}
+
+// newRedisCacheWritePlan translates lock and TTL state into the Redis SET expiration strategy.
+func newRedisCacheWritePlan(config *CmdLineConfig, remoteClient *RemoteClient) redisCacheWritePlan {
+	if remoteClient.Locked {
+		return redisCacheWritePlan{}
 	}
 
-	return true
+	if config.RedisTTL <= 0 {
+		return redisCacheWritePlan{deleteImmediately: true}
+	}
+
+	return redisCacheWritePlan{expiration: time.Duration(config.RedisTTL) * time.Second}
 }
 
 // updateRedisCache updates the Redis cache with the provided sender and RemoteClient information.
@@ -1013,25 +1035,25 @@ func shouldRunOperator(remoteClient *RemoteClient) bool {
 // configuration value. If the RemoteClient is locked, it additionally persists the cache entry.
 // It returns an error if any of the Redis operations fail.
 func updateRedisCache(sender string, remoteClient *RemoteClient) error {
+	return updateRedisCacheContext(context.Background(), sender, remoteClient)
+}
+
+// updateRedisCacheContext stores policy state in Redis with request context propagation.
+func updateRedisCacheContext(ctx context.Context, sender string, remoteClient *RemoteClient) error {
 	redisValue, err := json.Marshal(remoteClient)
 	if err != nil {
 		return err
 	}
 
 	key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
+	writePlan := newRedisCacheWritePlan(config, remoteClient)
 
-	if err = redisHandle.Set(ctx, key, redisValue, time.Duration(0)).Err(); err != nil {
+	if err = redisHandle.Set(ctx, key, redisValue, writePlan.expiration).Err(); err != nil {
 		return err
 	}
 
-	if remoteClient.Locked {
-		if err = redisHandle.Persist(ctx, key).Err(); err != nil {
-			return err
-		}
-	} else {
-		if err = redisHandle.Expire(ctx, key, time.Duration(config.RedisTTL)*time.Second).Err(); err != nil {
-			return err
-		}
+	if writePlan.deleteImmediately {
+		return redisHandle.Expire(ctx, key, 0).Err()
 	}
 
 	return nil
@@ -1045,6 +1067,10 @@ func updateRedisCache(sender string, remoteClient *RemoteClient) error {
 // home ForeignIPs seen, trusted ForeignIPs defined, total ForeignIPs, allowed max foreign ForeignIPs, allowed max home ForeignIPs,
 // and action status.
 func logPolicyResult(policyResponse *PolicyResponse, remoteClient *RemoteClient, sender string, trustedCountries, trustedIPs []string, allowedMaxForeignIPs, allowedMaxHomeIPs, allowedMaxForeignCountries, allowedMaxHomeCountries int, guid string) {
+	if !isInfoLoggingEnabled() {
+		return
+	}
+
 	level.Info(logger).Log("guid", guid,
 		getUserAttribute(), sender,
 		"current_client_ip", policyResponse.currentClientIP,
@@ -1239,7 +1265,7 @@ func getActionStatus(policyResponse *PolicyResponse) string {
 		return rejectText
 	}
 
-	return "ok"
+	return resultOK
 }
 
 // setCurrentClientInfo sets the current client IP and country code in the PolicyResponse object.
@@ -1251,36 +1277,171 @@ func setCurrentClientInfo(ip string, code string, policyResponse *PolicyResponse
 	policyResponse.currentCountryCode = code
 }
 
-// getPolicyResponse evaluates the policy request and generates a structured policy response object.
+// getObservedPolicyResponse records source-level policy request metrics around the map-based API.
+func getObservedPolicyResponse(ctx context.Context, source string, policyRequest map[string]string, guid string, info bool) (policyResponse *PolicyResponse, err error) {
+	policyInput, err := NewPolicyInputFromMap(policyRequest)
+	if err != nil {
+		if obs := currentObservability(); obs != nil {
+			obs.ObservePolicyRequest(ctx, source, resultError, 0)
+		}
+
+		return nil, err
+	}
+
+	return getObservedPolicyResponseFor(ctx, source, policyInput, guid, info)
+}
+
+// isIgnoredPolicyInput marks whitelisted requests and logs the matched ignore-network entry when info logging is active.
+func isIgnoredPolicyInput(clientIP, guid string, policyResponse *PolicyResponse) bool {
+	ignoreNet, found := config.IgnoreNetworkMatcher().MatchString(clientIP, guid)
+	if !found {
+		return false
+	}
+
+	policyResponse.whitelisted = true
+
+	if isInfoLoggingEnabled() {
+		_ = level.Info(logger).Log(
+			"guid", guid,
+			"msg", "IP address found in ignore-networks",
+			"client_address", clientIP,
+			"ignore_networks", ignoreNet,
+		)
+	}
+
+	return true
+}
+
+// effectivePolicySettings returns request-local policy settings with sender-specific custom overrides applied.
+func effectivePolicySettings(sender string) *PolicySettings {
+	policySettings := config.PolicySettings()
+
+	if customSettings := loadCustomSettings(); customSettings != nil {
+		customSettings.ApplyTo(sender, policySettings)
+	}
+
+	return policySettings
+}
+
+// fetchPolicySubject loads user-known state and current Redis policy state for a sender.
+func fetchPolicySubject(sender, clientIP, countryCode, guid string) (bool, *RemoteClient, bool, error) {
+	return fetchPolicySubjectContext(context.Background(), sender, clientIP, countryCode, guid)
+}
+
+// fetchPolicySubjectContext loads user-known state and current Redis policy state with request context propagation.
+func fetchPolicySubjectContext(ctx context.Context, sender, clientIP, countryCode, guid string) (bool, *RemoteClient, bool, error) {
+	userKnown, err := checkUserKnownContext(ctx, sender, guid)
+	if err != nil {
+		return false, nil, true, err
+	}
+
+	remoteClient, err := fetchAndLogRemoteClientContext(ctx, sender, clientIP, countryCode, guid)
+	if err != nil {
+		return false, nil, false, err
+	}
+
+	return userKnown, remoteClient, false, nil
+}
+
+// finalizePolicyDecision runs side effects and response enrichment after policy evaluation.
+func finalizePolicyDecision(sender string, remoteClient *RemoteClient, policyResponse *PolicyResponse, userKnown, requireActions bool, guid string) error {
+	return finalizePolicyDecisionContext(context.Background(), sender, remoteClient, policyResponse, userKnown, requireActions, guid)
+}
+
+// finalizePolicyDecisionContext runs side effects and response enrichment with request context propagation.
+func finalizePolicyDecisionContext(ctx context.Context, sender string, remoteClient *RemoteClient, policyResponse *PolicyResponse, userKnown, requireActions bool, guid string) error {
+	if remoteClient.Locked {
+		policyResponse.fired = true
+		requireActions = true
+	}
+
+	handleClientActionsContext(ctx, remoteClient, sender, userKnown, guid, requireActions)
+
+	if err := updateRedisCacheContext(ctx, sender, remoteClient); err != nil {
+		return err
+	}
+
+	updatePolicyResponse(policyResponse, remoteClient)
+
+	return nil
+}
+
+// getPolicyResponseFor evaluates a typed policy request and generates a structured policy response object.
 // It initializes the request, validates input, handles ignored networks, evaluates user information,
 // processes client data, and applies custom settings to determine policy actions.
 // Returns a pointer to PolicyResponse and an error if any issue occurs during processing.
 // If info is true, it only determines the country code and returns early with just the necessary data.
-func getPolicyResponse(policyRequest map[string]string, guid string, info bool) (policyResponse *PolicyResponse, err error) {
-	var (
-		trustedCountries           []string
-		trustedIPs                 []string
-		homeCountries              = config.HomeCountries
-		allowedMaxForeignIPs       = config.MaxIPs
-		allowedMaxForeignCountries = config.MaxCountries
-		allowedMaxHomeIPs          = config.MaxHomeIPs
-		allowedMaxHomeCountries    = config.MaxHomeCountries
-	)
+// getObservedPolicyResponseFor records source-level policy request metrics around the typed API.
+func getObservedPolicyResponseFor(ctx context.Context, source string, policyInput PolicyInput, guid string, info bool) (policyResponse *PolicyResponse, err error) {
+	start := time.Now()
 
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx,
+			"policy.request",
+			attribute.String("policy.source", source),
+			attribute.Bool("policy.info_only", info),
+		)
+		defer span.End()
+	}
+
+	policyResponse, err = getPolicyResponseForContext(ctx, policyInput, guid, info)
+	outcome := policyOutcome(policyResponse, err, info)
+
+	if obs != nil {
+		obs.ObservePolicyRequest(ctx, source, outcome, time.Since(start))
+
+		if err != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+		}
+	}
+
+	return policyResponse, err
+}
+
+// policyOutcome normalizes a policy response into low-cardinality metric labels.
+func policyOutcome(policyResponse *PolicyResponse, err error, info bool) string {
+	if err != nil {
+		return resultError
+	}
+
+	if policyResponse == nil {
+		return resultEmpty
+	}
+
+	if policyResponse.whitelisted {
+		return resultWhitelist
+	}
+
+	if info {
+		return resultInfo
+	}
+
+	if policyResponse.fired {
+		return resultReject
+	}
+
+	return resultAccept
+}
+
+// getPolicyResponseForContext evaluates a typed policy request with request context propagation.
+func getPolicyResponseForContext(ctx context.Context, policyInput PolicyInput, guid string, info bool) (policyResponse *PolicyResponse, err error) {
 	policyResponse = &PolicyResponse{}
 
-	sender, clientIP, err := initializePolicy(policyRequest)
-	if err != nil {
+	if err = policyInput.Validate(); err != nil {
 		return nil, err
 	}
 
-	if checkIgnoreNets(config.IgnoreNets, clientIP, guid) {
-		policyResponse.whitelisted = true
+	sender := policyInput.Sender
+	clientIP := policyInput.ClientIP
 
+	if isIgnoredPolicyInput(clientIP, guid, policyResponse) {
 		return
 	}
 
-	countryCode := getCountryCode(clientIP)
+	countryCode := getCountryCodeWithContext(ctx, clientIP)
 
 	setCurrentClientInfo(clientIP, countryCode, policyResponse)
 
@@ -1289,67 +1450,32 @@ func getPolicyResponse(policyRequest map[string]string, guid string, info bool) 
 		return policyResponse, nil
 	}
 
-	userKnown, err := checkUserKnown(sender, guid)
+	userKnown, remoteClient, keepResponseOnError, err := fetchPolicySubjectContext(ctx, sender, clientIP, countryCode, guid)
 	if err != nil {
-		return policyResponse, err
-	}
+		if keepResponseOnError {
+			return policyResponse, err
+		}
 
-	remoteClient, err := fetchAndLogRemoteClient(sender, clientIP, countryCode, guid)
-	if err != nil {
 		return nil, err
 	}
 
-	applyCustomSettings(
-		customSettingsStore.Load().(*CustomSettings),
-		sender,
-		&allowedMaxForeignIPs,
-		&allowedMaxForeignCountries,
-		&trustedIPs,
-		&trustedCountries,
-		&homeCountries,
-		&allowedMaxHomeIPs,
-		&allowedMaxHomeCountries,
-	)
+	policySettings := effectivePolicySettings(sender)
+	requireActions := policySettings.Evaluate(remoteClient, countryCode, policyResponse, clientIP, guid)
 
-	requireActions := evaluatePolicy(
-		remoteClient,
-		trustedIPs,
-		trustedCountries,
-		countryCode,
-		allowedMaxForeignCountries,
-		allowedMaxHomeCountries,
-		allowedMaxForeignIPs,
-		allowedMaxHomeIPs,
-		policyResponse,
-		clientIP,
-		guid,
-		checkHomeCountry(remoteClient, homeCountries, countryCode, clientIP, guid),
-	)
-
-	if remoteClient.Locked {
-		policyResponse.fired = true
-		requireActions = true
-	}
-
-	handleClientActions(remoteClient, sender, userKnown, guid, requireActions)
-
-	err = updateRedisCache(sender, remoteClient)
-	if err != nil {
+	if err = finalizePolicyDecisionContext(ctx, sender, remoteClient, policyResponse, userKnown, requireActions, guid); err != nil {
 		return nil, err
 	}
-
-	updatePolicyResponse(policyResponse, remoteClient)
 
 	logPolicyResult(
 		policyResponse,
 		remoteClient,
 		sender,
-		trustedCountries,
-		trustedIPs,
-		allowedMaxForeignIPs,
-		allowedMaxHomeIPs,
-		allowedMaxForeignCountries,
-		allowedMaxHomeCountries,
+		policySettings.TrustedCountries,
+		policySettings.TrustedIPs,
+		policySettings.AllowedMaxForeignIPs,
+		policySettings.AllowedMaxHomeIPs,
+		policySettings.AllowedMaxForeignCountries,
+		policySettings.AllowedMaxHomeCountries,
 		guid,
 	)
 

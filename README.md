@@ -12,6 +12,7 @@ they come from too many IP addresses.
 * LDAP support (optional)
 * REST interface to interact with the service on the fly
 * Actions
+* Prometheus metrics and OpenTelemetry export (optional)
 
 # Table of contents
 
@@ -22,7 +23,10 @@ they come from too many IP addresses.
     * [Server options](#server-options)
 2. [Environment variables](#environment-variables)
     * [Server](#server)
-3. [REST interface](#rest-interface)
+3. [Observability](#observability)
+    * [Prometheus](#prometheus)
+    * [OpenTelemetry](#opentelemetry)
+4. [REST interface](#rest-interface)
     * [GET request /reload](#get-request-reload)
     * [GET request /custom-settings](#get-request-custom-settings)
     * [POST request /remove](#post-request-remove)
@@ -30,9 +34,10 @@ they come from too many IP addresses.
     * [PUT request /update](#put-request-update)
     * [PATCH request /modify](#patch-request-modify)
     * [DELETE request /remove](#delete-request-remove)
-4. [Actions](#actions)
+5. [Endpoint test client](#endpoint-test-client)
+6. [Actions](#actions)
     * [Operator action](#operator-action)
-5. [LDAP](#ldap)
+7. [LDAP](#ldap)
     * [docker-compose.yml](#docker-composeyml)
     * [custom.json](#customjson)
 
@@ -141,6 +146,18 @@ Arguments:
       --http-basic-auth-password      HTTP basic auth password. Default: 
       --http-tls-cert                 HTTP TLS server certificate (full chain). Default: /localhost.pem
       --http-tls-key                  HTTP TLS server key. Default: /localhost-key.pem
+      --prometheus-enabled            Enable Prometheus metrics on the HTTP service. Default: false
+      --prometheus-path               HTTP path for Prometheus metrics. Default: /metrics
+      --prometheus-runtime-metrics    Include Go runtime and process metrics. Default: true
+      --otel-enabled                  Enable OpenTelemetry export. Default: false
+      --otel-traces-enabled           Export OpenTelemetry traces when OTel is enabled. Default: true
+      --otel-metrics-enabled          Export OpenTelemetry metrics when OTel is enabled. Default: true
+      --otel-service-name             OpenTelemetry service.name resource attribute. Default: geoip-policyd
+      --otel-service-version          OpenTelemetry service.version resource attribute. Default: current binary version
+      --otel-exporter-otlp-endpoint   OTLP HTTP endpoint as host:port or base URL. Default:
+      --otel-exporter-otlp-headers    Comma-separated OTLP HTTP headers as key=value pairs. Default:
+      --otel-exporter-otlp-insecure   Use insecure OTLP HTTP transport. Default: true
+      --otel-sample-ratio             OpenTelemetry trace sampling ratio between 0.0 and 1.0. Default: 1.0
       --use-ldap                      Enable LDAP support. Default: false
       --ldap-server-uri               Server URI. Specify multiple times, if you need more than one server. Default: [ldap://127.0.0.1:389/]
       --ldap-basedn                   Base DN. Default: 
@@ -218,6 +235,18 @@ on running the service as a docker service.
 | GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD   | HTTP basic auth password                                                                                  |
 | GEOIPPOLICYD_HTTP_TLS_CERT              | HTTP TLS server certificate (full chain); default(/localhost.pem)                                         |
 | GEOIPPOLICYD_HTTP_TLS_KEY               | HTTP TLS server key; default(/localhost-key.pem)                                                          |
+| GEOIPPOLICYD_PROMETHEUS_ENABLED         | Enable Prometheus metrics on the HTTP service; default(false)                                             |
+| GEOIPPOLICYD_PROMETHEUS_PATH            | HTTP path for Prometheus metrics; default(/metrics)                                                       |
+| GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS | Include Go runtime and process metrics; default(true)                                                     |
+| GEOIPPOLICYD_OTEL_ENABLED               | Enable OpenTelemetry OTLP HTTP export; default(false)                                                     |
+| GEOIPPOLICYD_OTEL_TRACES_ENABLED        | Export OpenTelemetry traces when OTel is enabled; default(true)                                           |
+| GEOIPPOLICYD_OTEL_METRICS_ENABLED       | Export OpenTelemetry metrics when OTel is enabled; default(true)                                          |
+| GEOIPPOLICYD_OTEL_SERVICE_NAME          | OpenTelemetry service.name resource attribute; default(geoip-policyd)                                     |
+| GEOIPPOLICYD_OTEL_SERVICE_VERSION       | OpenTelemetry service.version resource attribute; default(current binary version)                         |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT| OTLP HTTP endpoint as host:port or base URL                                                               |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_HEADERS | Comma-separated OTLP HTTP headers as key=value pairs                                                      |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE| Use insecure OTLP HTTP transport; default(true)                                                           |
+| GEOIPPOLICYD_OTEL_SAMPLE_RATIO          | OpenTelemetry trace sampling ratio between 0.0 and 1.0; default(1.0)                                      |
 | GEOIPPOLICYD_USE_LDAP                   | Enable LDAP support; default(false)                                                                       |
 | GEOIPPOLICYD_LDAP_SERVER_URIS           | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)      |
 | GEOIPPOLICYD_LDAP_BASEDN                | Base DN                                                                                                   |
@@ -248,6 +277,94 @@ on running the service as a docker service.
 | GEOIPPOLICYD_MAIL_PASSWORD              | E-mail server password                                                                                    |
 | GEOIPPOLICYD_MAIL_SSL_ON_CONNECT        | Use TLS on connect for the e-mail server; default(false)                                                  |
 | GEOIPPOLICYD_VERBOSE_LEVEL              | Log level. One of 'none', 'info' or 'debug'                                                               |
+
+Back to [table of contents](#table-of-contents)
+
+# Observability
+
+Observability is disabled by default. Enabling it adds process-local metrics and optional OTLP HTTP export so operators
+can observe HTTP requests, Postfix policy requests, policy decisions, Redis operations, LDAP operations and pool state,
+GeoIP lookups and reloads, CDB lookups, operator actions, and TCP connection lifecycle events.
+
+Metric and trace labels intentionally do not include sender addresses, client IP addresses, Redis keys, or raw LDAP
+filters. This keeps label cardinality predictable and avoids exporting sensitive request identifiers.
+
+## Prometheus
+
+Enable the Prometheus endpoint on the existing HTTP service:
+
+```shell
+geoip-policyd server --prometheus-enabled
+```
+
+The default endpoint is:
+
+```text
+http://127.0.0.1:8080/metrics
+```
+
+If HTTP basic auth is enabled, the metrics endpoint uses the same credentials as the REST API:
+
+```shell
+curl -u testuser:testsecret http://127.0.0.1:8080/metrics
+```
+
+Useful options:
+
+| Option                           | Default    | Description                                      |
+|----------------------------------|------------|--------------------------------------------------|
+| --prometheus-enabled             | false      | Enables the `/metrics` endpoint                  |
+| --prometheus-path                | /metrics   | Changes the metrics endpoint path                |
+| --prometheus-runtime-metrics     | true       | Adds Go runtime and process collectors           |
+
+Side effects:
+
+* The HTTP listener serves one additional route when Prometheus is enabled.
+* Go runtime and process collectors add standard `go_*` and `process_*` metrics unless disabled.
+* `/metrics` is not instrumented by the HTTP middleware to avoid self-scrape noise.
+
+## OpenTelemetry
+
+OpenTelemetry uses OTLP over HTTP. Enable it with an endpoint:
+
+```shell
+geoip-policyd server \
+  --otel-enabled \
+  --otel-exporter-otlp-endpoint 127.0.0.1:4318
+```
+
+The endpoint may be `host:port` or a base URL such as `http://collector.example:4318`. The exporter uses the standard
+OTLP HTTP paths for traces and metrics.
+
+Useful options:
+
+| Option                         | Default          | Description                                                     |
+|--------------------------------|------------------|-----------------------------------------------------------------|
+| --otel-enabled                 | false            | Enables OpenTelemetry export                                    |
+| --otel-traces-enabled          | true             | Exports traces when OTel is enabled                             |
+| --otel-metrics-enabled         | true             | Exports OTel metrics when OTel is enabled                       |
+| --otel-service-name            | geoip-policyd    | Sets the `service.name` resource attribute                      |
+| --otel-service-version         | current version  | Sets the `service.version` resource attribute                   |
+| --otel-exporter-otlp-endpoint  | empty            | OTLP HTTP collector endpoint; required when OTel is enabled     |
+| --otel-exporter-otlp-headers   | empty            | Comma-separated `key=value` headers for the OTLP HTTP exporter  |
+| --otel-exporter-otlp-insecure  | true             | Uses insecure transport for OTLP HTTP                           |
+| --otel-sample-ratio            | 1.0              | Trace sampling ratio from `0.0` to `1.0`                        |
+
+Example with headers:
+
+```shell
+geoip-policyd server \
+  --otel-enabled \
+  --otel-exporter-otlp-endpoint https://collector.example:4318 \
+  --otel-exporter-otlp-insecure=false \
+  --otel-exporter-otlp-headers "authorization=Bearer token"
+```
+
+Side effects:
+
+* The process opens outbound HTTP connections to the configured collector.
+* SIGINT and SIGTERM trigger a best-effort telemetry flush before process exit.
+* If OTel is enabled, at least one of traces or metrics must remain enabled and the OTLP endpoint is required.
 
 Back to [table of contents](#table-of-contents)
 
@@ -453,6 +570,68 @@ curl -d '{"key":"sender","value":"christian@roessner.email"}' -H "Content-Type: 
 # Secured with basic auth
 curl -k -d '{"key":"sender","value":"christian@roessner.email"}"' -H "Content-Type: application/json" -X DELETE "https://localhost:8443/remove" -u testuser:testsecret
 ````
+
+Back to [table of contents](#table-of-contents)
+
+# Endpoint test client
+
+The `contrib/geoip-policyd-test.py` script exercises the REST interface and the
+raw Postfix policy socket with useful local defaults. It uses only the Python
+standard library and does not require a virtual environment.
+
+The repository contains `testdata/GeoIP2-City-Test.mmdb` for local smoke tests
+that need a valid MaxMind database without depending on an operator-provided
+GeoLite file.
+
+Default targets:
+
+| Option | Default |
+| --- | --- |
+| `--base-url` | `http://127.0.0.1:8080` |
+| `--policy-host` | `127.0.0.1` |
+| `--policy-port` | `4646` |
+| `--sender` | `geoip-policyd-test@example.com` |
+| `--address` | `127.0.0.1` |
+| `--recipient` | `postmaster@example.com` |
+
+Run a single endpoint check:
+
+```shell
+contrib/geoip-policyd-test.py --address 8.8.8.8 --sender user@example.com query
+contrib/geoip-policyd-test.py --address 8.8.8.8 dovecotpolicy --command allow
+contrib/geoip-policyd-test.py --address 8.8.8.8 policy
+```
+
+Run the complete endpoint suite:
+
+```shell
+contrib/geoip-policyd-test.py all
+```
+
+The `all` command checks `GET /custom-settings`, `POST /query`,
+`POST /dovecotpolicy?command=report`, `POST /dovecotpolicy?command=allow`,
+the raw Postfix policy socket, `PUT /update`, `PATCH /modify`,
+`DELETE /remove`, `POST /remove`, and `GET /reload`. The suite intentionally
+touches mutating custom-settings and unlock endpoints, so run it against a
+dedicated test instance or with a sender and Redis prefix that are safe to
+modify.
+
+For HTTPS with a local or self-signed certificate, add `--insecure`. For HTTP
+basic authentication, add `--username` and `--password`.
+
+Example against isolated local test ports:
+
+```shell
+contrib/geoip-policyd-test.py \
+  --base-url http://127.0.0.1:18080 \
+  --policy-port 14646 \
+  --address 8.8.8.8 \
+  all
+```
+
+The output is a compact table with the endpoint name, method, target, status,
+expected status, result, and a short response summary. The process exits with
+status `0` only when all selected checks pass.
 
 Back to [table of contents](#table-of-contents)
 

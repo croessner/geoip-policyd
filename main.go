@@ -50,126 +50,129 @@ var (
 	ctx                 = context.Background()
 )
 
-type RedisLogger struct{}
-
-func (r *RedisLogger) Printf(_ context.Context, format string, values ...any) {
-	level.Info(logger).Log("redis", fmt.Sprintf(format, values...))
+type RedisLogger struct {
+	logger log.Logger
 }
 
-// initCustomSettings initializes the custom settings based on the provided command line configuration.
-// If the CustomSettingsPath in the cmdLineConfig is non-empty, it reads the JSON file, unmarshals it into
-// the customSettings object, and then flushes users from Redis based on the customSettings.
-// Returns the initialized customSettings or nil if there is no custom settings path provided.
-func initCustomSettings(cmdLineConfig *CmdLineConfig) *CustomSettings {
-	customSettings := &CustomSettings{}
+func NewRedisLogger(logger log.Logger) *RedisLogger {
+	return &RedisLogger{logger: logger}
+}
 
-	if cmdLineConfig.CustomSettingsPath != "" {
-		jsonFile, err := os.Open(cmdLineConfig.CustomSettingsPath)
-		if err != nil {
-			level.Error(logger).Log("error", err.Error())
-		}
+func (r *RedisLogger) Printf(_ context.Context, format string, values ...any) {
+	_ = level.Info(r.logger).Log("redis", fmt.Sprintf(format, values...))
+}
 
-		//goland:noinspection GoUnhandledErrorResult
-		defer jsonFile.Close()
+type RedisClientFactory struct {
+	config *CmdLineConfig
+}
 
-		if byteValue, err := io.ReadAll(jsonFile); err != nil {
-			level.Error(logger).Log("error", err.Error())
-		} else if err := json.Unmarshal(byteValue, customSettings); err != nil {
-			level.Error(logger).Log("error", err.Error())
-		}
+func NewRedisClientFactory(config *CmdLineConfig) *RedisClientFactory {
+	return &RedisClientFactory{config: config}
+}
 
-		flushUsersFromRedis(customSettings)
+func (f *RedisClientFactory) Primary() redis.UniversalClient {
+	if f.hasFailover() {
+		return f.failover(false)
+	}
 
-		return customSettings
+	return f.standard(f.config.RedisAddress, f.config.RedisPort)
+}
+
+func (f *RedisClientFactory) Replica() redis.UniversalClient {
+	if f.hasFailover() {
+		return f.failover(true)
+	}
+
+	if f.config.RedisAddressRO != f.config.RedisAddress || f.config.RedisPortRO != f.config.RedisPort {
+		return f.standard(f.config.RedisAddressRO, f.config.RedisPortRO)
 	}
 
 	return nil
 }
 
-// flushUsersFromRedis flushes user accounts from Redis based on the provided custom settings.
-// If the customSettings object is nil or the settings.Data field is nil, the function does nothing.
-// The function iterates over each account in settings.Data and deletes the corresponding key from Redis.
-// It constructs the Redis key using the `Sender` field of the account and the RedisPrefix configuration.
-// If an error occurs during the deletion, it checks if the error is due to the key not existing in Redis (redis.Nil),
-// in which case it returns immediately.
-// Otherwise, it logs the error using the provided logger.
-func flushUsersFromRedis(settings *CustomSettings) {
-	if settings.Data == nil {
+func (f *RedisClientFactory) hasFailover() bool {
+	return len(f.config.RedisSentinels) > 0 && f.config.RedisSentinelMasterName != ""
+}
+
+func (f *RedisClientFactory) failover(replicaOnly bool) redis.UniversalClient {
+	return redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:       f.config.RedisSentinelMasterName,
+		SentinelAddrs:    f.config.RedisSentinels,
+		ReplicaOnly:      replicaOnly,
+		DB:               f.config.RedisDB,
+		SentinelUsername: f.config.RedisSentinelUsername,
+		SentinelPassword: f.config.RedisSentinelPassword,
+		Username:         f.config.RedisUsername,
+		Password:         f.config.RedisPassword,
+	})
+}
+
+func (f *RedisClientFactory) standard(addr string, port int) redis.UniversalClient {
+	return redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", addr, port),
+		Username: f.config.RedisUsername,
+		Password: f.config.RedisPassword,
+		DB:       f.config.RedisDB,
+	})
+}
+
+type CustomSettingsService struct {
+	config *CmdLineConfig
+	logger log.Logger
+	redis  redis.UniversalClient
+}
+
+func NewCustomSettingsService(config *CmdLineConfig, redis redis.UniversalClient, logger log.Logger) *CustomSettingsService {
+	return &CustomSettingsService{
+		config: config,
+		logger: logger,
+		redis:  redis,
+	}
+}
+
+func (s *CustomSettingsService) Load() *CustomSettings {
+	customSettings := &CustomSettings{}
+
+	if s.config.CustomSettingsPath == "" {
+		return nil
+	}
+
+	jsonFile, err := os.Open(s.config.CustomSettingsPath)
+	if err != nil {
+		_ = level.Error(s.logger).Log("error", err.Error())
+
+		return nil
+	}
+
+	//goland:noinspection GoUnhandledErrorResult
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			_ = level.Error(s.logger).Log("error", err.Error())
+		}
+	}()
+
+	if byteValue, err := io.ReadAll(jsonFile); err != nil {
+		_ = level.Error(s.logger).Log("error", err.Error())
+	} else if err := json.Unmarshal(byteValue, customSettings); err != nil {
+		_ = level.Error(s.logger).Log("error", err.Error())
+	}
+
+	s.FlushUsers(customSettings)
+
+	return customSettings
+}
+
+func (s *CustomSettingsService) FlushUsers(settings *CustomSettings) {
+	if settings == nil || settings.Data == nil {
 		return
 	}
 
 	for _, account := range settings.Data {
-		err := redisHandle.Del(context.TODO(), fmt.Sprintf("%s%s", config.RedisPrefix, account.Sender)).Err()
-		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				return
-			}
-
-			level.Error(logger).Log("error", err.Error())
+		err := s.redis.Del(context.TODO(), fmt.Sprintf("%s%s", s.config.RedisPrefix, account.Sender)).Err()
+		if err != nil && !errors.Is(err, redis.Nil) {
+			_ = level.Error(s.logger).Log("error", err.Error())
 		}
 	}
-}
-
-// createFailoverClient creates a Redis failover client based on the provided configuration.
-// It takes a boolean parameter `replicaOnly` to determine whether to connect to replica nodes only.
-// It uses the `redis.FailoverOptions` struct to configure the client's settings, such as master name, sentinel addresses, etc.
-// It returns a `redis.UniversalClient` instance.
-func createFailoverClient(replicaOnly bool) redis.UniversalClient {
-	return redis.NewFailoverClient(&redis.FailoverOptions{
-		MasterName:       config.RedisSentinelMasterName,
-		SentinelAddrs:    config.RedisSentinels,
-		ReplicaOnly:      replicaOnly,
-		DB:               config.RedisDB,
-		SentinelUsername: config.RedisSentinelUsername,
-		SentinelPassword: config.RedisSentinelPassword,
-		Username:         config.RedisUsername,
-		Password:         config.RedisPassword,
-	})
-}
-
-// createStandardClient creates a Redis client with standard configuration.
-// It takes a string parameter `addr` to specify the address of the Redis server.
-// It takes an int parameter `port` to specify the port number of the Redis server.
-// It uses the `redis.Options` struct to configure the client's settings, such as address, username, password, etc.
-// It returns a `redis.UniversalClient` instance.
-func createStandardClient(addr string, port int) redis.UniversalClient {
-	return redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", addr, port),
-		Username: config.RedisUsername,
-		Password: config.RedisPassword,
-		DB:       config.RedisDB,
-	})
-}
-
-// NewRedisClient creates a Redis client based on the provided configuration.
-// If Redis sentinels and a master name are defined in the configuration,
-// it creates a failover client using the createFailoverClient function.
-// Otherwise, it creates a standard client using the createStandardClient function.
-// It returns a redis.UniversalClient instance.
-func NewRedisClient() redis.UniversalClient {
-	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
-		redisHandle = createFailoverClient(false)
-	} else {
-		redisHandle = createStandardClient(config.RedisAddress, config.RedisPort)
-	}
-
-	return redisHandle
-}
-
-// NewRedisReplicaClient returns a Redis replica client based on the provided configuration.
-// If Redis sentinels and a master name are defined in the configuration, it creates a failover client using the createFailoverClient function.
-// Otherwise, it creates a standard client using the createStandardClient function.
-// It returns a redis.UniversalClient instance or nil if no configuration is provided.
-func NewRedisReplicaClient() redis.UniversalClient {
-	if len(config.RedisSentinels) > 0 && config.RedisSentinelMasterName != "" {
-		return createFailoverClient(true)
-	}
-
-	if config.RedisAddressRO != config.RedisAddress || config.RedisPortRO != config.RedisPort {
-		return createStandardClient(config.RedisAddressRO, config.RedisPortRO)
-	}
-
-	return nil
 }
 
 // initializeSignalHandler initializes a signal handler that listens for OS signals
@@ -276,27 +279,54 @@ func waitForShutdownSignal(sigs chan os.Signal) {
 
 	level.Info(logger).Log("msg", "Shutting down geoip-policyd", "signal", sig)
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if obs := currentObservability(); obs != nil {
+		if err := obs.Shutdown(shutdownCtx); err != nil {
+			_ = level.Error(logger).Log("msg", "Unable to flush observability providers", "error", err.Error())
+		}
+	}
+
 	os.Exit(0)
 }
 
 // configureRedis initializes and configures the Redis clients and logger for the geoip-policyd application.
 // It takes a RedisLogger pointer as a parameter and sets it as the logger for the Redis client.
-// It then creates the primary Redis client using the NewRedisClient function, and assigns it to the redisHandle variable.
-// If the replica client is not configured, it assigns the primary client to the redisHandleReplica variable.
-// It then initializes the custom settings using the initCustomSettings function and stores the result in the customSettingsStore.
-// Finally, it logs the message "Starting geoip-policyd" with the current version.
 func configureRedis(redisLogger *RedisLogger) {
 	redis.SetLogger(redisLogger)
 
-	redisHandle = NewRedisClient()
-	redisHandleReplica = NewRedisReplicaClient()
+	redisFactory := NewRedisClientFactory(config)
+	redisHandle = redisFactory.Primary()
+	redisHandleReplica = redisFactory.Replica()
 
 	if redisHandleReplica == nil {
 		redisHandleReplica = redisHandle
 	}
 
-	customSettingsStore.Store(initCustomSettings(config))
+	if obs := currentObservability(); obs != nil {
+		obs.InstrumentRedisClient(redisHandle, "primary")
+
+		if redisHandleReplica != redisHandle {
+			obs.InstrumentRedisClient(redisHandleReplica, "replica")
+		}
+	}
+
+	customSettingsService := NewCustomSettingsService(config, redisHandle, logger)
+	storeCustomSettings(customSettingsService.Load())
 	level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
+}
+
+// initializeObservability builds the configured metrics and tracing runtime.
+func initializeObservability() error {
+	observabilityRuntime, err := NewObservability(context.Background(), config.Observability, version, logger)
+	if err != nil {
+		return err
+	}
+
+	config.observabilityRuntime = observabilityRuntime
+
+	return nil
 }
 
 // setupGeoIP initializes the GeoIP database reader by opening the specified GeoIP database file.
@@ -311,14 +341,12 @@ func setupGeoIP() error {
 		return fmt.Errorf("file '%s' may exist, but there's an error accessing it", config.GeoipPath)
 	}
 
-	geoIP = &GeoIP{}
-
-	var err error
-
-	geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+	reader, err := maxminddb.Open(config.GeoipPath)
 	if err != nil {
 		return err
 	}
+
+	geoIP = NewGeoIP(reader)
 
 	go autoReloadGeoIP(geoIP)
 
@@ -360,7 +388,7 @@ func startServer() {
 // starts the LDAP worker (if configured), initializes and stores the CDB (if configured),
 // and starts the TCP server.
 func startCommandServer() {
-	redisLogger := &RedisLogger{}
+	redisLogger := NewRedisLogger(logger)
 	configureRedis(redisLogger)
 
 	if err := setupGeoIP(); err != nil {
@@ -438,6 +466,10 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 		fileInfo, err := os.Stat(config.GeoipPath)
 
 		if err != nil {
+			if obs := currentObservability(); obs != nil {
+				obs.ObserveGeoIPReload(context.Background(), resultStatError)
+			}
+
 			level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
 
 			continue
@@ -448,16 +480,21 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 
 			lastModTime = fileInfo.ModTime()
 
-			geoIP.mu.Lock()
-			geoIP.Reader.Close()
-
-			geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+			reader, err := maxminddb.Open(config.GeoipPath)
 			if err != nil {
-				level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
-				geoIP.Reader = nil
-			}
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveGeoIPReload(context.Background(), resultError)
+				}
 
-			geoIP.mu.Unlock()
+				level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
+				geoIP.SwapReader(nil)
+			} else {
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveGeoIPReload(context.Background(), resultOK)
+				}
+
+				geoIP.SwapReader(reader)
+			}
 		}
 	}
 }
@@ -477,6 +514,12 @@ func main() {
 
 	initializeLogger()
 	setTimeZone()
+
+	if config.CommandServer {
+		if err := initializeObservability(); err != nil {
+			stdLibLog.Fatalln(err)
+		}
+	}
 
 	go waitForShutdownSignal(sigs)
 

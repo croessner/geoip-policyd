@@ -97,3 +97,7 @@ mail.secret
 GeoLite2-City.mmdb
 GeoIP2-Country.mmdb
 tests.http
+
+# Python helper script artifacts
+__pycache__/
+*.py[cod]
