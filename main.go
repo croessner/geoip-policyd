@@ -296,7 +296,7 @@ func configureRedis(redisLogger *RedisLogger) {
 	}
 
 	customSettingsService := NewCustomSettingsService(config, redisHandle, logger)
-	customSettingsStore.Store(customSettingsService.Load())
+	storeCustomSettings(customSettingsService.Load())
 	level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
 }
 
@@ -312,14 +312,12 @@ func setupGeoIP() error {
 		return fmt.Errorf("file '%s' may exist, but there's an error accessing it", config.GeoipPath)
 	}
 
-	geoIP = &GeoIP{}
-
-	var err error
-
-	geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+	reader, err := maxminddb.Open(config.GeoipPath)
 	if err != nil {
 		return err
 	}
+
+	geoIP = NewGeoIP(reader)
 
 	go autoReloadGeoIP(geoIP)
 
@@ -449,16 +447,13 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 
 			lastModTime = fileInfo.ModTime()
 
-			geoIP.mu.Lock()
-			geoIP.Reader.Close()
-
-			geoIP.Reader, err = maxminddb.Open(config.GeoipPath)
+			reader, err := maxminddb.Open(config.GeoipPath)
 			if err != nil {
 				level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
-				geoIP.Reader = nil
+				geoIP.SwapReader(nil)
+			} else {
+				geoIP.SwapReader(reader)
 			}
-
-			geoIP.mu.Unlock()
 		}
 	}
 }

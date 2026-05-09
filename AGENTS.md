@@ -11,11 +11,17 @@ whenever toolchain details change.
 - Run lint through `make lint`; `make guardrails` includes `golangci-lint`.
 - Keep the vendored module tree in sync. After dependency updates, run
   `go mod tidy` and `go mod vendor`.
+- Prefer unit-driven development for new or changed runtime behavior: add or
+  update focused unit tests for the target behavior before wiring production
+  code whenever the behavior can be exercised locally.
 - Add focused regression tests for bug fixes before changing production code
   when a reproducer is practical.
 - Keep runtime, Docker, systemd, and README changes aligned when operator-facing
   behavior changes.
 - Write code comments and technical documentation in English.
+- Document new and changed functions, methods, and cohesive runtime types with
+  clear English comments, including unexported helpers. Comments should describe
+  responsibility and contracts, not merely restate individual statements.
 
 ## Commit Log Format
 

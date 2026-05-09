@@ -10,11 +10,17 @@ These rules are mandatory for coding changes in this repository.
 - MUST: Keep `.golangci.yml` aligned with the repository guardrail policy and
   run `golangci-lint` through `make lint` or `make guardrails`.
 - MUST: Keep `vendor/` synchronized after dependency changes.
+- MUST: Prefer unit-driven development for new or changed runtime behavior by
+  adding or updating focused unit tests before production wiring whenever the
+  behavior can be exercised locally.
 - MUST: Add focused regression coverage for bug fixes when a reproducer is
   practical.
 - MUST: Keep runtime, Docker, systemd, and README changes aligned when
   operator-facing behavior changes.
 - MUST: Write code comments and technical documentation in English.
+- MUST: Document new and changed functions, methods, and cohesive runtime types,
+  including unexported helpers, with English comments that describe their
+  responsibility and contracts.
 - MUST: Use strict object-oriented design for new and changed code: cohesive
   types, constructor-based dependency injection, encapsulated mutable state, and
   methods on owning structs instead of procedural package-level workflows.
@@ -40,10 +46,12 @@ These rules are mandatory for coding changes in this repository.
 - [ ] Dependency changes were followed by `go mod tidy` and `go mod vendor`.
 - [ ] `make guardrails` passes locally.
 - [ ] `golangci-lint` findings are fixed or intentionally documented.
-- [ ] New or changed code has focused test coverage where appropriate.
+- [ ] New or changed runtime behavior has focused unit coverage added or
+  updated before the production wiring where practical.
 - [ ] New or changed runtime code follows the OOP, dependency-injection, and
   DRY rules above.
 - [ ] Operator-facing docs and packaging were updated when behavior changed.
-- [ ] Comments and technical docs introduced by the change are English-only.
+- [ ] New and changed functions, methods, and runtime types have useful English
+  comments, including unexported helpers.
 - [ ] Commit messages use the approved prefix, headline, and bullet-list body
   format.

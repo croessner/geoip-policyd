@@ -142,10 +142,17 @@ type CmdLineConfig struct {
 
 	// ForceUserKnown represents a boolean flag indicating whether the user is known or not.
 	ForceUserKnown bool
+
+	// policySettings caches policy limits and matchers derived from static configuration.
+	policySettings *PolicySettings
+	// ignoreNetworkMatcher caches parsed ignore-network entries for request-time checks.
+	ignoreNetworkMatcher *NetworkMatcher
 }
 
 type CustomSettings struct {
 	Data []Account `json:"data"`
+	// compiled indexes account-specific settings by sender for request-time lookups.
+	compiled map[string]*CompiledAccountSettings
 }
 
 type HomeCountries struct {
@@ -172,7 +179,7 @@ func (c *CmdLineConfig) String() string {
 
 	for index := 0; index < value.NumField(); index++ {
 		switch typeOfC.Field(index).Name {
-		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel":
+		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel", "policySettings", "ignoreNetworkMatcher":
 			continue
 		default:
 			_, _ = fmt.Fprintf(&result, " %s='%v'", typeOfC.Field(index).Name, value.Field(index).Interface())
@@ -625,5 +632,7 @@ func (c *CmdLineConfig) Init(args []string) {
 
 		v.SetDefault("mail_ssl_on_connect", *argServerMailSSL)
 		c.MailSSL = v.GetBool("mail_ssl_on_connect")
+
+		c.CompilePolicyRuntime()
 	}
 }
