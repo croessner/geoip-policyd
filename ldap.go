@@ -32,6 +32,8 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const ldapSingleValue = 0
@@ -75,6 +77,7 @@ const (
 )
 
 type LdapRequest struct {
+	ctx       context.Context
 	guid      *string
 	username  string
 	command   LDAPCommand
@@ -132,8 +135,29 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 		certificates []tls.Certificate
 	)
 
+	ctx := context.Background()
+	start := time.Now()
+	result := resultOK
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "ldap.connect", attribute.String("ldap.operation", "connect"))
+		defer span.End()
+		defer func() {
+			obs.ObserveLDAPOperation(ctx, "connect", result, time.Since(start))
+		}()
+	}
+
 	for {
 		if retryLimit > ldapMaxRetries {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), errLDAPConnect)
+			}
+
 			return errLDAPConnect
 		}
 
@@ -161,6 +185,12 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 			if ldapConf.TLSClientCert != "" && ldapConf.TLSClientKey != "" {
 				cert, err := tls.LoadX509KeyPair(ldapConf.TLSClientCert, ldapConf.TLSClientKey)
 				if err != nil {
+					result = resultError
+
+					if obs != nil {
+						obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+					}
+
 					return err
 				}
 
@@ -172,6 +202,12 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 			// Load CA chain
 			caCert, err := os.ReadFile(ldapConf.TLSCAFile)
 			if err != nil {
+				result = resultError
+
+				if obs != nil {
+					obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+				}
+
 				return err
 			}
 
@@ -182,6 +218,12 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 
 			host, _, err := net.SplitHostPort(u.Host)
 			if err != nil {
+				result = resultError
+
+				if obs != nil {
+					obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+				}
+
 				return err
 			}
 
@@ -194,6 +236,12 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 
 			err = l.Conn.StartTLS(tlsConfig)
 			if err != nil {
+				result = resultError
+
+				if obs != nil {
+					obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+				}
+
 				return err
 			}
 
@@ -211,11 +259,32 @@ func (l *LdapPool) connect(guid *string, ldapConf *LdapConf) error {
 func (l *LdapPool) bind(guid *string, ldapConf *LdapConf) error {
 	var err error
 
+	ctx := context.Background()
+	start := time.Now()
+	result := resultOK
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "ldap.bind", attribute.String("ldap.operation", "bind"))
+		defer span.End()
+		defer func() {
+			obs.ObserveLDAPOperation(ctx, "bind", result, time.Since(start))
+		}()
+	}
+
 	if ldapConf.SASLExternal {
 		level.Debug(logger).Log("guid", guid, "msg", "SASL/EXTERNAL")
 
 		err = l.Conn.ExternalBind()
 		if err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return err
 		}
 
@@ -235,6 +304,12 @@ func (l *LdapPool) bind(guid *string, ldapConf *LdapConf) error {
 		})
 
 		if err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return err
 		}
 
@@ -258,6 +333,21 @@ func (l *LdapPool) unbind() (err error) {
 func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result DatabaseResult, err error) {
 	var searchResult *ldap.SearchResult
 
+	ctx := ldapRequestContext(ldapRequest)
+	start := time.Now()
+	operationResult := resultOK
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "ldap.search", attribute.String("ldap.operation", "search"))
+		defer span.End()
+		defer func() {
+			obs.ObserveLDAPOperation(ctx, "search", operationResult, time.Since(start))
+		}()
+	}
+
 	ldapConf.Filter = strings.ReplaceAll(ldapConf.Filter, "%s", ldapRequest.username)
 
 	re := regexp.MustCompile(`\s*[\r\n]+\s*`)
@@ -279,6 +369,12 @@ func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result D
 
 	searchResult, err = l.Conn.Search(searchRequest)
 	if err != nil {
+		operationResult = resultError
+
+		if obs != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+		}
+
 		return nil, err
 	}
 
@@ -314,6 +410,15 @@ func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result D
 	}
 
 	return result, nil
+}
+
+// ldapRequestContext returns the request context attached to an LDAP request.
+func ldapRequestContext(request *LdapRequest) context.Context {
+	if request != nil && request.ctx != nil {
+		return request.ctx
+	}
+
+	return context.Background()
 }
 
 func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
@@ -373,6 +478,8 @@ func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
 				ldapPool[index].Mu.Unlock()
 			}
 
+			recordLDAPPoolState(ldapPool)
+
 			needClosing := 0
 
 			if diff := openConnections - idlePoolSize; diff > 0 {
@@ -405,7 +512,40 @@ func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
 					break
 				}
 			}
+
+			recordLDAPPoolState(ldapPool)
 		}
+	}
+}
+
+// recordLDAPPoolState publishes the current LDAP pool state distribution.
+func recordLDAPPoolState(ldapPool []LdapPool) {
+	obs := currentObservability()
+	if obs == nil {
+		return
+	}
+
+	counts := map[string]int{
+		"closed": 0,
+		"free":   0,
+		"busy":   0,
+	}
+
+	for index := range ldapPool {
+		ldapPool[index].Mu.Lock()
+		switch ldapPool[index].state {
+		case ldapStateClosed:
+			counts["closed"]++
+		case ldapStateFree:
+			counts["free"]++
+		case ldapStateBusy:
+			counts["busy"]++
+		}
+		ldapPool[index].Mu.Unlock()
+	}
+
+	for state, count := range counts {
+		obs.SetLDAPPoolConnections(state, count)
 	}
 }
 
@@ -651,6 +791,7 @@ func ldapWorker(ctx context.Context) {
 				ldapPool[index].state = ldapStateFree
 
 				ldapPool[index].Mu.Unlock()
+				recordLDAPPoolState(ldapPool)
 
 				ldapReply.err = nil
 				ldapReply.result = result

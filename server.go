@@ -17,6 +17,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -31,10 +32,22 @@ func clientConnections(listener net.Listener) chan net.Conn {
 	go func() {
 		for {
 			client, err := listener.Accept()
-			if client == nil {
+			if err != nil {
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveTCPConnection(context.Background(), eventAccept, resultError, 0)
+				}
+
 				level.Error(logger).Log("error", err.Error())
 
 				continue
+			}
+
+			if client == nil {
+				continue
+			}
+
+			if obs := currentObservability(); obs != nil {
+				obs.ObserveTCPConnection(context.Background(), eventAccept, resultOK, 1)
 			}
 
 			level.Debug(logger).Log("msg", "Client connected", "client_ip", client.RemoteAddr().String())
@@ -48,6 +61,12 @@ func clientConnections(listener net.Listener) chan net.Conn {
 
 //goland:noinspection GoUnhandledErrorResult
 func handleConnection(client net.Conn) {
+	defer func() {
+		if obs := currentObservability(); obs != nil {
+			obs.ObserveTCPConnection(context.Background(), eventClose, resultOK, -1)
+		}
+	}()
+
 	b := bufio.NewReader(client)
 	policyRequest := make(map[string]string)
 
@@ -72,7 +91,7 @@ func handleConnection(client net.Conn) {
 				policyResponse *PolicyResponse
 			)
 
-			policyResponse, err = getPolicyResponse(policyRequest, ksuid.New().String(), false)
+			policyResponse, err = getObservedPolicyResponse(context.Background(), sourcePostfixTCP, policyRequest, ksuid.New().String(), false)
 
 			if err != nil {
 				prefix = "DEFER "

@@ -279,6 +279,15 @@ func waitForShutdownSignal(sigs chan os.Signal) {
 
 	level.Info(logger).Log("msg", "Shutting down geoip-policyd", "signal", sig)
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if obs := currentObservability(); obs != nil {
+		if err := obs.Shutdown(shutdownCtx); err != nil {
+			_ = level.Error(logger).Log("msg", "Unable to flush observability providers", "error", err.Error())
+		}
+	}
+
 	os.Exit(0)
 }
 
@@ -295,9 +304,29 @@ func configureRedis(redisLogger *RedisLogger) {
 		redisHandleReplica = redisHandle
 	}
 
+	if obs := currentObservability(); obs != nil {
+		obs.InstrumentRedisClient(redisHandle, "primary")
+
+		if redisHandleReplica != redisHandle {
+			obs.InstrumentRedisClient(redisHandleReplica, "replica")
+		}
+	}
+
 	customSettingsService := NewCustomSettingsService(config, redisHandle, logger)
 	storeCustomSettings(customSettingsService.Load())
 	level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
+}
+
+// initializeObservability builds the configured metrics and tracing runtime.
+func initializeObservability() error {
+	observabilityRuntime, err := NewObservability(context.Background(), config.Observability, version, logger)
+	if err != nil {
+		return err
+	}
+
+	config.observabilityRuntime = observabilityRuntime
+
+	return nil
 }
 
 // setupGeoIP initializes the GeoIP database reader by opening the specified GeoIP database file.
@@ -437,6 +466,10 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 		fileInfo, err := os.Stat(config.GeoipPath)
 
 		if err != nil {
+			if obs := currentObservability(); obs != nil {
+				obs.ObserveGeoIPReload(context.Background(), resultStatError)
+			}
+
 			level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
 
 			continue
@@ -449,9 +482,17 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 
 			reader, err := maxminddb.Open(config.GeoipPath)
 			if err != nil {
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveGeoIPReload(context.Background(), resultError)
+				}
+
 				level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
 				geoIP.SwapReader(nil)
 			} else {
+				if obs := currentObservability(); obs != nil {
+					obs.ObserveGeoIPReload(context.Background(), resultOK)
+				}
+
 				geoIP.SwapReader(reader)
 			}
 		}
@@ -473,6 +514,12 @@ func main() {
 
 	initializeLogger()
 	setTimeZone()
+
+	if config.CommandServer {
+		if err := initializeObservability(); err != nil {
+			stdLibLog.Fatalln(err)
+		}
+	}
 
 	go waitForShutdownSignal(sigs)
 

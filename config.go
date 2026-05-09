@@ -44,6 +44,8 @@ const (
 	httpPort       = 8080
 	httpX509Cert   = "/localhost.pem"
 	httpX509Key    = "/localhost-key.pem"
+	prometheusPath = "/metrics"
+	otelService    = "geoip-policyd"
 	ldapPoolSize   = 10
 	ldapMaxRetries = 9
 	mailPort       = 587
@@ -143,10 +145,32 @@ type CmdLineConfig struct {
 	// ForceUserKnown represents a boolean flag indicating whether the user is known or not.
 	ForceUserKnown bool
 
+	// Observability contains Prometheus and OpenTelemetry runtime settings.
+	Observability ObservabilityConfig
+
 	// policySettings caches policy limits and matchers derived from static configuration.
 	policySettings *PolicySettings
 	// ignoreNetworkMatcher caches parsed ignore-network entries for request-time checks.
 	ignoreNetworkMatcher *NetworkMatcher
+	// observabilityRuntime owns metrics, tracing providers, and shutdown behavior.
+	observabilityRuntime *Observability
+}
+
+// ObservabilityConfig contains Prometheus and OpenTelemetry operator settings.
+type ObservabilityConfig struct {
+	PrometheusEnabled        bool
+	PrometheusPath           string
+	PrometheusRuntimeMetrics bool
+
+	OTelEnabled        bool
+	OTelTracesEnabled  bool
+	OTelMetricsEnabled bool
+	OTelServiceName    string
+	OTelServiceVersion string
+	OTLPEndpoint       string
+	OTLPHeaders        map[string]string
+	OTLPInsecure       bool
+	OTelSampleRatio    float64
 }
 
 type CustomSettings struct {
@@ -179,7 +203,7 @@ func (c *CmdLineConfig) String() string {
 
 	for index := 0; index < value.NumField(); index++ {
 		switch typeOfC.Field(index).Name {
-		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel", "policySettings", "ignoreNetworkMatcher":
+		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel", "Observability", "policySettings", "ignoreNetworkMatcher", "observabilityRuntime":
 			continue
 		default:
 			_, _ = fmt.Fprintf(&result, " %s='%v'", typeOfC.Field(index).Name, value.Field(index).Interface())
@@ -201,6 +225,32 @@ func splitComma(s string) []string {
 	}
 
 	return parts
+}
+
+// parseOTLPHeaders converts comma-separated key=value pairs into OTLP HTTP headers.
+func parseOTLPHeaders(raw string) map[string]string {
+	headers := make(map[string]string)
+	if raw == "" {
+		return headers
+	}
+
+	for part := range strings.SplitSeq(raw, ",") {
+		keyValue := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(keyValue) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(keyValue[0])
+		value := strings.TrimSpace(keyValue[1])
+
+		if key == "" {
+			continue
+		}
+
+		headers[key] = value
+	}
+
+	return headers
 }
 
 //nolint:gocognit,gocyclo,maintidx // Ignore complexity
@@ -282,6 +332,18 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerHTTPBasicAuthPassword := flags.String("http-basic-auth-password", "", "HTTP basic auth password")
 	argServerHTTPTLSCert := flags.String("http-tls-cert", httpX509Cert, "HTTP TLS server certificate (full chain)")
 	argServerHTTPTLSKey := flags.String("http-tls-key", httpX509Key, "HTTP TLS server key")
+	argServerPrometheusEnabled := flags.Bool("prometheus-enabled", false, "Enable Prometheus metrics on the HTTP service")
+	argServerPrometheusPath := flags.String("prometheus-path", prometheusPath, "HTTP path for Prometheus metrics")
+	argServerPrometheusRuntimeMetrics := flags.Bool("prometheus-runtime-metrics", true, "Include Go runtime and process metrics")
+	argServerOTelEnabled := flags.Bool("otel-enabled", false, "Enable OpenTelemetry export")
+	argServerOTelTracesEnabled := flags.Bool("otel-traces-enabled", true, "Export OpenTelemetry traces when OTel is enabled")
+	argServerOTelMetricsEnabled := flags.Bool("otel-metrics-enabled", true, "Export OpenTelemetry metrics when OTel is enabled")
+	argServerOTelServiceName := flags.String("otel-service-name", otelService, "OpenTelemetry service.name resource attribute")
+	argServerOTelServiceVersion := flags.String("otel-service-version", "", "OpenTelemetry service.version resource attribute")
+	argServerOTLPEndpoint := flags.String("otel-exporter-otlp-endpoint", "", "OTLP HTTP endpoint URL")
+	argServerOTLPHeaders := flags.String("otel-exporter-otlp-headers", "", "Comma-separated OTLP HTTP headers as key=value pairs")
+	argServerOTLPInsecure := flags.Bool("otel-exporter-otlp-insecure", true, "Use insecure OTLP HTTP transport")
+	argServerOTelSampleRatio := flags.Float64("otel-sample-ratio", 1.0, "OpenTelemetry trace sampling ratio between 0.0 and 1.0")
 	argServerUseCDB := flags.Bool("use-cdb", false, "Enable CDB support")
 	argServerCDBPath := flags.String("cdb-path", "", "Full path to the cdb file")
 	argServerUseLDAP := flags.Bool("use-ldap", false, "Enable LDAP support")
@@ -506,6 +568,43 @@ func (c *CmdLineConfig) Init(args []string) {
 			v.SetDefault("http_tls_key", *argServerHTTPTLSKey)
 			c.HTTPApp.x509.key = v.GetString("http_tls_key")
 		}
+
+		// --- Observability ---
+		v.SetDefault("prometheus_enabled", *argServerPrometheusEnabled)
+		c.Observability.PrometheusEnabled = v.GetBool("prometheus_enabled")
+
+		v.SetDefault("prometheus_path", *argServerPrometheusPath)
+		c.Observability.PrometheusPath = v.GetString("prometheus_path")
+
+		v.SetDefault("prometheus_runtime_metrics", *argServerPrometheusRuntimeMetrics)
+		c.Observability.PrometheusRuntimeMetrics = v.GetBool("prometheus_runtime_metrics")
+
+		v.SetDefault("otel_enabled", *argServerOTelEnabled)
+		c.Observability.OTelEnabled = v.GetBool("otel_enabled")
+
+		v.SetDefault("otel_traces_enabled", *argServerOTelTracesEnabled)
+		c.Observability.OTelTracesEnabled = v.GetBool("otel_traces_enabled")
+
+		v.SetDefault("otel_metrics_enabled", *argServerOTelMetricsEnabled)
+		c.Observability.OTelMetricsEnabled = v.GetBool("otel_metrics_enabled")
+
+		v.SetDefault("otel_service_name", *argServerOTelServiceName)
+		c.Observability.OTelServiceName = v.GetString("otel_service_name")
+
+		v.SetDefault("otel_service_version", *argServerOTelServiceVersion)
+		c.Observability.OTelServiceVersion = v.GetString("otel_service_version")
+
+		v.SetDefault("otel_exporter_otlp_endpoint", *argServerOTLPEndpoint)
+		c.Observability.OTLPEndpoint = v.GetString("otel_exporter_otlp_endpoint")
+
+		v.SetDefault("otel_exporter_otlp_headers", *argServerOTLPHeaders)
+		c.Observability.OTLPHeaders = parseOTLPHeaders(v.GetString("otel_exporter_otlp_headers"))
+
+		v.SetDefault("otel_exporter_otlp_insecure", *argServerOTLPInsecure)
+		c.Observability.OTLPInsecure = v.GetBool("otel_exporter_otlp_insecure")
+
+		v.SetDefault("otel_sample_ratio", *argServerOTelSampleRatio)
+		c.Observability.OTelSampleRatio = v.GetFloat64("otel_sample_ratio")
 
 		// --- CDB ---
 		v.SetDefault("use_cdb", *argServerUseCDB)

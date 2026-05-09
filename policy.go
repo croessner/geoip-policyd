@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -30,6 +31,8 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -522,12 +525,32 @@ func checkIgnoreNets(ignoreNets []string, clientIP, guid string) bool {
 // with the GUID and the sender's name. It then returns true with nil error.
 // If the UseLDAP configuration value is false, the function returns false with nil error.
 func checkUserInLDAP(sender, guid string) (bool, error) {
+	return checkUserInLDAPContext(context.Background(), sender, guid)
+}
+
+// checkUserInLDAPContext checks LDAP user state while preserving trace context for the request.
+func checkUserInLDAPContext(ctx context.Context, sender, guid string) (bool, error) {
 	if !config.UseLDAP {
 		return false, nil
 	}
 
+	start := time.Now()
+	result := resultUnknown
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "ldap.user_check", attribute.String("ldap.operation", "user_check"))
+		defer span.End()
+		defer func() {
+			obs.ObserveLDAPOperation(ctx, "user_check", result, time.Since(start))
+		}()
+	}
+
 	ldapReplyChan := make(chan *LdapReply)
 	ldapRequest := &LdapRequest{
+		ctx:       ctx,
 		username:  sender,
 		guid:      &guid,
 		replyChan: ldapReplyChan,
@@ -540,9 +563,16 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 	if ldapReply.err != nil {
 		var ldapError *ldap.Error
 		if errors.As(ldapReply.err, &ldapError) && ldapError.ResultCode == uint16(ldap.LDAPResultNoSuchObject) {
+			result = resultNotFound
 			level.Info(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' does not exist", sender))
 
 			return false, nil
+		}
+
+		result = resultError
+
+		if obs != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), ldapReply.err)
 		}
 
 		level.Error(logger).Log("guid", guid, "error", ldapReply.err.Error())
@@ -550,13 +580,14 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 		return true, ldapReply.err
 	}
 
-	if resultAttr, mapKeyFound := ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+	if _, mapKeyFound := ldapReply.result[config.SearchAttributes[ldapSingleValue]]; mapKeyFound {
+		result = resultFound
 		level.Debug(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' found in LDAP", sender))
-
-		sender = resultAttr[ldapSingleValue].(string)
 
 		return true, nil
 	}
+
+	result = resultNotFound
 
 	return false, nil
 }
@@ -571,17 +602,43 @@ func checkUserInLDAP(sender, guid string) (bool, error) {
 // The function returns an error if there is an error while getting the user data from the CDB.
 // If the UseCDB configuration value is false, the function returns false and nil error.
 func checkUserInCDB(sender string, guid string) (bool, error) {
+	return checkUserInCDBContext(context.Background(), sender, guid)
+}
+
+// checkUserInCDBContext checks CDB user state while preserving trace context for the request.
+func checkUserInCDBContext(ctx context.Context, sender string, guid string) (bool, error) {
 	if !config.UseCDB {
 		return false, nil
+	}
+
+	start := time.Now()
+	result := resultNotFound
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx, "cdb.lookup", attribute.String("cdb.operation", "get"))
+		defer span.End()
+		defer func() {
+			obs.ObserveCDBLookup(ctx, result, time.Since(start))
+		}()
 	}
 
 	if db := cdbStore.Load().(*cdb.CDB); db != nil {
 		value, err := db.Get([]byte(sender))
 		if err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return false, err
 		}
 
 		if value != nil {
+			result = resultFound
 			level.Debug(logger).Log("guid", guid, "msg", fmt.Sprintf("User '%s' found in CDB", sender))
 
 			return true, nil
@@ -596,6 +653,11 @@ func checkUserInCDB(sender string, guid string) (bool, error) {
 // If the object is found in Redis, it is unmarshaled into a RemoteClient object.
 // The function returns the fetched RemoteClient object and any encountered errors.
 func fetchRemoteClient(sender string) (*RemoteClient, error) {
+	return fetchRemoteClientContext(context.Background(), sender)
+}
+
+// fetchRemoteClientContext loads the cached policy state with the request context.
+func fetchRemoteClientContext(ctx context.Context, sender string) (*RemoteClient, error) {
 	key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
 	remoteClient := &RemoteClient{}
 
@@ -831,17 +893,22 @@ func evaluatePolicy(remoteClient *RemoteClient, trustedIPs, trustedCountries []s
 // If the user is not known in CDB, it returns false and nil error.
 // If there is an error while checking in LDAP or CDB, it returns false and the error.
 func checkUserKnown(sender, guid string) (bool, error) {
+	return checkUserKnownContext(context.Background(), sender, guid)
+}
+
+// checkUserKnownContext checks all configured user directories with request context propagation.
+func checkUserKnownContext(ctx context.Context, sender, guid string) (bool, error) {
 	if config.ForceUserKnown {
 		return true, nil
 	}
 
-	userKnown, err := checkUserInLDAP(sender, guid)
+	userKnown, err := checkUserInLDAPContext(ctx, sender, guid)
 	if err != nil {
 		return false, err
 	}
 
 	if !userKnown {
-		userKnown, err = checkUserInCDB(sender, guid)
+		userKnown, err = checkUserInCDBContext(ctx, sender, guid)
 		if err != nil {
 			return false, err
 		}
@@ -854,7 +921,12 @@ func checkUserKnown(sender, guid string) (bool, error) {
 // logs the client details and country details using the provided sender, client IP, country code, and GUID.
 // It returns the fetched remote client and any errors encountered.
 func fetchAndLogRemoteClient(sender, clientIP, countryCode, guid string) (*RemoteClient, error) {
-	remoteClient, err := fetchRemoteClient(sender)
+	return fetchAndLogRemoteClientContext(context.Background(), sender, clientIP, countryCode, guid)
+}
+
+// fetchAndLogRemoteClientContext fetches cached state with request context propagation.
+func fetchAndLogRemoteClientContext(ctx context.Context, sender, clientIP, countryCode, guid string) (*RemoteClient, error) {
+	remoteClient, err := fetchRemoteClientContext(ctx, sender)
 	if err != nil {
 		return nil, err
 	}
@@ -871,8 +943,13 @@ func fetchAndLogRemoteClient(sender, clientIP, countryCode, guid string) (*Remot
 // If runOperatorAction returns an error, it logs the error message with the guid value.
 // Note that handleClientActions does not return any value.
 func handleClientActions(remoteClient *RemoteClient, sender string, userKnown bool, guid string, requireActions bool) {
+	handleClientActionsContext(context.Background(), remoteClient, sender, userKnown, guid, requireActions)
+}
+
+// handleClientActionsContext runs side-effect actions with request context propagation.
+func handleClientActionsContext(ctx context.Context, remoteClient *RemoteClient, sender string, userKnown bool, guid string, requireActions bool) {
 	if config.RunActions && requireActions {
-		err := runOperatorAction(remoteClient, sender, userKnown, guid)
+		err := runOperatorActionContext(ctx, remoteClient, sender, userKnown, guid)
 		if err != nil {
 			level.Error(logger).Log("guid", guid, "error", err.Error())
 		}
@@ -886,9 +963,34 @@ func handleClientActions(remoteClient *RemoteClient, sender string, userKnown bo
 // After successfully running the action, the "operator" action is appended to the actions list of the remote client.
 // Returns nil if the action is not run or if it is run successfully.
 func runOperatorAction(remoteClient *RemoteClient, sender string, userKnown bool, guid string) error {
+	return runOperatorActionContext(context.Background(), remoteClient, sender, userKnown, guid)
+}
+
+// runOperatorActionContext processes the operator action with metrics and tracing.
+func runOperatorActionContext(ctx context.Context, remoteClient *RemoteClient, sender string, userKnown bool, guid string) error {
 	if userKnown && config.RunActionOperator && shouldRunOperator(remoteClient) {
 		action := &EmailOperator{}
+		start := time.Now()
+		result := resultOK
+
+		obs := currentObservability()
+		if obs != nil {
+			var span trace.Span
+
+			ctx, span = obs.StartSpan(ctx, "action.operator", attribute.String("action.name", "operator"))
+			defer span.End()
+			defer func() {
+				obs.ObserveAction(ctx, "operator", result, time.Since(start))
+			}()
+		}
+
 		if err := action.Call(sender); err != nil {
+			result = resultError
+
+			if obs != nil {
+				obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+			}
+
 			return err
 		}
 
@@ -933,6 +1035,11 @@ func newRedisCacheWritePlan(config *CmdLineConfig, remoteClient *RemoteClient) r
 // configuration value. If the RemoteClient is locked, it additionally persists the cache entry.
 // It returns an error if any of the Redis operations fail.
 func updateRedisCache(sender string, remoteClient *RemoteClient) error {
+	return updateRedisCacheContext(context.Background(), sender, remoteClient)
+}
+
+// updateRedisCacheContext stores policy state in Redis with request context propagation.
+func updateRedisCacheContext(ctx context.Context, sender string, remoteClient *RemoteClient) error {
 	redisValue, err := json.Marshal(remoteClient)
 	if err != nil {
 		return err
@@ -1158,7 +1265,7 @@ func getActionStatus(policyResponse *PolicyResponse) string {
 		return rejectText
 	}
 
-	return "ok"
+	return resultOK
 }
 
 // setCurrentClientInfo sets the current client IP and country code in the PolicyResponse object.
@@ -1170,14 +1277,18 @@ func setCurrentClientInfo(ip string, code string, policyResponse *PolicyResponse
 	policyResponse.currentCountryCode = code
 }
 
-// getPolicyResponse preserves the map-based API used by the socket server and delegates to the typed hotpath.
-func getPolicyResponse(policyRequest map[string]string, guid string, info bool) (policyResponse *PolicyResponse, err error) {
+// getObservedPolicyResponse records source-level policy request metrics around the map-based API.
+func getObservedPolicyResponse(ctx context.Context, source string, policyRequest map[string]string, guid string, info bool) (policyResponse *PolicyResponse, err error) {
 	policyInput, err := NewPolicyInputFromMap(policyRequest)
 	if err != nil {
+		if obs := currentObservability(); obs != nil {
+			obs.ObservePolicyRequest(ctx, source, resultError, 0)
+		}
+
 		return nil, err
 	}
 
-	return getPolicyResponseFor(policyInput, guid, info)
+	return getObservedPolicyResponseFor(ctx, source, policyInput, guid, info)
 }
 
 // isIgnoredPolicyInput marks whitelisted requests and logs the matched ignore-network entry when info logging is active.
@@ -1214,12 +1325,17 @@ func effectivePolicySettings(sender string) *PolicySettings {
 
 // fetchPolicySubject loads user-known state and current Redis policy state for a sender.
 func fetchPolicySubject(sender, clientIP, countryCode, guid string) (bool, *RemoteClient, bool, error) {
-	userKnown, err := checkUserKnown(sender, guid)
+	return fetchPolicySubjectContext(context.Background(), sender, clientIP, countryCode, guid)
+}
+
+// fetchPolicySubjectContext loads user-known state and current Redis policy state with request context propagation.
+func fetchPolicySubjectContext(ctx context.Context, sender, clientIP, countryCode, guid string) (bool, *RemoteClient, bool, error) {
+	userKnown, err := checkUserKnownContext(ctx, sender, guid)
 	if err != nil {
 		return false, nil, true, err
 	}
 
-	remoteClient, err := fetchAndLogRemoteClient(sender, clientIP, countryCode, guid)
+	remoteClient, err := fetchAndLogRemoteClientContext(ctx, sender, clientIP, countryCode, guid)
 	if err != nil {
 		return false, nil, false, err
 	}
@@ -1229,14 +1345,19 @@ func fetchPolicySubject(sender, clientIP, countryCode, guid string) (bool, *Remo
 
 // finalizePolicyDecision runs side effects and response enrichment after policy evaluation.
 func finalizePolicyDecision(sender string, remoteClient *RemoteClient, policyResponse *PolicyResponse, userKnown, requireActions bool, guid string) error {
+	return finalizePolicyDecisionContext(context.Background(), sender, remoteClient, policyResponse, userKnown, requireActions, guid)
+}
+
+// finalizePolicyDecisionContext runs side effects and response enrichment with request context propagation.
+func finalizePolicyDecisionContext(ctx context.Context, sender string, remoteClient *RemoteClient, policyResponse *PolicyResponse, userKnown, requireActions bool, guid string) error {
 	if remoteClient.Locked {
 		policyResponse.fired = true
 		requireActions = true
 	}
 
-	handleClientActions(remoteClient, sender, userKnown, guid, requireActions)
+	handleClientActionsContext(ctx, remoteClient, sender, userKnown, guid, requireActions)
 
-	if err := updateRedisCache(sender, remoteClient); err != nil {
+	if err := updateRedisCacheContext(ctx, sender, remoteClient); err != nil {
 		return err
 	}
 
@@ -1250,7 +1371,63 @@ func finalizePolicyDecision(sender string, remoteClient *RemoteClient, policyRes
 // processes client data, and applies custom settings to determine policy actions.
 // Returns a pointer to PolicyResponse and an error if any issue occurs during processing.
 // If info is true, it only determines the country code and returns early with just the necessary data.
-func getPolicyResponseFor(policyInput PolicyInput, guid string, info bool) (policyResponse *PolicyResponse, err error) {
+// getObservedPolicyResponseFor records source-level policy request metrics around the typed API.
+func getObservedPolicyResponseFor(ctx context.Context, source string, policyInput PolicyInput, guid string, info bool) (policyResponse *PolicyResponse, err error) {
+	start := time.Now()
+
+	obs := currentObservability()
+	if obs != nil {
+		var span trace.Span
+
+		ctx, span = obs.StartSpan(ctx,
+			"policy.request",
+			attribute.String("policy.source", source),
+			attribute.Bool("policy.info_only", info),
+		)
+		defer span.End()
+	}
+
+	policyResponse, err = getPolicyResponseForContext(ctx, policyInput, guid, info)
+	outcome := policyOutcome(policyResponse, err, info)
+
+	if obs != nil {
+		obs.ObservePolicyRequest(ctx, source, outcome, time.Since(start))
+
+		if err != nil {
+			obs.RecordSpanError(trace.SpanFromContext(ctx), err)
+		}
+	}
+
+	return policyResponse, err
+}
+
+// policyOutcome normalizes a policy response into low-cardinality metric labels.
+func policyOutcome(policyResponse *PolicyResponse, err error, info bool) string {
+	if err != nil {
+		return resultError
+	}
+
+	if policyResponse == nil {
+		return resultEmpty
+	}
+
+	if policyResponse.whitelisted {
+		return resultWhitelist
+	}
+
+	if info {
+		return resultInfo
+	}
+
+	if policyResponse.fired {
+		return resultReject
+	}
+
+	return resultAccept
+}
+
+// getPolicyResponseForContext evaluates a typed policy request with request context propagation.
+func getPolicyResponseForContext(ctx context.Context, policyInput PolicyInput, guid string, info bool) (policyResponse *PolicyResponse, err error) {
 	policyResponse = &PolicyResponse{}
 
 	if err = policyInput.Validate(); err != nil {
@@ -1264,7 +1441,7 @@ func getPolicyResponseFor(policyInput PolicyInput, guid string, info bool) (poli
 		return
 	}
 
-	countryCode := getCountryCode(clientIP)
+	countryCode := getCountryCodeWithContext(ctx, clientIP)
 
 	setCurrentClientInfo(clientIP, countryCode, policyResponse)
 
@@ -1273,7 +1450,7 @@ func getPolicyResponseFor(policyInput PolicyInput, guid string, info bool) (poli
 		return policyResponse, nil
 	}
 
-	userKnown, remoteClient, keepResponseOnError, err := fetchPolicySubject(sender, clientIP, countryCode, guid)
+	userKnown, remoteClient, keepResponseOnError, err := fetchPolicySubjectContext(ctx, sender, clientIP, countryCode, guid)
 	if err != nil {
 		if keepResponseOnError {
 			return policyResponse, err
@@ -1285,7 +1462,7 @@ func getPolicyResponseFor(policyInput PolicyInput, guid string, info bool) (poli
 	policySettings := effectivePolicySettings(sender)
 	requireActions := policySettings.Evaluate(remoteClient, countryCode, policyResponse, clientIP, guid)
 
-	if err = finalizePolicyDecision(sender, remoteClient, policyResponse, userKnown, requireActions, guid); err != nil {
+	if err = finalizePolicyDecisionContext(ctx, sender, remoteClient, policyResponse, userKnown, requireActions, guid); err != nil {
 		return nil, err
 	}
 

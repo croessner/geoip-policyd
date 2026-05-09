@@ -171,6 +171,10 @@ func (h *HTTP) GETReload() {
 
 	reader, err := maxminddb.Open(config.GeoipPath)
 	if err != nil {
+		if obs := currentObservability(); obs != nil {
+			obs.ObserveGeoIPReload(h.request.Context(), resultError)
+		}
+
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
@@ -178,6 +182,10 @@ func (h *HTTP) GETReload() {
 	}
 
 	geoIP.SwapReader(reader)
+
+	if obs := currentObservability(); obs != nil {
+		obs.ObserveGeoIPReload(h.request.Context(), resultOK)
+	}
 
 	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
 
@@ -278,6 +286,7 @@ func (h *HTTP) POSTRemove() {
 
 			ldapRequest = &LdapRequest{}
 
+			ldapRequest.ctx = h.request.Context()
 			ldapRequest.username = sender
 			ldapRequest.guid = &h.guid
 			ldapRequest.replyChan = ldapReplyChan
@@ -340,7 +349,7 @@ func (h *HTTP) POSTQuery() {
 		}
 
 		info := h.request.URL.Query().Get("info") == "1"
-		policyResponse, policyErr = getPolicyResponseFor(policyInput, h.guid, info)
+		policyResponse, policyErr = getObservedPolicyResponseFor(h.request.Context(), sourceRestQuery, policyInput, h.guid, info)
 	} else {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoClient)
@@ -485,14 +494,14 @@ func (h *HTTP) POSTDovecotPolicy() {
 	infoParam := h.request.URL.Query().Get("info")
 	info := infoParam == "1"
 
-	policyResponse, err = getPolicyResponse(policyRequest, h.guid, info)
+	policyResponse, err = getObservedPolicyResponse(h.request.Context(), sourceDovecot, policyRequest, h.guid, info)
 
 	if err == nil {
 		if policyResponse.fired {
 			result = rejectText
 			resultCode = DovecotPolicyReject
 		} else {
-			result = "ok"
+			result = resultOK
 			resultCode = DovecotPolicyAccept
 		}
 	} else {
@@ -857,14 +866,29 @@ func (a *HTTPApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 func httpApp() {
 	var err error
 
-	app := &config.HTTPApp
+	var (
+		app         = &config.HTTPApp
+		mux         = http.NewServeMux()
+		rootHandler = http.Handler(http.HandlerFunc(app.httpRootPage))
+	)
 
-	mux := http.NewServeMux()
 	if app.useBasicAuth {
-		mux.HandleFunc("/", app.basicAuth(app.httpRootPage))
-	} else {
-		mux.HandleFunc("/", app.httpRootPage)
+		rootHandler = http.HandlerFunc(app.basicAuth(rootHandler.ServeHTTP))
 	}
+
+	if obs := currentObservability(); obs != nil {
+		rootHandler = obs.InstrumentHTTP(rootHandler)
+		if obs.PrometheusEnabled() {
+			metricsHandler := obs.PrometheusHandler()
+			if app.useBasicAuth {
+				metricsHandler = http.HandlerFunc(app.basicAuth(metricsHandler.ServeHTTP))
+			}
+
+			mux.Handle(obs.PrometheusPath(), metricsHandler)
+		}
+	}
+
+	mux.Handle("/", rootHandler)
 
 	www := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", config.HTTPAddress, config.HTTPPort),
