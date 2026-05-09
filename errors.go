@@ -25,19 +25,6 @@ var (
 	errMacroPercentSOnce = errors.New("email message file must contain exactly one '%%s' macro for the sender")
 )
 
-// config.
-var (
-	errNotIPOrHostname    = errors.New("argument is not a valid IP address or hostname")
-	errNotInteger         = errors.New("argument is not an integer")
-	errNotValidPortNumber = errors.New("argument is not a valid port number")
-	errFileNotFound       = errors.New("file not found")
-	errMaxCountries       = errors.New("argument must be an unsigned integer and greater or equal than 0")
-	errMaxIPs             = errors.New("argument must be an unsigned integer")
-	errPoolSize           = errors.New("argument must be an unsigned integer and not 0")
-	errIdlePoolSize       = errors.New("argument must be an unsigned integer")
-	errLDAPScope          = errors.New("argument must be one of: 'one', 'base' or 'sub'")
-)
-
 // ldap.
 var errLDAPConnect = errors.New("could not connect to any LDAP servers")
 
@@ -47,7 +34,6 @@ var (
 	errValueMustBeString       = errors.New("value must be string")
 	errValueMustNotBeEmpty     = errors.New("value must not be empty")
 	errUnknownKey              = errors.New("unknown key")
-	errValueFormat             = errors.New("wrong value format")
 	errNoAddressNORSender      = errors.New("value does not contain a valid 'address' and 'sender' fields")
 	errNoClient                = errors.New("key does not contain 'client' value")
 	errCommentNotString        = errors.New("'comment' is not a string")

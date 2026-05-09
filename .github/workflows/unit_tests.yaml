@@ -28,5 +28,3 @@ jobs:
 
       - name: Guardrails
         run: make guardrails
-        env:
-          GOLANGCI_NEW_FROM_REV: HEAD~

@@ -257,7 +257,7 @@ func setTimeZone() {
 	if tz := os.Getenv("TZ"); tz != "" {
 		loc, err := time.LoadLocation(tz)
 		if err != nil {
-			level.Error(logger).Log("error", fmt.Sprintf("Error loading location '%s': %v", tz, err.Error()))
+			_ = level.Error(logger).Log("error", fmt.Sprintf("Error loading location '%s': %v", tz, err.Error()))
 		} else {
 			time.Local = loc
 		}
@@ -277,7 +277,7 @@ func setTimeZone() {
 func waitForShutdownSignal(sigs chan os.Signal) {
 	sig := <-sigs
 
-	level.Info(logger).Log("msg", "Shutting down geoip-policyd", "signal", sig)
+	_ = level.Info(logger).Log("msg", "Shutting down geoip-policyd", "signal", sig)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -314,7 +314,8 @@ func configureRedis(redisLogger *RedisLogger) {
 
 	customSettingsService := NewCustomSettingsService(config, redisHandle, logger)
 	storeCustomSettings(customSettingsService.Load())
-	level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
+
+	_ = level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
 }
 
 // initializeObservability builds the configured metrics and tracing runtime.
@@ -427,7 +428,7 @@ func startCommandServer() {
 //
 // The function does not provide an example of usage as it is typically used internally in the application.
 func handleFileError(msg string, err error) {
-	level.Error(logger).Log("msg", msg, "error", err.Error())
+	_ = level.Error(logger).Log("msg", msg, "error", err.Error())
 
 	panic(err.Error())
 }
@@ -438,7 +439,7 @@ func handleFileError(msg string, err error) {
 func initializeCDB(cdbPath string) *cdb.CDB {
 	db, err := cdb.Open(cdbPath)
 	if err != nil {
-		level.Error(logger).Log("msg", "Unable to open CDB file", "error", err.Error())
+		_ = level.Error(logger).Log("msg", "Unable to open CDB file", "error", err.Error())
 
 		return nil
 	}
@@ -464,19 +465,18 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 	ticker := time.NewTicker(300 * time.Second)
 	for range ticker.C {
 		fileInfo, err := os.Stat(config.GeoipPath)
-
 		if err != nil {
 			if obs := currentObservability(); obs != nil {
 				obs.ObserveGeoIPReload(context.Background(), resultStatError)
 			}
 
-			level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
+			_ = level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
 
 			continue
 		}
 
 		if !fileInfo.ModTime().Equal(lastModTime) {
-			level.Info(logger).Log("msg", "GeoIP database file has changed")
+			_ = level.Info(logger).Log("msg", "GeoIP database file has changed")
 
 			lastModTime = fileInfo.ModTime()
 
@@ -486,7 +486,8 @@ func autoReloadGeoIP(geoIP *GeoIP) {
 					obs.ObserveGeoIPReload(context.Background(), resultError)
 				}
 
-				level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
+				_ = level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
+
 				geoIP.SwapReader(nil)
 			} else {
 				if obs := currentObservability(); obs != nil {

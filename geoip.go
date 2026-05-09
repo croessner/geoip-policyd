@@ -74,7 +74,8 @@ func (g *GeoIP) LookupCountryCodeContext(ctx context.Context, ipAddress string) 
 
 	if g == nil || g.reader.Load() == nil {
 		result = resultUnavailable
-		level.Error(logger).Log("error", "no GeoIP database file available")
+
+		_ = level.Error(logger).Log("error", "no GeoIP database file available")
 
 		return ""
 	}
@@ -141,11 +142,6 @@ func (g *GeoIP) closeReaderAfterGrace(reader *maxminddb.Reader) {
 
 		_ = reader.Close()
 	}()
-}
-
-// getCountryCode returns the ISO code of the country associated with the given IP address.
-func getCountryCode(ipAddress string) string {
-	return geoIP.LookupCountryCode(ipAddress)
 }
 
 // getCountryCodeWithContext returns the ISO code with request context propagation.

@@ -60,6 +60,12 @@ const (
 )
 
 const (
+	verboseNameNone  = "none"
+	verboseNameInfo  = resultInfo
+	verboseNameDebug = "debug"
+)
+
+const (
 	BASE = "base"
 	ONE  = "one"
 	SUB  = "sub"
@@ -253,7 +259,7 @@ func parseOTLPHeaders(raw string) map[string]string {
 	return headers
 }
 
-//nolint:gocognit,gocyclo,maintidx // Ignore complexity
+//nolint:funlen,gocognit,gocyclo,maintidx // Flag registration is intentionally centralized.
 func (c *CmdLineConfig) Init(args []string) {
 	// Detect "server" subcommand (must appear before any flags).
 	subCmdIdx := -1
@@ -413,23 +419,23 @@ func (c *CmdLineConfig) Init(args []string) {
 
 	switch *argVerbose {
 	case logLevelNone:
-		verbDefault = "none"
+		verbDefault = verboseNameNone
 	case logLevelInfo:
-		verbDefault = "info"
+		verbDefault = verboseNameInfo
 	case logLevelDebug:
-		verbDefault = "debug"
+		verbDefault = verboseNameDebug
 	default:
-		verbDefault = "info"
+		verbDefault = verboseNameInfo
 	}
 
 	v.SetDefault("verbose_level", verbDefault)
 
 	switch v.GetString("verbose_level") {
-	case "none":
+	case verboseNameNone:
 		c.VerboseLevel = logLevelNone
-	case "info":
+	case verboseNameInfo:
 		c.VerboseLevel = logLevelInfo
-	case "debug":
+	case verboseNameDebug:
 		c.VerboseLevel = logLevelDebug
 	}
 
@@ -548,25 +554,25 @@ func (c *CmdLineConfig) Init(args []string) {
 
 		// --- HTTP app ---
 		v.SetDefault("http_use_basic_auth", *argServerHTTPUseBasicAuth)
-		c.HTTPApp.useBasicAuth = v.GetBool("http_use_basic_auth")
+		c.useBasicAuth = v.GetBool("http_use_basic_auth")
 
-		if c.HTTPApp.useBasicAuth {
+		if c.useBasicAuth {
 			v.SetDefault("http_basic_auth_username", *argServerHTTPBasicAuthUsername)
-			c.HTTPApp.auth.username = v.GetString("http_basic_auth_username")
+			c.auth.username = v.GetString("http_basic_auth_username")
 
 			v.SetDefault("http_basic_auth_password", *argServerHTTPBasicAuthPassword)
-			c.HTTPApp.auth.password = v.GetString("http_basic_auth_password")
+			c.auth.password = v.GetString("http_basic_auth_password")
 		}
 
 		v.SetDefault("http_use_ssl", *argServerHTTPUseSSL)
-		c.HTTPApp.useSSL = v.GetBool("http_use_ssl")
+		c.useSSL = v.GetBool("http_use_ssl")
 
-		if c.HTTPApp.useSSL {
+		if c.useSSL {
 			v.SetDefault("http_tls_cert", *argServerHTTPTLSCert)
-			c.HTTPApp.x509.cert = v.GetString("http_tls_cert")
+			c.x509.cert = v.GetString("http_tls_cert")
 
 			v.SetDefault("http_tls_key", *argServerHTTPTLSKey)
-			c.HTTPApp.x509.key = v.GetString("http_tls_key")
+			c.x509.key = v.GetString("http_tls_key")
 		}
 
 		// --- Observability ---
@@ -624,54 +630,54 @@ func (c *CmdLineConfig) Init(args []string) {
 			v.SetDefault("ldap_server_uris", strings.Join(*argServerLDAPServerURIs, ","))
 
 			if urisStr := v.GetString("ldap_server_uris"); urisStr != "" {
-				c.LdapConf.ServerURIs = splitComma(urisStr)
+				c.ServerURIs = splitComma(urisStr)
 			} else {
-				c.LdapConf.ServerURIs = []string{}
+				c.ServerURIs = []string{}
 			}
 
 			v.SetDefault("ldap_basedn", *argServerLDAPBaseDN)
-			c.LdapConf.BaseDN = v.GetString("ldap_basedn")
+			c.BaseDN = v.GetString("ldap_basedn")
 
 			v.SetDefault("ldap_binddn", *argServerLDAPBindDN)
-			c.LdapConf.BindDN = v.GetString("ldap_binddn")
+			c.BindDN = v.GetString("ldap_binddn")
 
 			v.SetDefault("ldap_bindpw", *argServerLDAPBindPWPATH)
-			c.LdapConf.BindPW = v.GetString("ldap_bindpw")
+			c.BindPW = v.GetString("ldap_bindpw")
 
 			v.SetDefault("ldap_filter", *argServerLDAPFilter)
-			c.LdapConf.Filter = v.GetString("ldap_filter")
+			c.Filter = v.GetString("ldap_filter")
 
 			v.SetDefault("ldap_result_attribute", *argServerLDAPResultAttr)
-			c.LdapConf.SearchAttributes = []string{v.GetString("ldap_result_attribute")}
+			c.SearchAttributes = []string{v.GetString("ldap_result_attribute")}
 
 			v.SetDefault("ldap_starttls", *argServerLDAPStartTLS)
-			c.LdapConf.StartTLS = v.GetBool("ldap_starttls")
+			c.StartTLS = v.GetBool("ldap_starttls")
 
 			v.SetDefault("ldap_tls_skip_verify", *argServerLDAPTLSVerify)
-			c.LdapConf.TLSSkipVerify = v.GetBool("ldap_tls_skip_verify")
+			c.TLSSkipVerify = v.GetBool("ldap_tls_skip_verify")
 
 			v.SetDefault("ldap_tls_cafile", *argServerLDAPTLSCAFile)
-			c.LdapConf.TLSCAFile = v.GetString("ldap_tls_cafile")
+			c.TLSCAFile = v.GetString("ldap_tls_cafile")
 
 			v.SetDefault("ldap_tls_client_cert", *argServerLDAPTLSClientCert)
-			c.LdapConf.TLSClientCert = v.GetString("ldap_tls_client_cert")
+			c.TLSClientCert = v.GetString("ldap_tls_client_cert")
 
 			v.SetDefault("ldap_tls_client_key", *argServerLDAPTLSClientKey)
-			c.LdapConf.TLSClientKey = v.GetString("ldap_tls_client_key")
+			c.TLSClientKey = v.GetString("ldap_tls_client_key")
 
 			v.SetDefault("ldap_sasl_external", *argServerLDAPSASLExternal)
-			c.LdapConf.SASLExternal = v.GetBool("ldap_sasl_external")
+			c.SASLExternal = v.GetBool("ldap_sasl_external")
 
 			// LDAP scope (special: string base/one/sub → int)
 			v.SetDefault("ldap_scope", *argServerLDAPScope)
 
 			switch v.GetString("ldap_scope") {
 			case BASE:
-				c.LdapConf.Scope = ldap.ScopeBaseObject
+				c.Scope = ldap.ScopeBaseObject
 			case ONE:
-				c.LdapConf.Scope = ldap.ScopeSingleLevel
+				c.Scope = ldap.ScopeSingleLevel
 			case SUB:
-				c.LdapConf.Scope = ldap.ScopeWholeSubtree
+				c.Scope = ldap.ScopeWholeSubtree
 			default:
 				log.Fatalf("ldap-scope value '%s' must be one of: base, one, sub\n", v.GetString("ldap_scope"))
 			}
@@ -683,8 +689,8 @@ func (c *CmdLineConfig) Init(args []string) {
 			v.SetDefault("ldap_idle_pool_size", idleDefault)
 			v.SetDefault("ldap_pool_size", poolDefault)
 
-			c.LdapConf.IdlePoolSize = v.GetInt("ldap_idle_pool_size")
-			c.LdapConf.PoolSize = v.GetInt("ldap_pool_size")
+			c.IdlePoolSize = v.GetInt("ldap_idle_pool_size")
+			c.PoolSize = v.GetInt("ldap_pool_size")
 		}
 
 		// --- Actions ---
