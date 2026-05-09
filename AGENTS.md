@@ -18,6 +18,9 @@ whenever toolchain details change.
   when a reproducer is practical.
 - Keep runtime, Docker, systemd, and README changes aligned when operator-facing
   behavior changes.
+- Document new and changed `contrib/` helper scripts, endpoint test clients,
+  and operator-facing tooling in README, including purpose, defaults, commands,
+  and side effects.
 - Write code comments and technical documentation in English.
 - Document new and changed functions, methods, and cohesive runtime types with
   clear English comments, including unexported helpers. Comments should describe

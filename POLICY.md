@@ -17,6 +17,9 @@ These rules are mandatory for coding changes in this repository.
   practical.
 - MUST: Keep runtime, Docker, systemd, and README changes aligned when
   operator-facing behavior changes.
+- MUST: Document new and changed `contrib/` helper scripts, endpoint test
+  clients, and operator-facing tooling in README, including purpose, defaults,
+  commands, and side effects.
 - MUST: Write code comments and technical documentation in English.
 - MUST: Document new and changed functions, methods, and cohesive runtime types,
   including unexported helpers, with English comments that describe their
@@ -51,6 +54,9 @@ These rules are mandatory for coding changes in this repository.
 - [ ] New or changed runtime code follows the OOP, dependency-injection, and
   DRY rules above.
 - [ ] Operator-facing docs and packaging were updated when behavior changed.
+- [ ] New or changed `contrib/` helper scripts, endpoint test clients, and
+  operator-facing tooling are documented in README with defaults and side
+  effects.
 - [ ] New and changed functions, methods, and runtime types have useful English
   comments, including unexported helpers.
 - [ ] Commit messages use the approved prefix, headline, and bullet-list body

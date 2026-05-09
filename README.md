@@ -30,9 +30,10 @@ they come from too many IP addresses.
     * [PUT request /update](#put-request-update)
     * [PATCH request /modify](#patch-request-modify)
     * [DELETE request /remove](#delete-request-remove)
-4. [Actions](#actions)
+4. [Endpoint test client](#endpoint-test-client)
+5. [Actions](#actions)
     * [Operator action](#operator-action)
-5. [LDAP](#ldap)
+6. [LDAP](#ldap)
     * [docker-compose.yml](#docker-composeyml)
     * [custom.json](#customjson)
 
@@ -453,6 +454,64 @@ curl -d '{"key":"sender","value":"christian@roessner.email"}' -H "Content-Type: 
 # Secured with basic auth
 curl -k -d '{"key":"sender","value":"christian@roessner.email"}"' -H "Content-Type: application/json" -X DELETE "https://localhost:8443/remove" -u testuser:testsecret
 ````
+
+Back to [table of contents](#table-of-contents)
+
+# Endpoint test client
+
+The `contrib/geoip-policyd-test.py` script exercises the REST interface and the
+raw Postfix policy socket with useful local defaults. It uses only the Python
+standard library and does not require a virtual environment.
+
+Default targets:
+
+| Option | Default |
+| --- | --- |
+| `--base-url` | `http://127.0.0.1:8080` |
+| `--policy-host` | `127.0.0.1` |
+| `--policy-port` | `4646` |
+| `--sender` | `geoip-policyd-test@example.com` |
+| `--address` | `127.0.0.1` |
+| `--recipient` | `postmaster@example.com` |
+
+Run a single endpoint check:
+
+```shell
+contrib/geoip-policyd-test.py --address 8.8.8.8 --sender user@example.com query
+contrib/geoip-policyd-test.py --address 8.8.8.8 dovecotpolicy --command allow
+contrib/geoip-policyd-test.py --address 8.8.8.8 policy
+```
+
+Run the complete endpoint suite:
+
+```shell
+contrib/geoip-policyd-test.py all
+```
+
+The `all` command checks `GET /custom-settings`, `POST /query`,
+`POST /dovecotpolicy?command=report`, `POST /dovecotpolicy?command=allow`,
+the raw Postfix policy socket, `PUT /update`, `PATCH /modify`,
+`DELETE /remove`, `POST /remove`, and `GET /reload`. The suite intentionally
+touches mutating custom-settings and unlock endpoints, so run it against a
+dedicated test instance or with a sender and Redis prefix that are safe to
+modify.
+
+For HTTPS with a local or self-signed certificate, add `--insecure`. For HTTP
+basic authentication, add `--username` and `--password`.
+
+Example against isolated local test ports:
+
+```shell
+contrib/geoip-policyd-test.py \
+  --base-url http://127.0.0.1:18080 \
+  --policy-port 14646 \
+  --address 8.8.8.8 \
+  all
+```
+
+The output is a compact table with the endpoint name, method, target, status,
+expected status, result, and a short response summary. The process exits with
+status `0` only when all selected checks pass.
 
 Back to [table of contents](#table-of-contents)
 
