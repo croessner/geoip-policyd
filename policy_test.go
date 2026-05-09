@@ -11,6 +11,33 @@ import (
 	"github.com/go-kit/log/level"
 )
 
+const (
+	testCountryBR      = "BR"
+	testCountryCA      = "CA"
+	testCountryJP      = "JP"
+	testCountryMX      = "MX"
+	testForeignIP1     = "1.1.1.1"
+	testForeignIP2     = "2.2.2.2"
+	testForeignIP3     = "3.3.3.3"
+	testForeignIP4     = "4.4.4.4"
+	testForeignIP5     = "5.5.5.5"
+	testForeignIP6     = "6.6.6.6"
+	testForeignIP7     = "7.7.7.7"
+	testIPv4Network    = "192.168.1.0/24"
+	testIPv4NetworkIP  = "192.168.1.1"
+	testIPv4NetworkIP2 = "192.168.1.2"
+	testIPv6Address    = "2001:db8::1"
+	testTrustedIP1     = "10.0.0.1"
+	testTrustedIP2     = "10.0.0.2"
+	testOverrideIP     = "172.16.0.1"
+	testGUID           = "test"
+	testEmailExample   = "example@example.com"
+	testEmailMulti     = "multi@example.com"
+	testEmailOverride  = "override@example.com"
+	testEmailPrimary   = "test@test.com"
+	testPolicyGUID     = "test_guid"
+)
+
 func TestIsTrustedIP(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -22,29 +49,29 @@ func TestIsTrustedIP(t *testing.T) {
 		{
 			name:       "Empty IPs",
 			trustedIPs: []string{},
-			clientIP:   "10.0.0.1",
-			guid:       "test",
+			clientIP:   testTrustedIP1,
+			guid:       testGUID,
 			want:       false,
 		},
 		{
 			name:       "Trusted single IP",
-			trustedIPs: []string{"10.0.0.1"},
-			clientIP:   "10.0.0.1",
-			guid:       "test",
+			trustedIPs: []string{testTrustedIP1},
+			clientIP:   testTrustedIP1,
+			guid:       testGUID,
 			want:       true,
 		},
 		{
 			name:       "Non-Trusted Single IP",
-			trustedIPs: []string{"10.0.0.1"},
-			clientIP:   "10.0.0.2",
-			guid:       "test",
+			trustedIPs: []string{testTrustedIP1},
+			clientIP:   testTrustedIP2,
+			guid:       testGUID,
 			want:       false,
 		},
 		{
 			name:       "Multiple IPs",
-			trustedIPs: []string{"10.0.0.1", "10.0.0.2"},
-			clientIP:   "10.0.0.2",
-			guid:       "test",
+			trustedIPs: []string{testTrustedIP1, testTrustedIP2},
+			clientIP:   testTrustedIP2,
+			guid:       testGUID,
 			want:       true,
 		},
 	}
@@ -58,6 +85,7 @@ func TestIsTrustedIP(t *testing.T) {
 	}
 }
 
+//nolint:funlen // The table keeps the IPv4 and IPv6 boundary cases together.
 func TestNetworkContainsIP(t *testing.T) {
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
 	logger = level.NewFilter(logger, level.AllowNone())
@@ -71,58 +99,58 @@ func TestNetworkContainsIP(t *testing.T) {
 	}{
 		{
 			name:           "Valid IPv4 in network",
-			trustedIPOrNet: "192.168.1.0/24",
-			ipAddress:      "192.168.1.1",
-			guid:           "test",
+			trustedIPOrNet: testIPv4Network,
+			ipAddress:      testIPv4NetworkIP,
+			guid:           testGUID,
 			want:           true,
 		},
 		{
 			name:           "IPv4 not in network",
-			trustedIPOrNet: "192.168.1.0/24",
+			trustedIPOrNet: testIPv4Network,
 			ipAddress:      "192.168.2.1",
-			guid:           "test",
+			guid:           testGUID,
 			want:           false,
 		},
 		{
 			name:           "Invalid IPv4 network range",
 			trustedIPOrNet: "300.168.1.0/24",
-			ipAddress:      "192.168.1.1",
-			guid:           "test",
+			ipAddress:      testIPv4NetworkIP,
+			guid:           testGUID,
 			want:           false,
 		},
 		{
 			name:           "Invalid IPv4 address",
-			trustedIPOrNet: "192.168.1.0/24",
+			trustedIPOrNet: testIPv4Network,
 			ipAddress:      "300.168.1.1",
-			guid:           "test",
+			guid:           testGUID,
 			want:           false,
 		},
 		{
 			name:           "Valid IPv6 in network",
-			trustedIPOrNet: "2001:db8::/32",
-			ipAddress:      "2001:db8::1",
-			guid:           "test",
+			trustedIPOrNet: testIPv6Prefix,
+			ipAddress:      testIPv6Address,
+			guid:           testGUID,
 			want:           true,
 		},
 		{
 			name:           "IPv6 not in network",
-			trustedIPOrNet: "2001:db8::/32",
+			trustedIPOrNet: testIPv6Prefix,
 			ipAddress:      "2001:db9::1",
-			guid:           "test",
+			guid:           testGUID,
 			want:           false,
 		},
 		{
 			name:           "Invalid IPv6 network range",
 			trustedIPOrNet: "2001:db8:::/32",
-			ipAddress:      "2001:db8::1",
-			guid:           "test",
+			ipAddress:      testIPv6Address,
+			guid:           testGUID,
 			want:           false,
 		},
 		{
 			name:           "Invalid IPv6 address",
-			trustedIPOrNet: "2001:db8::/32",
+			trustedIPOrNet: testIPv6Prefix,
 			ipAddress:      "2001:dg8::1",
-			guid:           "test",
+			guid:           testGUID,
 			want:           false,
 		},
 	}
@@ -141,6 +169,7 @@ func setTTL() int64 {
 	return time.Now().UnixNano() + time.Hour.Nanoseconds()
 }
 
+//nolint:funlen // The table covers the full IP-policy decision matrix.
 func TestCheckIPsPolicy(t *testing.T) {
 	config = &CmdLineConfig{BlockPermanent: true}
 
@@ -158,9 +187,9 @@ func TestCheckIPsPolicy(t *testing.T) {
 	}{
 		{
 			name:                  "No trusted IPs, within max IP limits",
-			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL()}},
 			trustedIPs:            []string{},
-			clientIP:              "1.1.1.1",
+			clientIP:              testForeignIP1,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
 			allowedMaxForeignIPs:  10,
@@ -170,9 +199,9 @@ func TestCheckIPsPolicy(t *testing.T) {
 		},
 		{
 			name:                  "Client IP not trusted, exceeds max IP limits",
-			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL(), "4.4.4.4": setTTL(), "5.5.5.5": setTTL(), "6.6.6.6": setTTL()}},
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL(), testForeignIP3: setTTL(), testForeignIP4: setTTL(), testForeignIP5: setTTL(), testForeignIP6: setTTL()}},
 			trustedIPs:            []string{},
-			clientIP:              "7.7.7.7",
+			clientIP:              testForeignIP7,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: true},
 			allowedMaxForeignIPs:  5,
@@ -182,9 +211,9 @@ func TestCheckIPsPolicy(t *testing.T) {
 		},
 		{
 			name:                  "Client IP trusted, within max IP limits",
-			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()}},
-			trustedIPs:            []string{"1.1.1.1"},
-			clientIP:              "1.1.1.1",
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL()}},
+			trustedIPs:            []string{testForeignIP1},
+			clientIP:              testForeignIP1,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
 			allowedMaxForeignIPs:  10,
@@ -195,13 +224,13 @@ func TestCheckIPsPolicy(t *testing.T) {
 		{
 			name: "Client IP trusted, exceeds max home IP limits",
 			remoteClient: &RemoteClient{
-				ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL()},
+				ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL()},
 				HomeCountries: &RedisHomeCountries{
-					IPs: TTLStringMap{"3.3.3.3": setTTL(), "4.4.4.4": setTTL()},
+					IPs: TTLStringMap{testForeignIP3: setTTL(), testForeignIP4: setTTL()},
 				},
 			},
-			trustedIPs:            []string{"1.1.1.1"},
-			clientIP:              "1.1.1.1",
+			trustedIPs:            []string{testForeignIP1},
+			clientIP:              testForeignIP1,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
 			allowedMaxForeignIPs:  10,
@@ -211,9 +240,9 @@ func TestCheckIPsPolicy(t *testing.T) {
 		},
 		{
 			name:                  "All IPs trusted, within max IP limits",
-			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL()}},
-			trustedIPs:            []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"},
-			clientIP:              "1.1.1.1",
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL(), testForeignIP3: setTTL()}},
+			trustedIPs:            []string{testForeignIP1, testForeignIP2, testForeignIP3},
+			clientIP:              testForeignIP1,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
 			allowedMaxForeignIPs:  10,
@@ -223,9 +252,9 @@ func TestCheckIPsPolicy(t *testing.T) {
 		},
 		{
 			name:                  "All IPs trusted, exceeds max IP limits",
-			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{"1.1.1.1": setTTL(), "2.2.2.2": setTTL(), "3.3.3.3": setTTL()}},
-			trustedIPs:            []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"},
-			clientIP:              "1.1.1.1",
+			remoteClient:          &RemoteClient{ForeignIPs: TTLStringMap{testForeignIP1: setTTL(), testForeignIP2: setTTL(), testForeignIP3: setTTL()}},
+			trustedIPs:            []string{testForeignIP1, testForeignIP2, testForeignIP3},
+			clientIP:              testForeignIP1,
 			policyResponse:        &PolicyResponse{fired: false},
 			expectedPolicyRespone: &PolicyResponse{fired: false},
 			allowedMaxForeignIPs:  2,
@@ -249,6 +278,7 @@ func TestCheckIPsPolicy(t *testing.T) {
 	}
 }
 
+//nolint:funlen // The table covers the full country-policy decision matrix.
 func TestCheckCountryPolicy(t *testing.T) {
 	config = &CmdLineConfig{BlockPermanent: true}
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
@@ -270,41 +300,41 @@ func TestCheckCountryPolicy(t *testing.T) {
 		{
 			name:                       "Trusted Country",
 			remoteClient:               &RemoteClient{},
-			trustedCountries:           []string{"US"},
-			countryCode:                "US",
+			trustedCountries:           []string{testCountryUS},
+			countryCode:                testCountryUS,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: false},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       false,
 		},
 		{
 			name:                       "Untrusted Country",
 			remoteClient:               &RemoteClient{},
-			trustedCountries:           []string{"US"},
-			countryCode:                "CA",
+			trustedCountries:           []string{testCountryUS},
+			countryCode:                testCountryCA,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: true},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       true,
 		},
 		{
 			name: "Exceeding Max Home Countries",
 			remoteClient: &RemoteClient{
 				HomeCountries: &RedisHomeCountries{
-					Countries: TTLStringMap{"US": 0, "CA": 0, "MX": 0},
+					Countries: TTLStringMap{testCountryUS: 0, testCountryCA: 0, testCountryMX: 0},
 				},
 			},
 			trustedCountries:           []string{},
-			countryCode:                "US",
+			countryCode:                testCountryUS,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: true},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    2,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       true,
 			isHome:                     true,
 		},
@@ -312,48 +342,48 @@ func TestCheckCountryPolicy(t *testing.T) {
 			name:                       "Empty Countries",
 			remoteClient:               &RemoteClient{},
 			trustedCountries:           []string{},
-			countryCode:                "US",
+			countryCode:                testCountryUS,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: false},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       false,
 		},
 		{
 			name:                       "All Countries Trusted",
 			remoteClient:               &RemoteClient{},
-			trustedCountries:           []string{"US", "CA", "MX", "JP", "DE"},
-			countryCode:                "DE",
+			trustedCountries:           []string{testCountryUS, testCountryCA, testCountryMX, testCountryJP, testCountryDE},
+			countryCode:                testCountryDE,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: false},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       false,
 		},
 		{
 			name:                       "Null Remote Client",
 			remoteClient:               nil,
-			trustedCountries:           []string{"US"},
-			countryCode:                "US",
+			trustedCountries:           []string{testCountryUS},
+			countryCode:                testCountryUS,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: false},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       false,
 		},
 		{
 			name:                       "Multiple Trusted ForeignCountries without Match",
 			remoteClient:               &RemoteClient{},
-			trustedCountries:           []string{"US", "CA", "MX"},
-			countryCode:                "JP",
+			trustedCountries:           []string{testCountryUS, testCountryCA, testCountryMX},
+			countryCode:                testCountryJP,
 			policyResponse:             &PolicyResponse{fired: false},
 			expectedPolicyRespone:      &PolicyResponse{fired: true},
 			allowedMaxForeignCountries: 10,
 			allowedMaxHomeCountries:    10,
-			guid:                       "test_guid",
+			guid:                       testPolicyGUID,
 			want:                       true,
 		},
 	}
@@ -393,6 +423,7 @@ func initializeIfNil(value any, defaultValue any) any {
 	return value
 }
 
+//nolint:funlen // The table verifies all custom-settings override combinations.
 func TestApplyCustomSettings(t *testing.T) {
 	tests := []struct {
 		name                               string
@@ -421,7 +452,7 @@ func TestApplyCustomSettings(t *testing.T) {
 		{
 			name:                               "Nil Custom Settings",
 			customSettings:                     nil,
-			sender:                             "test@test.com",
+			sender:                             testEmailPrimary,
 			dataCustomSettings:                 nil,
 			preDataallowedMaxForeignIPs:        5,
 			preDataallowedMaxForeignCountries:  5,
@@ -438,7 +469,7 @@ func TestApplyCustomSettings(t *testing.T) {
 		{
 			name:                               "Empty Data in Custom Settings",
 			customSettings:                     &CustomSettings{},
-			sender:                             "test@test.com",
+			sender:                             testEmailPrimary,
 			dataCustomSettings:                 []Account{},
 			preDataallowedMaxForeignIPs:        10,
 			preDataallowedMaxForeignCountries:  10,
@@ -455,10 +486,10 @@ func TestApplyCustomSettings(t *testing.T) {
 		{
 			name:           "Change Allowed Max ForeignIPs",
 			customSettings: &CustomSettings{},
-			sender:         "test@test.com",
+			sender:         testEmailPrimary,
 			dataCustomSettings: []Account{
 				{
-					Sender: "test@test.com",
+					Sender: testEmailPrimary,
 					IPs:    12,
 				},
 			},
@@ -477,13 +508,13 @@ func TestApplyCustomSettings(t *testing.T) {
 		{
 			name:           "Set Trusted ForeignIPs and ForeignCountries",
 			customSettings: &CustomSettings{},
-			sender:         "example@example.com",
+			sender:         testEmailExample,
 			dataCustomSettings: []Account{
 				{
-					Sender:           "example@example.com",
+					Sender:           testEmailExample,
 					IPs:              10,
-					TrustedIPs:       []string{"192.168.1.1", "192.168.1.2"},
-					TrustedCountries: []string{"DE", "US"},
+					TrustedIPs:       []string{testIPv4NetworkIP, testIPv4NetworkIP2},
+					TrustedCountries: []string{testCountryDE, testCountryUS},
 				},
 			},
 			preDataallowedMaxForeignIPs:        8,
@@ -494,22 +525,22 @@ func TestApplyCustomSettings(t *testing.T) {
 			expectedallowedMaxForeignCountries: 8,
 			expectedAllowedMaxHomeIPs:          8,
 			expectedAllowedMaxHomeCountries:    8,
-			expectedTrustedIPs:                 []string{"192.168.1.1", "192.168.1.2"},
-			expectedTrustedCountries:           []string{"DE", "US"},
+			expectedTrustedIPs:                 []string{testIPv4NetworkIP, testIPv4NetworkIP2},
+			expectedTrustedCountries:           []string{testCountryDE, testCountryUS},
 			expectedHomeCountries:              &HomeCountries{},
 		},
 		{
 			name:           "Override Existing Settings",
 			customSettings: &CustomSettings{},
-			sender:         "override@example.com",
+			sender:         testEmailOverride,
 			dataCustomSettings: []Account{
 				{
-					Sender:           "override@example.com",
+					Sender:           testEmailOverride,
 					IPs:              15,
-					TrustedIPs:       []string{"172.16.0.1"},
-					TrustedCountries: []string{"FR"},
+					TrustedIPs:       []string{testOverrideIP},
+					TrustedCountries: []string{testCountryFR},
 					HomeCountries: &HomeCountries{
-						Codes: []string{"US"},
+						Codes: []string{testCountryUS},
 					},
 				},
 			},
@@ -521,20 +552,20 @@ func TestApplyCustomSettings(t *testing.T) {
 			expectedallowedMaxForeignCountries: 15,
 			expectedAllowedMaxHomeIPs:          15,
 			expectedAllowedMaxHomeCountries:    15,
-			expectedTrustedIPs:                 []string{"172.16.0.1"},
-			expectedTrustedCountries:           []string{"FR"},
-			expectedHomeCountries:              &HomeCountries{Codes: []string{"US"}},
+			expectedTrustedIPs:                 []string{testOverrideIP},
+			expectedTrustedCountries:           []string{testCountryFR},
+			expectedHomeCountries:              &HomeCountries{Codes: []string{testCountryUS}},
 		},
 		{
 			name:           "Multiple Entries in Custom Settings",
 			customSettings: &CustomSettings{},
-			sender:         "multi@example.com",
+			sender:         testEmailMulti,
 			dataCustomSettings: []Account{
 				{
-					Sender:           "multi@example.com",
+					Sender:           testEmailMulti,
 					IPs:              20,
-					TrustedIPs:       []string{"10.0.0.1", "10.0.0.2"},
-					TrustedCountries: []string{"JP", "BR"},
+					TrustedIPs:       []string{testTrustedIP1, testTrustedIP2},
+					TrustedCountries: []string{testCountryJP, testCountryBR},
 				},
 				{
 					Sender:           "another@example.com",
@@ -551,8 +582,8 @@ func TestApplyCustomSettings(t *testing.T) {
 			expectedallowedMaxForeignCountries: 10,
 			expectedAllowedMaxHomeIPs:          10,
 			expectedAllowedMaxHomeCountries:    10,
-			expectedTrustedIPs:                 []string{"10.0.0.1", "10.0.0.2"},
-			expectedTrustedCountries:           []string{"JP", "BR"},
+			expectedTrustedIPs:                 []string{testTrustedIP1, testTrustedIP2},
+			expectedTrustedCountries:           []string{testCountryJP, testCountryBR},
 			expectedHomeCountries:              &HomeCountries{},
 		},
 	}

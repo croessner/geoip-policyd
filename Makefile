@@ -6,7 +6,10 @@ PREFIX := /usr/local
 BIN_DIR := $(PREFIX)/sbin
 SYSTEMD_DIR := /usr/lib/systemd/system
 DEFAULTS_DIR := /etc/default
-GOLANGCI_NEW_FROM_REV ?= HEAD
+GOLANGCI_LINT_ARGS := ./...
+ifneq ($(strip $(GOLANGCI_NEW_FROM_REV)),)
+GOLANGCI_LINT_ARGS := --new-from-rev=$(GOLANGCI_NEW_FROM_REV) ./...
+endif
 
 # Default target
 all: build
@@ -47,7 +50,7 @@ vet:
 
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found. Install it and rerun make guardrails"; exit 1; }
-	golangci-lint run --new-from-rev=$(GOLANGCI_NEW_FROM_REV) ./...
+	golangci-lint run $(GOLANGCI_LINT_ARGS)
 
 test:
 	go test -v ./...

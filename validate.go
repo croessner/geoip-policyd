@@ -25,6 +25,48 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// validationMessageFormatter turns a validator field error into a stable diagnostic.
+type validationMessageFormatter func(validator.FieldError) string
+
+var validationMessageFormatters = map[string]validationMessageFormatter{
+	"required": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' is required but missing or empty", e.Field())
+	},
+	"required_if": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' is required when %s", e.Field(), e.Param())
+	},
+	"min": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be at least %s (got %v)", e.Field(), e.Param(), e.Value())
+	},
+	"max": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be at most %s (got %v)", e.Field(), e.Param(), e.Value())
+	},
+	"ip": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a valid IP address (got '%v')", e.Field(), e.Value())
+	},
+	"hostname_rfc1123": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a valid IP address or hostname (got '%v')", e.Field(), e.Value())
+	},
+	"email": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a valid e-mail address (got '%v')", e.Field(), e.Value())
+	},
+	"file": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a path to an existing file (got '%v')", e.Field(), e.Value())
+	},
+	"iso3166_1_alpha2": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' contains an invalid ISO 3166-1 alpha-2 country code (got '%v')", e.Field(), e.Value())
+	},
+	"ldap_uri": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a valid LDAP URI (ldap://, ldaps://, or ldapi://) (got '%v')", e.Field(), e.Value())
+	},
+	"cidr_or_ip": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be a valid IP address or CIDR notation (got '%v')", e.Field(), e.Value())
+	},
+	"contains": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must contain the substring '%s' (got '%v')", e.Field(), e.Param(), e.Value())
+	},
+}
+
 // validateLDAPURI validates that a string is a valid LDAP URI.
 // Accepted schemes: ldap://, ldaps://, ldapi://
 func validateLDAPURI(fl validator.FieldLevel) bool {
@@ -73,42 +115,19 @@ func formatValidationErrors(err error) error {
 	msgs := make([]string, 0, len(validationErrors))
 
 	for _, e := range validationErrors {
-		var msg string
-
-		switch e.Tag() {
-		case "required":
-			msg = fmt.Sprintf("'%s' is required but missing or empty", e.Field())
-		case "required_if":
-			msg = fmt.Sprintf("'%s' is required when %s", e.Field(), e.Param())
-		case "min":
-			msg = fmt.Sprintf("'%s' must be at least %s (got %v)", e.Field(), e.Param(), e.Value())
-		case "max":
-			msg = fmt.Sprintf("'%s' must be at most %s (got %v)", e.Field(), e.Param(), e.Value())
-		case "ip":
-			msg = fmt.Sprintf("'%s' must be a valid IP address (got '%v')", e.Field(), e.Value())
-		case "hostname_rfc1123":
-			// Reached when both ip and hostname_rfc1123 failed in an ip|hostname_rfc1123 OR check.
-			msg = fmt.Sprintf("'%s' must be a valid IP address or hostname (got '%v')", e.Field(), e.Value())
-		case "email":
-			msg = fmt.Sprintf("'%s' must be a valid e-mail address (got '%v')", e.Field(), e.Value())
-		case "file":
-			msg = fmt.Sprintf("'%s' must be a path to an existing file (got '%v')", e.Field(), e.Value())
-		case "iso3166_1_alpha2":
-			msg = fmt.Sprintf("'%s' contains an invalid ISO 3166-1 alpha-2 country code (got '%v')", e.Field(), e.Value())
-		case "ldap_uri":
-			msg = fmt.Sprintf("'%s' must be a valid LDAP URI (ldap://, ldaps://, or ldapi://) (got '%v')", e.Field(), e.Value())
-		case "cidr_or_ip":
-			msg = fmt.Sprintf("'%s' must be a valid IP address or CIDR notation (got '%v')", e.Field(), e.Value())
-		case "contains":
-			msg = fmt.Sprintf("'%s' must contain the substring '%s' (got '%v')", e.Field(), e.Param(), e.Value())
-		default:
-			msg = fmt.Sprintf("'%s' failed validation '%s' (got '%v')", e.Field(), e.Tag(), e.Value())
-		}
-
-		msgs = append(msgs, msg)
+		msgs = append(msgs, formatValidationError(e))
 	}
 
 	return fmt.Errorf("configuration validation failed:\n  - %s", strings.Join(msgs, "\n  - "))
+}
+
+// formatValidationError formats one validator field error for an operator.
+func formatValidationError(e validator.FieldError) string {
+	if formatter, ok := validationMessageFormatters[e.Tag()]; ok {
+		return formatter(e)
+	}
+
+	return fmt.Sprintf("'%s' failed validation '%s' (got '%v')", e.Field(), e.Tag(), e.Value())
 }
 
 // Validate validates the server configuration after Init() has been called.
@@ -120,40 +139,63 @@ func (c *CmdLineConfig) Validate() error {
 		return err
 	}
 
-	if err = v.Struct(c); err != nil {
+	if err := c.validateStructs(v); err != nil {
+		return err
+	}
+
+	if err := c.validateHTTPSettings(); err != nil {
+		return err
+	}
+
+	return c.validateObservabilitySettings()
+}
+
+// validateStructs validates exported configuration fields and optional nested LDAP fields.
+func (c *CmdLineConfig) validateStructs(v *validator.Validate) error {
+	if err := v.Struct(c); err != nil {
 		return formatValidationErrors(err)
 	}
 
 	// The embedded *LdapConf pointer is not traversed automatically by the validator when
 	// it is nil, so we validate it separately when LDAP is enabled.
 	if c.UseLDAP && c.LdapConf != nil {
-		if err = v.Struct(c.LdapConf); err != nil {
+		if err := v.Struct(c.LdapConf); err != nil {
 			return formatValidationErrors(err)
 		}
 	}
 
+	return nil
+}
+
+// validateHTTPSettings validates unexported HTTPApp fields that struct tags cannot see.
+func (c *CmdLineConfig) validateHTTPSettings() error {
 	// HTTPApp contains only unexported fields which are invisible to the struct validator.
 	// Validate them programmatically.
-	if c.HTTPApp.useBasicAuth {
-		if c.HTTPApp.auth.username == "" {
+	if c.useBasicAuth {
+		if c.auth.username == "" {
 			return errors.New("'http-basic-auth-username' is required when http-use-basic-auth is enabled")
 		}
 
-		if c.HTTPApp.auth.password == "" {
+		if c.auth.password == "" {
 			return errors.New("'http-basic-auth-password' is required when http-use-basic-auth is enabled")
 		}
 	}
 
-	if c.HTTPApp.useSSL {
-		if _, err = os.Stat(c.HTTPApp.x509.cert); err != nil {
-			return fmt.Errorf("'http-tls-cert': file '%s' does not exist or is not accessible", c.HTTPApp.x509.cert)
+	if c.useSSL {
+		if _, err := os.Stat(c.x509.cert); err != nil {
+			return fmt.Errorf("'http-tls-cert': file '%s' does not exist or is not accessible", c.x509.cert)
 		}
 
-		if _, err = os.Stat(c.HTTPApp.x509.key); err != nil {
-			return fmt.Errorf("'http-tls-key': file '%s' does not exist or is not accessible", c.HTTPApp.x509.key)
+		if _, err := os.Stat(c.x509.key); err != nil {
+			return fmt.Errorf("'http-tls-key': file '%s' does not exist or is not accessible", c.x509.key)
 		}
 	}
 
+	return nil
+}
+
+// validateObservabilitySettings validates metrics and tracing cross-field constraints.
+func (c *CmdLineConfig) validateObservabilitySettings() error {
 	if c.Observability.PrometheusEnabled {
 		if c.Observability.PrometheusPath == "" || !strings.HasPrefix(c.Observability.PrometheusPath, "/") {
 			return errors.New("'prometheus-path' must start with '/' when prometheus is enabled")

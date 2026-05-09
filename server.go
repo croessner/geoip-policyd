@@ -37,7 +37,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 					obs.ObserveTCPConnection(context.Background(), eventAccept, resultError, 0)
 				}
 
-				level.Error(logger).Log("error", err.Error())
+				_ = level.Error(logger).Log("error", err.Error())
 
 				continue
 			}
@@ -50,7 +50,7 @@ func clientConnections(listener net.Listener) chan net.Conn {
 				obs.ObserveTCPConnection(context.Background(), eventAccept, resultOK, 1)
 			}
 
-			level.Debug(logger).Log("msg", "Client connected", "client_ip", client.RemoteAddr().String())
+			_ = level.Debug(logger).Log("msg", "Client connected", "client_ip", client.RemoteAddr().String())
 
 			clientConnectionsChan <- client
 		}
@@ -73,8 +73,8 @@ func handleConnection(client net.Conn) {
 	for {
 		lineBytes, err := b.ReadBytes('\n')
 		if err != nil { // EOF, or worse
-			level.Debug(logger).Log("msg", "Client disconnected", "client_ip", client.RemoteAddr().String())
-			client.Close()
+			_ = level.Debug(logger).Log("msg", "Client disconnected", "client_ip", client.RemoteAddr().String())
+			_ = client.Close()
 
 			break
 		}
@@ -92,12 +92,11 @@ func handleConnection(client net.Conn) {
 			)
 
 			policyResponse, err = getObservedPolicyResponse(context.Background(), sourcePostfixTCP, policyRequest, ksuid.New().String(), false)
-
 			if err != nil {
 				prefix = "DEFER "
 				actionText = deferText
 
-				level.Error(logger).Log("error", err.Error())
+				_ = level.Error(logger).Log("error", err.Error())
 			} else {
 				if policyResponse.fired {
 					prefix = "REJECT "
@@ -105,7 +104,7 @@ func handleConnection(client net.Conn) {
 				} else {
 					if policyResponse.whitelisted {
 						prefix = "INFO "
-						actionText = fmt.Sprintf("Client IP address <%s> is defined in ignore-networks", policyRequest["client_address"])
+						actionText = fmt.Sprintf("Client IP address <%s> is defined in ignore-networks", policyRequest[ClientAddress])
 					} else {
 						prefix = "DUNNO"
 					}

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+// Package main implements the geoip-policyd service and helper commands.
 package main
 
 import (
@@ -31,42 +32,41 @@ type Action interface {
 
 type EmailOperator struct{}
 
-func (a *EmailOperator) Call(sender string) error {
-	var (
-		messageTextRaw []byte
-		err            error
-	)
-
+// newMessage validates operator settings and renders the configured message body.
+func (a *EmailOperator) newMessage(sender string) (*gomail.Message, error) {
 	if config.EmailOperatorFrom == "" {
-		return errOperatorFromEmpty
+		return nil, errOperatorFromEmpty
 	}
 
 	if config.EmailOperatorTo == "" {
-		return errOperatorToEmpty
+		return nil, errOperatorToEmpty
 	}
 
-	message := gomail.NewMessage()
-
-	message.SetHeader("From", config.EmailOperatorFrom)
-	message.SetHeader("To", config.EmailOperatorTo)
-	message.SetHeader("Subject", config.EmailOperatorSubject)
-
-	if messageTextRaw, err = os.ReadFile(config.EmailOperatorMessagePath); err != nil {
-		return err
+	messageTextRaw, err := os.ReadFile(config.EmailOperatorMessagePath)
+	if err != nil {
+		return nil, err
 	}
 
 	messageText := string(messageTextRaw)
 	if !strings.Contains(messageText, "%s") {
-		return errMacroPercentS
+		return nil, errMacroPercentS
 	}
 
 	if strings.Count(messageText, "%s") != 1 {
-		return errMacroPercentSOnce
+		return nil, errMacroPercentSOnce
 	}
 
-	messageText = fmt.Sprintf(messageText, sender)
-	message.SetBody(config.EmailOperatorMessageCT, messageText)
+	message := gomail.NewMessage()
+	message.SetHeader("From", config.EmailOperatorFrom)
+	message.SetHeader("To", config.EmailOperatorTo)
+	message.SetHeader("Subject", config.EmailOperatorSubject)
+	message.SetBody(config.EmailOperatorMessageCT, fmt.Sprintf(messageText, sender))
 
+	return message, nil
+}
+
+// newDialer creates the SMTP dialer from the current operator mail configuration.
+func (a *EmailOperator) newDialer() *gomail.Dialer {
 	dialer := &gomail.Dialer{Host: config.MailServer, Port: config.MailPort, SSL: config.MailSSL}
 	dialer.SSL = config.MailSSL
 
@@ -90,7 +90,16 @@ func (a *EmailOperator) Call(sender string) error {
 		}
 	}
 
-	if err = dialer.DialAndSend(message); err != nil {
+	return dialer
+}
+
+func (a *EmailOperator) Call(sender string) error {
+	message, err := a.newMessage(sender)
+	if err != nil {
+		return err
+	}
+
+	if err = a.newDialer().DialAndSend(message); err != nil {
 		return err
 	}
 

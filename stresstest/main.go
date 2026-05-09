@@ -1,3 +1,4 @@
+// Package main implements a quick concurrent load tester for geoip-policyd.
 package main
 
 import (
@@ -27,7 +28,7 @@ type SimultaneousConnections struct {
 	current int32
 }
 
-//nolint:gocognit,gocyclo,forbidigo,maintidx,forcetypeassert // This is a q&d stress test...
+//nolint:funlen,gocognit,gocyclo,forbidigo,maintidx,forcetypeassert // This is a q&d stress test...
 func main() {
 	if len(os.Args) < 5 || len(os.Args) > 6 {
 		fmt.Println("Required args: <host:port> <sender> <client_address> <Total number of tests> [optional test]")
@@ -114,8 +115,9 @@ func main() {
 					goto abort
 				}
 
-				//goland:noinspection GoUnhandledErrorResult
-				defer conn.Close()
+				defer func() {
+					_ = conn.Close()
+				}()
 
 				err = conn.SetDeadline(time.Now().Add(timeoutDuration))
 				if err != nil {
@@ -139,7 +141,6 @@ func main() {
 					buffer := make([]byte, 1024)
 					// Read action= string
 					_, err = conn.Read(buffer)
-
 					if err != nil {
 						failed.Store(failed.Load().(int) + 1)
 						failedRead.Store(failedRead.Load().(int) + 1)
@@ -229,7 +230,6 @@ func main() {
 		}()
 
 		for range MaxConnections {
-
 			waitGroup.Go(func() {
 				var (
 					conn   net.Conn
@@ -248,8 +248,9 @@ func main() {
 					goto abort
 				}
 
-				//goland:noinspection GoUnhandledErrorResult
-				defer conn.Close()
+				defer func() {
+					_ = conn.Close()
+				}()
 
 				err = conn.SetDeadline(time.Now().Add(timeoutDuration))
 				if err != nil {
@@ -312,6 +313,7 @@ func main() {
 		}
 
 		waitGroup.Wait()
+
 		statsEnd <- 0
 
 		elapsed := time.Since(start)

@@ -44,9 +44,12 @@ const (
 )
 
 const (
-	Sender       = "sender"
-	Client       = "client"
-	SASLUsername = "sasl_username"
+	Sender              = "sender"
+	Client              = "client"
+	ClientAddress       = "client_address"
+	PolicyRequest       = "request"
+	PolicyProtocolSMTPD = "smtpd_access_policy"
+	SASLUsername        = "sasl_username"
 )
 
 type DovecotPolicyStatus int8
@@ -116,6 +119,28 @@ type HTTP struct {
 	request        *http.Request
 }
 
+// httpRouteHandlers maps HTTP methods and paths to route handlers.
+var httpRouteHandlers = map[string]map[string]func(*HTTP){
+	GET: {
+		routeReload:         (*HTTP).GETReload,
+		routeCustomSettings: (*HTTP).GETCustomSettings,
+	},
+	POST: {
+		routeRemove:        (*HTTP).POSTRemove,
+		routeQuery:         (*HTTP).POSTQuery,
+		routeDovecotPolicy: (*HTTP).POSTDovecotPolicy,
+	},
+	PUT: {
+		routeUpdate: (*HTTP).PUTUpdate,
+	},
+	PATCH: {
+		routeModify: (*HTTP).PATCHModify,
+	},
+	DELETE: {
+		routeRemove: (*HTTP).DELETERemove,
+	},
+}
+
 type DovecotPolicyResponse struct {
 	Status  DovecotPolicyStatus `json:"status"`
 	Message string              `json:"msg"`
@@ -142,20 +167,20 @@ func (h *HTTP) LogInfo(message ...any) {
 	var args = []any{
 		"guid", h.guid,
 		"client", h.request.RemoteAddr,
-		"request", h.request.Method,
+		PolicyRequest, h.request.Method,
 		"path", h.request.URL.Path,
 	}
 
 	args = append(args, message...)
 
-	level.Info(logger).Log(args...)
+	_ = level.Info(logger).Log(args...)
 }
 
 func (h *HTTP) LogError(err error) {
-	level.Error(logger).Log(
+	_ = level.Error(logger).Log(
 		"guid", h.guid,
 		"client", h.request.RemoteAddr,
-		"request", h.request.Method,
+		PolicyRequest, h.request.Method,
 		"path", h.request.URL.Path,
 		"query_string", h.request.URL.RawQuery,
 		"error", err)
@@ -193,7 +218,6 @@ func (h *HTTP) GETReload() {
 		var db *cdb.CDB
 
 		db, err = cdb.Open(config.CDBPath)
-
 		if err != nil {
 			h.responseWriter.WriteHeader(http.StatusInternalServerError)
 			h.LogError(err)
@@ -202,7 +226,7 @@ func (h *HTTP) GETReload() {
 		}
 
 		if olddb := cdbStore.Load().(*cdb.CDB); olddb != nil {
-			olddb.Close()
+			_ = olddb.Close()
 		}
 
 		cdbStore.Store(db)
@@ -234,14 +258,13 @@ func (h *HTTP) GETCustomSettings() {
 	}
 }
 
-func (h *HTTP) POSTRemove() {
-	var requestData *Body
-
+// decodeBodyRequest decodes a JSON Body request and writes the matching HTTP error on failure.
+func (h *HTTP) decodeBodyRequest() (*Body, bool) {
 	if !HasContentType(h.request, "application/json") {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errWrongCT)
 
-		return
+		return nil, false
 	}
 
 	body, err := io.ReadAll(h.request.Body)
@@ -249,14 +272,24 @@ func (h *HTTP) POSTRemove() {
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
-		return
+		return nil, false
 	}
 
-	requestData = &Body{}
+	requestData := &Body{}
 	if err = json.Unmarshal(body, requestData); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
 
+		return nil, false
+	}
+
+	return requestData, true
+}
+
+//nolint:funlen // Unlocking supports direct and LDAP-resolved sender identities in one endpoint.
+func (h *HTTP) POSTRemove() {
+	requestData, ok := h.decodeBodyRequest()
+	if !ok {
 		return
 	}
 
@@ -296,15 +329,20 @@ func (h *HTTP) POSTRemove() {
 			ldapReply = <-ldapReplyChan
 
 			if ldapReply.err != nil {
-				h.LogError(err)
-			} else if resultAttr, ok := ldapReply.result[config.LdapConf.SearchAttributes[ldapSingleValue]]; ok {
+				h.LogError(ldapReply.err)
+			} else if resultAttr, ok := ldapReply.result[config.SearchAttributes[ldapSingleValue]]; ok {
 				// LDAP single value
 				sender = resultAttr[ldapSingleValue].(string)
 			}
 		}
 
 		key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
-		redisHandle.Del(ctx, key).Err()
+		if err := redisHandle.Del(ctx, key).Err(); err != nil {
+			h.responseWriter.WriteHeader(http.StatusInternalServerError)
+			h.LogError(err)
+
+			return
+		}
 
 		h.LogInfo(Sender, sender, "result", "unlocked")
 		h.responseWriter.WriteHeader(http.StatusAccepted)
@@ -315,6 +353,8 @@ func (h *HTTP) POSTRemove() {
 }
 
 // POSTQuery handles the public JSON policy query route and translates it into the typed policy hotpath.
+//
+//nolint:funlen // Query response assembly keeps the public REST contract explicit.
 func (h *HTTP) POSTQuery() {
 	var (
 		policyErr   error
@@ -370,31 +410,9 @@ func (h *HTTP) POSTQuery() {
 		result = true
 	}
 
-	var object any
-
-	if policyResponse == nil {
-		object = nil
-	} else if h.request.URL.Query().Get("compact") == "1" {
-		object = Client
-	} else {
-		object = QueryResponseObject{
-			RemoteAddr:           h.request.RemoteAddr,
-			PolicyReject:         policyResponse.fired,
-			Whitelisted:          policyResponse.whitelisted,
-			CurrentClientIP:      policyResponse.currentClientIP,
-			CurrentCountryCode:   policyResponse.currentCountryCode,
-			TotalIPs:             policyResponse.totalIPs,
-			TotalCountries:       policyResponse.totalCountries,
-			HomeIPsSeen:          policyResponse.homeIPsSeen,
-			ForeignIPsSeen:       policyResponse.foreignIPsSeen,
-			HomeCountriesSeen:    policyResponse.homeCountriesSeen,
-			ForeignCountriesSeen: policyResponse.foreignCountriesSeen,
-		}
-	}
-
 	respone, _ := json.Marshal(&RESTResult{
 		GUID:      h.guid,
-		Object:    object,
+		Object:    h.queryResponseObject(policyResponse),
 		Operation: "query",
 		Error:     policyErr,
 		Result:    result,
@@ -402,33 +420,38 @@ func (h *HTTP) POSTQuery() {
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
 	h.responseWriter.WriteHeader(http.StatusAccepted)
-	h.responseWriter.Write(respone)
+	_, _ = h.responseWriter.Write(respone)
+}
+
+// queryResponseObject builds the detailed or compact REST response object.
+func (h *HTTP) queryResponseObject(policyResponse *PolicyResponse) any {
+	if policyResponse == nil {
+		return nil
+	}
+
+	if h.request.URL.Query().Get("compact") == "1" {
+		return Client
+	}
+
+	return QueryResponseObject{
+		RemoteAddr:           h.request.RemoteAddr,
+		PolicyReject:         policyResponse.fired,
+		Whitelisted:          policyResponse.whitelisted,
+		CurrentClientIP:      policyResponse.currentClientIP,
+		CurrentCountryCode:   policyResponse.currentCountryCode,
+		TotalIPs:             policyResponse.totalIPs,
+		TotalCountries:       policyResponse.totalCountries,
+		HomeIPsSeen:          policyResponse.homeIPsSeen,
+		ForeignIPsSeen:       policyResponse.foreignIPsSeen,
+		HomeCountriesSeen:    policyResponse.homeCountriesSeen,
+		ForeignCountriesSeen: policyResponse.foreignCountriesSeen,
+	}
 }
 
 func (h *HTTP) POSTDovecotPolicy() {
-	var (
-		assertOk bool
-
-		resultCode DovecotPolicyStatus
-		result     string
-
-		address string
-		sender  string
-
-		policyResponse *PolicyResponse
-		dovecotPolicy  map[string]any
-	)
-
 	cmd := h.request.URL.Query().Get("command")
 	if cmd == "report" {
-		respone, _ := json.Marshal(&DovecotPolicyResponse{
-			Status:  DovecotPolicyAccept,
-			Message: "Nothing to report",
-		})
-
-		h.responseWriter.Header().Set("Content-Type", "application/json")
-		h.responseWriter.WriteHeader(http.StatusOK)
-		h.responseWriter.Write(respone)
+		h.writeDovecotPolicyResponse(http.StatusOK, DovecotPolicyAccept, "Nothing to report")
 
 		return
 	} else if cmd != "allow" {
@@ -438,11 +461,30 @@ func (h *HTTP) POSTDovecotPolicy() {
 		return
 	}
 
+	address, sender, ok := h.decodeDovecotPolicyRequest()
+	if !ok {
+		return
+	}
+
+	policyResponse, err := h.evaluateDovecotPolicy(address, sender)
+	if err != nil {
+		_ = level.Error(logger).Log("guid", h.guid, "error", err.Error())
+		h.responseWriter.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	resultCode, result := h.dovecotPolicyResult(policyResponse)
+	h.writeDovecotPolicyResponse(http.StatusOK, resultCode, result)
+}
+
+// decodeDovecotPolicyRequest reads and validates the Dovecot policy payload.
+func (h *HTTP) decodeDovecotPolicyRequest() (string, string, bool) {
 	if !HasContentType(h.request, "application/json") {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errWrongCT)
 
-		return
+		return "", "", false
 	}
 
 	body, err := io.ReadAll(h.request.Body)
@@ -450,34 +492,41 @@ func (h *HTTP) POSTDovecotPolicy() {
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
-		return
+		return "", "", false
 	}
 
-	dovecotPolicy = make(map[string]any)
+	dovecotPolicy := make(map[string]any)
 	if err = json.Unmarshal(body, &dovecotPolicy); err != nil {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(err)
 
-		return
+		return "", "", false
 	}
 
-	level.Debug(logger).Log(
+	_ = level.Debug(logger).Log(
 		"guid", h.guid, "msg", "dovecot policy request", "policy", fmt.Sprintf("%+v", dovecotPolicy))
 
-	if address, assertOk = dovecotPolicy["remote"].(string); !assertOk || address == "" {
+	address, assertOk := dovecotPolicy["remote"].(string)
+	if !assertOk || address == "" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
-		return
+		return "", "", false
 	}
 
-	if sender, assertOk = dovecotPolicy["login"].(string); !assertOk || sender == "" {
+	sender, assertOk := dovecotPolicy["login"].(string)
+	if !assertOk || sender == "" {
 		h.responseWriter.WriteHeader(http.StatusBadRequest)
 		h.LogError(errNoAddressNORSender)
 
-		return
+		return "", "", false
 	}
 
+	return address, sender, true
+}
+
+// evaluateDovecotPolicy builds the internal policy request for a validated Dovecot payload.
+func (h *HTTP) evaluateDovecotPolicy(address, sender string) (*PolicyResponse, error) {
 	userAttribute := Sender
 
 	if config.UseSASLUsername {
@@ -485,40 +534,37 @@ func (h *HTTP) POSTDovecotPolicy() {
 	}
 
 	policyRequest := map[string]string{
-		"request":        "smtpd_access_policy",
-		"client_address": address,
-		userAttribute:    sender,
+		PolicyRequest: PolicyProtocolSMTPD,
+		ClientAddress: address,
+		userAttribute: sender,
 	}
 
 	// Check if info parameter is present in the query string
 	infoParam := h.request.URL.Query().Get("info")
 	info := infoParam == "1"
 
-	policyResponse, err = getObservedPolicyResponse(h.request.Context(), sourceDovecot, policyRequest, h.guid, info)
+	return getObservedPolicyResponse(h.request.Context(), sourceDovecot, policyRequest, h.guid, info)
+}
 
-	if err == nil {
-		if policyResponse.fired {
-			result = rejectText
-			resultCode = DovecotPolicyReject
-		} else {
-			result = resultOK
-			resultCode = DovecotPolicyAccept
-		}
-	} else {
-		level.Error(logger).Log("guid", h.guid, "error", err.Error())
-		h.responseWriter.WriteHeader(http.StatusInternalServerError)
-
-		return
+// dovecotPolicyResult maps a policy response to Dovecot's status and message fields.
+func (h *HTTP) dovecotPolicyResult(policyResponse *PolicyResponse) (DovecotPolicyStatus, string) {
+	if policyResponse.fired {
+		return DovecotPolicyReject, rejectText
 	}
 
+	return DovecotPolicyAccept, resultOK
+}
+
+// writeDovecotPolicyResponse writes the JSON Dovecot policy response.
+func (h *HTTP) writeDovecotPolicyResponse(status int, resultCode DovecotPolicyStatus, result string) {
 	respone, _ := json.Marshal(&DovecotPolicyResponse{
 		Status:  resultCode,
 		Message: result,
 	})
 
 	h.responseWriter.Header().Set("Content-Type", "application/json")
-	h.responseWriter.WriteHeader(http.StatusOK)
-	h.responseWriter.Write(respone)
+	h.responseWriter.WriteHeader(status)
+	_, _ = h.responseWriter.Write(respone)
 }
 
 func (h *HTTP) PUTUpdate() {
@@ -631,21 +677,6 @@ func (h *HTTP) extractString(accountData map[string]any, key string, err error) 
 	return ""
 }
 
-func (h *HTTP) extractHome(accountData map[string]any) *HomeCountries {
-	if home, ok := accountData["home_countries"]; ok {
-		homeCountries := &HomeCountries{}
-
-		err := json.Unmarshal([]byte(home.(string)), homeCountries)
-		if err != nil {
-			return nil
-		}
-
-		return homeCountries
-	}
-
-	return nil
-}
-
 func (h *HTTP) validateAccountData(countries, ips int, sender string) error {
 	if countries <= 0 {
 		return errCountriesLowerThantZero
@@ -706,28 +737,8 @@ func (h *HTTP) createAndStoreNewSettings(comment string, countries, ips int, sen
 }
 
 func (h *HTTP) DELETERemove() {
-	var requestData *Body
-
-	if !HasContentType(h.request, "application/json") {
-		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(errWrongCT)
-
-		return
-	}
-
-	body, err := io.ReadAll(h.request.Body)
-	if err != nil {
-		h.responseWriter.WriteHeader(http.StatusInternalServerError)
-		h.LogError(err)
-
-		return
-	}
-
-	requestData = &Body{}
-	if err = json.Unmarshal(body, requestData); err != nil {
-		h.responseWriter.WriteHeader(http.StatusBadRequest)
-		h.LogError(err)
-
+	requestData, ok := h.decodeBodyRequest()
+	if !ok {
 		return
 	}
 
@@ -785,58 +796,21 @@ func (a *HTTPApp) httpRootPage(responseWriter http.ResponseWriter, request *http
 		request:        request,
 	}
 
-	switch request.Method {
-	case GET:
-		switch request.URL.Path {
-		case "/reload":
-			app.GETReload()
-		case "/custom-settings":
-			app.GETCustomSettings()
-		default:
-			responseWriter.WriteHeader(http.StatusNotFound)
-		}
-
-	case POST:
-		switch request.URL.Path {
-		case "/remove":
-			app.POSTRemove()
-		case "/query":
-			app.POSTQuery()
-		case "/dovecotpolicy":
-			app.POSTDovecotPolicy()
-		default:
-			responseWriter.WriteHeader(http.StatusNotFound)
-		}
-
-	case PUT:
-		switch request.URL.Path {
-		case "/update":
-			app.PUTUpdate()
-		default:
-			responseWriter.WriteHeader(http.StatusNotFound)
-		}
-
-	case PATCH:
-		switch request.URL.Path {
-		case "/modify":
-			app.PATCHModify()
-		default:
-			responseWriter.WriteHeader(http.StatusNotFound)
-		}
-
-	case DELETE:
-		switch request.URL.Path {
-		case "/remove":
-			app.DELETERemove()
-		default:
-			responseWriter.WriteHeader(http.StatusNotFound)
-		}
-
-	default:
+	routes, methodAllowed := httpRouteHandlers[request.Method]
+	if !methodAllowed {
 		responseWriter.WriteHeader(http.StatusMethodNotAllowed)
 
 		return
 	}
+
+	handler, routeFound := routes[request.URL.Path]
+	if !routeFound {
+		responseWriter.WriteHeader(http.StatusNotFound)
+
+		return
+	}
+
+	handler(app)
 }
 
 func (a *HTTPApp) basicAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -899,7 +873,7 @@ func httpApp() {
 		WriteTimeout:      30 * time.Second,
 	}
 
-	level.Info(logger).Log("msg", "Starting geoip-policyd HTTP service", "address", www.Addr)
+	_ = level.Info(logger).Log("msg", "Starting geoip-policyd HTTP service", "address", www.Addr)
 
 	if app.useSSL {
 		err = www.ListenAndServeTLS(app.x509.cert, app.x509.key)
@@ -907,6 +881,7 @@ func httpApp() {
 		err = www.ListenAndServe()
 	}
 
-	level.Error(logger).Log("error", err)
+	_ = level.Error(logger).Log("error", err)
+
 	os.Exit(1)
 }
