@@ -165,7 +165,7 @@ type Account struct {
 }
 
 func (c *CmdLineConfig) String() string {
-	var result string
+	var result strings.Builder
 
 	value := reflect.ValueOf(*c)
 	typeOfC := value.Type()
@@ -175,11 +175,11 @@ func (c *CmdLineConfig) String() string {
 		case "CommandServer", "UseLDAP", "LDAP", "MailPassword", "HTTPApp", "VerboseLevel":
 			continue
 		default:
-			result += fmt.Sprintf(" %s='%v'", typeOfC.Field(index).Name, value.Field(index).Interface())
+			_, _ = fmt.Fprintf(&result, " %s='%v'", typeOfC.Field(index).Name, value.Field(index).Interface())
 		}
 	}
 
-	return result[1:]
+	return result.String()[1:]
 }
 
 // splitComma splits a comma-separated string into a trimmed slice, returning nil for empty input.

@@ -48,13 +48,13 @@ type LdapConf struct {
 	IdlePoolSize int `validate:"min=0"`
 	PoolSize     int `validate:"min=1"`
 
-	BaseDN        string   `validate:"required"`
+	BaseDN        string `validate:"required"`
 	BindDN        string
 	BindPW        string
-	Filter        string   `validate:"required,contains=%s"`
-	TLSCAFile     string   `validate:"omitempty,file"`
-	TLSClientCert string   `validate:"omitempty,file"`
-	TLSClientKey  string   `validate:"omitempty,file"`
+	Filter        string `validate:"required,contains=%s"`
+	TLSCAFile     string `validate:"omitempty,file"`
+	TLSClientCert string `validate:"omitempty,file"`
+	TLSClientKey  string `validate:"omitempty,file"`
 
 	SearchAttributes []string `validate:"required,min=1"`
 
@@ -101,7 +101,7 @@ type ldapConnectionState struct {
 }
 
 func (l *LdapConf) String() string {
-	var result string
+	var result strings.Builder
 
 	value := reflect.ValueOf(*l)
 	typeOfValue := value.Type()
@@ -109,15 +109,15 @@ func (l *LdapConf) String() string {
 	for index := 0; index < value.NumField(); index++ {
 		switch typeOfValue.Field(index).Name {
 		case "BindPW":
-			result += fmt.Sprintf(" %s='<hidden>'", typeOfValue.Field(index).Name)
+			_, _ = fmt.Fprintf(&result, " %s='<hidden>'", typeOfValue.Field(index).Name)
 		case "PoolSize", "IdlePoolSize":
 			continue
 		default:
-			result += fmt.Sprintf(" %s='%v'", typeOfValue.Field(index).Name, value.Field(index).Interface())
+			_, _ = fmt.Fprintf(&result, " %s='%v'", typeOfValue.Field(index).Name, value.Field(index).Interface())
 		}
 	}
 
-	return result[1:]
+	return result.String()[1:]
 }
 
 func (l *LdapPool) isClosing() bool {
@@ -318,7 +318,7 @@ func (l *LdapPool) search(ldapConf LdapConf, ldapRequest *LdapRequest) (result D
 
 func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
 	// Cleanup interval
-	timer := time.NewTicker(30 * time.Second) //nolint:gomnd // 30 seconds
+	timer := time.NewTicker(30 * time.Second)
 
 	// Make (idle) pool size thread safe!
 	poolSize := len(ldapPool)
@@ -335,7 +335,7 @@ func closeUnusedConnections(ctx context.Context, ldapPool []LdapPool) {
 		case <-timer.C:
 			openConnections := 0
 
-			for index := 0; index < poolSize; index++ {
+			for index := range poolSize {
 				ldapPool[index].Mu.Lock()
 
 				if ldapPool[index].state == ldapStateFree {
@@ -432,7 +432,7 @@ func ldapWorker(ctx context.Context) {
 	ldapConf := make([]LdapConf, poolSize)
 	ldapPool := make([]LdapPool, poolSize)
 
-	for index := 0; index < poolSize; index++ {
+	for index := range poolSize {
 		ldapConf[index].ServerURIs = config.LdapConf.ServerURIs
 		ldapConf[index].BaseDN = config.LdapConf.BaseDN
 		ldapConf[index].Filter = config.LdapConf.Filter
@@ -456,7 +456,7 @@ func ldapWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			for i := 0; i < poolSize; i++ {
+			for i := range poolSize {
 				if ldapPool[i].Conn != nil {
 					_ = ldapPool[i].unbind()
 					ldapPool[i].Conn.Close()
@@ -478,7 +478,7 @@ func ldapWorker(ctx context.Context) {
 			foundFreeConn := false
 			openConnections := 0
 
-			for index := 0; index < poolSize; index++ {
+			for index := range poolSize {
 				ldapPool[index].Mu.Lock()
 
 				if ldapPool[index].state != ldapStateClosed {
@@ -514,7 +514,7 @@ func ldapWorker(ctx context.Context) {
 			}
 
 			for {
-				for index := 0; index < poolSize; index++ {
+				for index := range poolSize {
 					ldapPool[index].Mu.Lock()
 
 					if ldapPool[index].state == ldapStateBusy {

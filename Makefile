@@ -1,29 +1,67 @@
-OUTPUT := geoip-policyd/bin/geoip-policyd
-PKG_LIST := $(shell go list ./... | grep -v /vendor/)
-GIT_TAG=$(shell git describe --tags --abbrev=0)
-GIT_COMMIT=$(shell git rev-parse --short HEAD)
+# Variables
+APP_NAME := geoip-policyd
+VERSION := $(shell git describe --tags --always --dirty)
+LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+PREFIX := /usr/local
+BIN_DIR := $(PREFIX)/sbin
+SYSTEMD_DIR := /usr/lib/systemd/system
+DEFAULTS_DIR := /etc/default
+GOLANGCI_NEW_FROM_REV ?= HEAD
 
-.PHONY: all test race msan dep build clean
-
+# Default target
 all: build
 
-$(OUTPUT):
-	mkdir -p $(dir $(OUTPUT))
+# Build target
+build:
+	go build -mod=vendor -trimpath $(LDFLAGS) -o $(APP_NAME)
+
+# Build check target
+build-check:
+	go build -mod=vendor ./...
+
+# Install target
+install: build
+	install -d $(DESTDIR)$(BIN_DIR)
+	install -m 0755 $(APP_NAME) $(DESTDIR)$(BIN_DIR)/
+	install -d $(DESTDIR)$(SYSTEMD_DIR)
+	install -m 0644 systemd/$(APP_NAME).service $(DESTDIR)$(SYSTEMD_DIR)/
+	install -d $(DESTDIR)$(DEFAULTS_DIR)
+	install -m 0644 systemd/$(APP_NAME) $(DESTDIR)$(DEFAULTS_DIR)/
+
+# Uninstall target
+uninstall:
+	rm -f $(DESTDIR)$(BIN_DIR)/$(APP_NAME)
+	rm -f $(DESTDIR)$(SYSTEMD_DIR)/$(APP_NAME).service
+	rm -f $(DESTDIR)$(DEFAULTS_DIR)/$(APP_NAME)
+
+# Clean target
+clean:
+	rm -f $(APP_NAME)
+
+# Test targets
+fix:
+	go fix ./...
+
+vet:
+	go vet ./...
+
+lint:
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found. Install it and rerun make guardrails"; exit 1; }
+	golangci-lint run --new-from-rev=$(GOLANGCI_NEW_FROM_REV) ./...
 
 test:
-	go test -short ${PKG_LIST}
+	go test -v ./...
 
-race: dep
-	go test -race -short ${PKG_LIST}
+race:
+	go test -race -short $$(go list ./... | grep -v /vendor/)
 
-msan: dep
-	go test -msan -short ${PKG_LIST}
+msan:
+	go test -msan -short $$(go list ./... | grep -v /vendor/)
 
-dep:
-	go get -v -d ./...
+guardrails: fix vet lint test race build-check
 
-build: dep
-	go build -v -ldflags "-X main.version=$(GIT_TAG)-$(GIT_COMMIT)" -o $(OUTPUT) .
+# Print version
+version:
+	@echo $(VERSION)
 
-clean: ## Remove previous build
-	[ -x $(OUTPUT) ] && rm -f $(OUTPUT)
+.PHONY: all build build-check clean version install uninstall fix vet lint test race msan guardrails

@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/go-ldap/ldap/v3"
@@ -960,24 +961,16 @@ func TestConfigLdapConfServerUris(t *testing.T) {
 	f2 := false
 	cfg.Init([]string{"app", "server", "--use-ldap", "--ldap-server-uri", u1, "--ldap-server-uri", u2})
 
-	for _, v := range cfg.LdapConf.ServerURIs {
-		if v == u1 {
-			f1 = true
-
-			break
-		}
+	if slices.Contains(cfg.ServerURIs, u1) {
+		f1 = true
 	}
 
-	for _, v := range cfg.LdapConf.ServerURIs {
-		if v == u2 {
-			f2 = true
-
-			break
-		}
+	if slices.Contains(cfg.ServerURIs, u2) {
+		f2 = true
 	}
 
 	if f1 != true && f2 != true {
-		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.LdapConf.ServerURIs)
+		t.Errorf("Expected --ldap-server-uri=%s --ldap-server-uri=%s, got value=%v", u1, u2, cfg.ServerURIs)
 	}
 }
 
@@ -994,20 +987,12 @@ func TestConfigEnvLdapConfServerUris(t *testing.T) {
 	f2 := false
 	cfg.Init([]string{"app", "server"})
 
-	for _, v := range cfg.LdapConf.ServerURIs {
-		if v == u1 {
-			f1 = true
-
-			break
-		}
+	if slices.Contains(cfg.ServerURIs, u1) {
+		f1 = true
 	}
 
-	for _, v := range cfg.LdapConf.ServerURIs {
-		if v == u2 {
-			f2 = true
-
-			break
-		}
+	if slices.Contains(cfg.ServerURIs, u2) {
+		f2 = true
 	}
 
 	if f1 != true && f2 != true {

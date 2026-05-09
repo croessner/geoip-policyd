@@ -71,8 +71,8 @@ type HTTPApp struct {
 }
 
 type Body struct {
-	Key   string      `json:"key"`
-	Value interface{} `json:"value"`
+	Key   string `json:"key"`
+	Value any    `json:"value"`
 }
 
 type RESTResult struct {
@@ -97,7 +97,7 @@ type DovecotPolicyResponse struct {
 func HasContentType(request *http.Request, mimetype string) bool {
 	contentType := request.Header.Get("Content-type")
 
-	for _, v := range strings.Split(contentType, ",") {
+	for v := range strings.SplitSeq(contentType, ",") {
 		t, _, err := mime.ParseMediaType(v)
 		if err != nil {
 			break
@@ -178,7 +178,7 @@ func (h *HTTP) GETReload() {
 
 	//nolint:forcetypeassert // Global variable
 	if customSettings = customSettingsStore.Load().(*CustomSettings); customSettings != nil {
-		newCustomSettings = initCustomSettings(config)
+		newCustomSettings = NewCustomSettingsService(config, redisHandle, logger).Load()
 		if newCustomSettings != nil {
 			customSettingsStore.Store(newCustomSettings)
 
@@ -891,9 +891,9 @@ func httpApp() {
 		Addr:              fmt.Sprintf("%s:%d", config.HTTPAddress, config.HTTPPort),
 		Handler:           mux,
 		IdleTimeout:       time.Minute,
-		ReadTimeout:       10 * time.Second, //nolint:gomnd // Time factor
-		ReadHeaderTimeout: 10 * time.Second, //nolint:gomnd // Time factor
-		WriteTimeout:      30 * time.Second, //nolint:gomnd // Time factor
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 
 	level.Info(logger).Log("msg", "Starting geoip-policyd HTTP service", "address", www.Addr)

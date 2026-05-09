@@ -61,10 +61,8 @@ func handleConnection(client net.Conn) {
 		}
 
 		lineStr := strings.TrimSpace(string(lineBytes))
-		//nolint:gomnd // Split into key and "list" of values
 		items := strings.SplitN(lineStr, "=", 2)
 
-		//nolint:gomnd // Either items is a key=value pair or it is empty, indicating the end of the request
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
@@ -95,7 +93,9 @@ func handleConnection(client net.Conn) {
 				}
 			}
 
-			client.Write([]byte(fmt.Sprintf("action=%s%s\n\n", prefix, actionText)))
+			if _, err = client.Write(fmt.Appendf(nil, "action=%s%s\n\n", prefix, actionText)); err != nil {
+				_ = level.Error(logger).Log("error", err.Error())
+			}
 
 			// Clear policy request for next connection
 			policyRequest = make(map[string]string)

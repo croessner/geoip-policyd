@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -998,13 +999,7 @@ func runOperatorAction(remoteClient *RemoteClient, sender string, userKnown bool
 // If it does, it returns false to indicate that the action should not be run.
 // If it doesn't, it returns true to indicate that the action should be run.
 func shouldRunOperator(remoteClient *RemoteClient) bool {
-	for _, actionItem := range remoteClient.Actions {
-		if actionItem == "operator" {
-			return false
-		}
-	}
-
-	return true
+	return !slices.Contains(remoteClient.Actions, "operator")
 }
 
 // updateRedisCache updates the Redis cache with the provided sender and RemoteClient information.
