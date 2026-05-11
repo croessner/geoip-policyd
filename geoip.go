@@ -28,7 +28,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const geoIPReaderCloseDelay = time.Minute
+const (
+	geoIPLookupSpanName        = "geoip.lookup"
+	geoIPMaxMindLookupSpanName = "geoip.maxmind.lookup"
+	geoIPReaderCloseDelay      = time.Minute
+)
 
 // GeoIP owns the active MaxMind reader and swaps it atomically during reloads.
 type GeoIP struct {
@@ -65,10 +69,14 @@ func (g *GeoIP) LookupCountryCodeContext(ctx context.Context, ipAddress string) 
 	if obs != nil {
 		var span trace.Span
 
-		ctx, span = obs.StartSpan(ctx, "geoip.lookup", attribute.String("geoip.operation", "lookup"))
-		defer span.End()
+		ctx, span = obs.StartSpan(ctx, geoIPLookupSpanName, attribute.String("geoip.operation", "lookup"))
+
 		defer func() {
-			obs.ObserveGeoIPLookup(ctx, result, time.Since(start))
+			duration := time.Since(start)
+
+			span.SetAttributes(attribute.String(labelResult, result))
+			span.End()
+			obs.ObserveGeoIPLookup(ctx, result, duration)
 		}()
 	}
 
@@ -104,7 +112,9 @@ func (g *GeoIP) lookupCountryCode(ctx context.Context, obs *Observability, ipAdd
 	}
 
 	record := &geoIPCountryRecord{}
-	if err := reader.Lookup(ip, record); err != nil {
+
+	lookupResult, err := g.lookupMaxMindRecord(ctx, obs, reader, ip, record)
+	if err != nil {
 		*result = resultError
 
 		if obs != nil {
@@ -115,10 +125,39 @@ func (g *GeoIP) lookupCountryCode(ctx context.Context, obs *Observability, ipAdd
 	}
 
 	if record.Country.ISOCode != "" {
-		*result = resultHit
+		*result = lookupResult
 	}
 
 	return record.Country.ISOCode
+}
+
+// lookupMaxMindRecord wraps the concrete MaxMind reader lookup so traces can isolate database access time.
+func (g *GeoIP) lookupMaxMindRecord(ctx context.Context, obs *Observability, reader *maxminddb.Reader, ip net.IP, record *geoIPCountryRecord) (string, error) {
+	lookupResult := resultMiss
+
+	var span trace.Span
+	if obs != nil {
+		_, span = obs.StartSpan(ctx, geoIPMaxMindLookupSpanName, attribute.String("geoip.operation", "maxmind_lookup"))
+	}
+
+	err := reader.Lookup(ip, record)
+	if err != nil {
+		lookupResult = resultError
+	} else if record.Country.ISOCode != "" {
+		lookupResult = resultHit
+	}
+
+	if obs != nil {
+		span.SetAttributes(attribute.String(labelResult, lookupResult))
+
+		if err != nil {
+			obs.RecordSpanError(span, err)
+		}
+
+		span.End()
+	}
+
+	return lookupResult, err
 }
 
 // SwapReader publishes a replacement reader and closes the previous reader after a short grace period.

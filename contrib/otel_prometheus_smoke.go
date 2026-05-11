@@ -34,6 +34,8 @@ const (
 	defaultGeoIPPath   = "GeoIP2-Country.mmdb"
 	defaultSender      = "otel-smoke@example.test"
 	defaultTimeout     = 30 * time.Second
+	geoIPLookupSpan    = "geoip.lookup"
+	maxMindLookupSpan  = "geoip.maxmind.lookup"
 	httpQuerySpanName  = "HTTP POST /query"
 	loopbackAddress    = "127.0.0.1"
 	metricPath         = "/metrics"
@@ -247,7 +249,7 @@ func (r *smokeRunner) assertSmokeResults(collector *fakeOTLPCollector, prometheu
 	}
 
 	_, _ = fmt.Fprintln(r.output, "prometheus metrics: http, policy, redis, geoip")
-	_, _ = fmt.Fprintln(r.output, "otlp trace graph: HTTP POST /query -> policy.request -> geoip.lookup, redis.command GET, redis.command SET")
+	_, _ = fmt.Fprintln(r.output, "otlp trace graph: HTTP POST /query -> policy.request -> geoip.lookup -> geoip.maxmind.lookup, redis.command GET, redis.command SET")
 	_, _ = fmt.Fprintln(r.output, "otlp metrics: http, policy, redis, geoip")
 	_, _ = fmt.Fprintln(r.output, "observability smoke passed")
 
@@ -346,8 +348,10 @@ func (p *serviceProcess) args(redisPort int, otlpEndpoint string) []string {
 		"--force-user-known",
 		"--prometheus-enabled",
 		"--otel-enabled",
+		"--otel-traces-enabled",
 		"--otel-metrics-enabled",
 		"--otel-exporter-otlp-endpoint", otlpEndpoint,
+		"--otel-exporter-otlp-insecure",
 		"--otel-sample-ratio", "1.0",
 	}
 }
@@ -431,7 +435,7 @@ func (c *fakeOTLPCollector) Close(ctx context.Context) {
 // AssertTraceTopology verifies the exported trace graph expected from POST /query.
 func (c *fakeOTLPCollector) AssertTraceTopology() error {
 	spans := c.spanMap()
-	required := []string{httpQuerySpanName, policySpanName, "geoip.lookup", redisGetSpanName, redisSetSpanName}
+	required := []string{httpQuerySpanName, policySpanName, geoIPLookupSpan, maxMindLookupSpan, redisGetSpanName, redisSetSpanName}
 
 	for _, name := range required {
 		if _, ok := spans[name]; !ok {
@@ -551,7 +555,8 @@ func (c *fakeOTLPCollector) spanNames() string {
 func assertSpanRelationships(spans map[string]collectedSpan) error {
 	httpSpan := spans[httpQuerySpanName]
 	policySpan := spans[policySpanName]
-	geoIPSpan := spans["geoip.lookup"]
+	geoIPSpan := spans[geoIPLookupSpan]
+	maxMindSpan := spans[maxMindLookupSpan]
 	redisGETSpan := spans[redisGetSpanName]
 	redisSETSpan := spans[redisSetSpanName]
 
@@ -563,7 +568,11 @@ func assertSpanRelationships(spans map[string]collectedSpan) error {
 		return fmt.Errorf("policy parent = %s, want HTTP span %s", policySpan.parentSpanID, httpSpan.spanID)
 	}
 
-	return assertPolicyChildren(policySpan, geoIPSpan, redisGETSpan, redisSETSpan)
+	if err := assertPolicyChildren(policySpan, geoIPSpan, redisGETSpan, redisSETSpan); err != nil {
+		return err
+	}
+
+	return assertTraceChild(geoIPSpan, maxMindSpan)
 }
 
 // assertPolicyChildren validates all expected child spans under policy.request.
@@ -581,6 +590,19 @@ func assertPolicyChildren(policySpan, geoIPSpan, redisGETSpan, redisSETSpan coll
 
 	if redisGETSpan.kind != tracepb.Span_SPAN_KIND_CLIENT || redisSETSpan.kind != tracepb.Span_SPAN_KIND_CLIENT {
 		return fmt.Errorf("redis spans are not client spans")
+	}
+
+	return nil
+}
+
+// assertTraceChild verifies that a span is a direct child of another span in the same trace.
+func assertTraceChild(parent, child collectedSpan) error {
+	if child.traceID != parent.traceID {
+		return fmt.Errorf("%q trace = %s, want %s", child.name, child.traceID, parent.traceID)
+	}
+
+	if child.parentSpanID != parent.spanID {
+		return fmt.Errorf("%q parent = %s, want span %s", child.name, child.parentSpanID, parent.spanID)
 	}
 
 	return nil

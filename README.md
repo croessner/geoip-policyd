@@ -710,6 +710,7 @@ metrics. It also checks that OTLP traces contain this graph:
 HTTP POST /query
 `-- policy.request
     |-- geoip.lookup
+    |   `-- geoip.maxmind.lookup
     |-- redis.command GET
     `-- redis.command SET
 ```
