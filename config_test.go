@@ -94,6 +94,7 @@ const (
 	testOTLPSampleRatio       = "0.25"
 	testOTLPSecret            = "secret"
 	testOTelEnabledFlag       = "--otel-enabled"
+	testOTelTracesEnabledFlag = "--otel-traces-enabled"
 	testOTelService           = "geoip-policyd-test"
 	testOTelVersion           = "test-version"
 	testPrometheusMetrics     = "/internal/metrics"
@@ -1916,16 +1917,16 @@ func TestConfigObservabilityDefaults(t *testing.T) {
 		t.Fatalf("PrometheusPath = %q, want %s", cfg.Observability.PrometheusPath, prometheusPath)
 	}
 
-	if !cfg.Observability.PrometheusRuntimeMetrics {
-		t.Fatal("PrometheusRuntimeMetrics = false, want true")
+	if cfg.Observability.PrometheusRuntimeMetrics {
+		t.Fatal("PrometheusRuntimeMetrics = true, want false")
 	}
 
 	if cfg.Observability.OTelEnabled {
 		t.Fatal("OTelEnabled = true, want false")
 	}
 
-	if !cfg.Observability.OTelTracesEnabled {
-		t.Fatal("OTelTracesEnabled = false, want true")
+	if cfg.Observability.OTelTracesEnabled {
+		t.Fatal("OTelTracesEnabled = true, want false")
 	}
 
 	if cfg.Observability.OTelMetricsEnabled {
@@ -1940,8 +1941,8 @@ func TestConfigObservabilityDefaults(t *testing.T) {
 		t.Fatalf("OTelSampleRatio = %v, want 1.0", cfg.Observability.OTelSampleRatio)
 	}
 
-	if !cfg.Observability.OTLPInsecure {
-		t.Fatal("OTLPInsecure = false, want true")
+	if cfg.Observability.OTLPInsecure {
+		t.Fatal("OTLPInsecure = true, want false")
 	}
 }
 
@@ -1951,7 +1952,7 @@ func TestConfigPrometheusObservability(t *testing.T) {
 		testCommandApp, testCommandServer,
 		testFlagPrometheusEnabled,
 		"--prometheus-path", testPrometheusMetrics,
-		"--prometheus-runtime-metrics=" + testBooleanFalse,
+		"--prometheus-runtime-metrics",
 	})
 
 	if !cfg.Observability.PrometheusEnabled {
@@ -1962,8 +1963,8 @@ func TestConfigPrometheusObservability(t *testing.T) {
 		t.Fatalf("PrometheusPath = %q, want /internal/metrics", cfg.Observability.PrometheusPath)
 	}
 
-	if cfg.Observability.PrometheusRuntimeMetrics {
-		t.Fatal("PrometheusRuntimeMetrics = true, want false")
+	if !cfg.Observability.PrometheusRuntimeMetrics {
+		t.Fatal("PrometheusRuntimeMetrics = false, want true")
 	}
 }
 
@@ -1971,7 +1972,7 @@ func TestConfigEnvPrometheusObservability(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_PROMETHEUS_ENABLED":         testValueTrue,
 		"GEOIPPOLICYD_PROMETHEUS_PATH":            testPrometheusMetrics,
-		"GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS": testBooleanFalse,
+		"GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS": testValueTrue,
 	})
 	defer closer()
 
@@ -1986,8 +1987,8 @@ func TestConfigEnvPrometheusObservability(t *testing.T) {
 		t.Fatalf("PrometheusPath = %q, want /internal/metrics", cfg.Observability.PrometheusPath)
 	}
 
-	if cfg.Observability.PrometheusRuntimeMetrics {
-		t.Fatal("PrometheusRuntimeMetrics = true, want false")
+	if !cfg.Observability.PrometheusRuntimeMetrics {
+		t.Fatal("PrometheusRuntimeMetrics = false, want true")
 	}
 }
 
@@ -1996,13 +1997,13 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 	cfg.Init([]string{
 		testCommandApp, testCommandServer,
 		testOTelEnabledFlag,
-		"--otel-traces-enabled=" + testBooleanFalse,
+		testOTelTracesEnabledFlag,
 		"--otel-metrics-enabled",
 		"--otel-service-name", testOTelService,
 		"--otel-service-version", testOTelVersion,
 		testOTLPEndpointFlag, testOTLPEndpoint,
 		"--otel-exporter-otlp-headers", testOTLPHeaders,
-		"--otel-exporter-otlp-insecure=" + testBooleanFalse,
+		"--otel-exporter-otlp-insecure",
 		"--otel-sample-ratio", testOTLPSampleRatio,
 	})
 
@@ -2010,8 +2011,8 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 		t.Fatal("OTelEnabled = false, want true")
 	}
 
-	if cfg.Observability.OTelTracesEnabled {
-		t.Fatal("OTelTracesEnabled = true, want false")
+	if !cfg.Observability.OTelTracesEnabled {
+		t.Fatal("OTelTracesEnabled = false, want true")
 	}
 
 	if !cfg.Observability.OTelMetricsEnabled {
@@ -2034,8 +2035,8 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 		t.Fatalf("OTLPHeaders = %#v, want tenant and token entries", cfg.Observability.OTLPHeaders)
 	}
 
-	if cfg.Observability.OTLPInsecure {
-		t.Fatal("OTLPInsecure = true, want false")
+	if !cfg.Observability.OTLPInsecure {
+		t.Fatal("OTLPInsecure = false, want true")
 	}
 
 	if cfg.Observability.OTelSampleRatio != 0.25 {
@@ -2043,7 +2044,7 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 	}
 }
 
-func TestConfigOpenTelemetryMetricsOptIn(t *testing.T) {
+func TestConfigOpenTelemetrySignalsOptIn(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{
 		testCommandApp, testCommandServer,
@@ -2055,8 +2056,8 @@ func TestConfigOpenTelemetryMetricsOptIn(t *testing.T) {
 		t.Fatal("OTelEnabled = false, want true")
 	}
 
-	if !cfg.Observability.OTelTracesEnabled {
-		t.Fatal("OTelTracesEnabled = false, want true")
+	if cfg.Observability.OTelTracesEnabled {
+		t.Fatal("OTelTracesEnabled = true, want false")
 	}
 
 	if cfg.Observability.OTelMetricsEnabled {
@@ -2067,13 +2068,13 @@ func TestConfigOpenTelemetryMetricsOptIn(t *testing.T) {
 func TestConfigEnvOpenTelemetryObservability(t *testing.T) {
 	closer := envSetter(map[string]string{
 		"GEOIPPOLICYD_OTEL_ENABLED":                testValueTrue,
-		"GEOIPPOLICYD_OTEL_TRACES_ENABLED":         testBooleanFalse,
+		"GEOIPPOLICYD_OTEL_TRACES_ENABLED":         testValueTrue,
 		"GEOIPPOLICYD_OTEL_METRICS_ENABLED":        testValueTrue,
 		"GEOIPPOLICYD_OTEL_SERVICE_NAME":           testOTelService,
 		"GEOIPPOLICYD_OTEL_SERVICE_VERSION":        testOTelVersion,
 		"GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT": testOTLPEndpoint,
 		"GEOIPPOLICYD_OTEL_EXPORTER_OTLP_HEADERS":  testOTLPHeaders,
-		"GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE": testBooleanFalse,
+		"GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE": testValueTrue,
 		"GEOIPPOLICYD_OTEL_SAMPLE_RATIO":           testOTLPSampleRatio,
 	})
 	defer closer()
@@ -2085,8 +2086,8 @@ func TestConfigEnvOpenTelemetryObservability(t *testing.T) {
 		t.Fatal("OTelEnabled = false, want true")
 	}
 
-	if cfg.Observability.OTelTracesEnabled {
-		t.Fatal("OTelTracesEnabled = true, want false")
+	if !cfg.Observability.OTelTracesEnabled {
+		t.Fatal("OTelTracesEnabled = false, want true")
 	}
 
 	if !cfg.Observability.OTelMetricsEnabled {
@@ -2109,8 +2110,8 @@ func TestConfigEnvOpenTelemetryObservability(t *testing.T) {
 		t.Fatalf("OTLPHeaders = %#v, want tenant and token entries", cfg.Observability.OTLPHeaders)
 	}
 
-	if cfg.Observability.OTLPInsecure {
-		t.Fatal("OTLPInsecure = true, want false")
+	if !cfg.Observability.OTLPInsecure {
+		t.Fatal("OTLPInsecure = false, want true")
 	}
 
 	if cfg.Observability.OTelSampleRatio != 0.25 {
@@ -2120,7 +2121,12 @@ func TestConfigEnvOpenTelemetryObservability(t *testing.T) {
 
 func TestValidateOpenTelemetryRequiresEndpoint(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{testCommandApp, testCommandServer, testFlagGeoIPPath, tempGeoIPPath(t), testOTelEnabledFlag})
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testOTelEnabledFlag,
+		testOTelTracesEnabledFlag,
+	})
 
 	err := cfg.Validate()
 	if err == nil {
@@ -2129,6 +2135,25 @@ func TestValidateOpenTelemetryRequiresEndpoint(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "otel-exporter-otlp-endpoint") {
 		t.Fatalf("Validate() error = %q, want otel-exporter-otlp-endpoint", err.Error())
+	}
+}
+
+func TestValidateOpenTelemetryRequiresSignal(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testOTelEnabledFlag,
+		testOTLPEndpointFlag, testOTLPEndpoint,
+	})
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want missing OTel signal error")
+	}
+
+	if !strings.Contains(err.Error(), "otel-traces-enabled") {
+		t.Fatalf("Validate() error = %q, want otel-traces-enabled", err.Error())
 	}
 }
 

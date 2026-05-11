@@ -151,15 +151,15 @@ Arguments:
       --http-tls-key                  HTTP TLS server key. Default: /localhost-key.pem
       --prometheus-enabled            Enable Prometheus metrics on the HTTP service. Default: false
       --prometheus-path               HTTP path for Prometheus metrics. Default: /metrics
-      --prometheus-runtime-metrics    Include Go runtime and process metrics. Default: true
+      --prometheus-runtime-metrics    Include Go runtime and process metrics. Default: false
       --otel-enabled                  Enable OpenTelemetry export. Default: false
-      --otel-traces-enabled           Export OpenTelemetry traces when OTel is enabled. Default: true
+      --otel-traces-enabled           Export OpenTelemetry traces when OTel is enabled. Default: false
       --otel-metrics-enabled          Export OpenTelemetry metrics when OTel is enabled. Default: false
       --otel-service-name             OpenTelemetry service.name resource attribute. Default: geoip-policyd
       --otel-service-version          OpenTelemetry service.version resource attribute. Default: current binary version
       --otel-exporter-otlp-endpoint   OTLP HTTP endpoint as host:port or base URL. Default:
       --otel-exporter-otlp-headers    Comma-separated OTLP HTTP headers as key=value pairs. Default:
-      --otel-exporter-otlp-insecure   Use insecure OTLP HTTP transport. Default: true
+      --otel-exporter-otlp-insecure   Use insecure OTLP HTTP transport. Default: false
       --otel-sample-ratio             OpenTelemetry trace sampling ratio between 0.0 and 1.0. Default: 1.0
       --use-ldap                      Enable LDAP support. Default: false
       --ldap-server-uri               Server URI. Specify multiple times, if you need more than one server. Default: [ldap://127.0.0.1:389/]
@@ -242,15 +242,15 @@ on running the service as a docker service.
 | GEOIPPOLICYD_HTTP_TLS_KEY                | HTTP TLS server key; default(/localhost-key.pem)                                                          |
 | GEOIPPOLICYD_PROMETHEUS_ENABLED          | Enable Prometheus metrics on the HTTP service; default(false)                                             |
 | GEOIPPOLICYD_PROMETHEUS_PATH             | HTTP path for Prometheus metrics; default(/metrics)                                                       |
-| GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS  | Include Go runtime and process metrics; default(true)                                                     |
+| GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS  | Include Go runtime and process metrics; default(false)                                                    |
 | GEOIPPOLICYD_OTEL_ENABLED                | Enable OpenTelemetry OTLP HTTP export; default(false)                                                     |
-| GEOIPPOLICYD_OTEL_TRACES_ENABLED         | Export OpenTelemetry traces when OTel is enabled; default(true)                                           |
+| GEOIPPOLICYD_OTEL_TRACES_ENABLED         | Export OpenTelemetry traces when OTel is enabled; default(false)                                          |
 | GEOIPPOLICYD_OTEL_METRICS_ENABLED        | Export OpenTelemetry metrics when OTel is enabled; default(false)                                         |
 | GEOIPPOLICYD_OTEL_SERVICE_NAME           | OpenTelemetry service.name resource attribute; default(geoip-policyd)                                     |
 | GEOIPPOLICYD_OTEL_SERVICE_VERSION        | OpenTelemetry service.version resource attribute; default(current binary version)                         |
 | GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT | OTLP HTTP endpoint as host:port or base URL                                                               |
 | GEOIPPOLICYD_OTEL_EXPORTER_OTLP_HEADERS  | Comma-separated OTLP HTTP headers as key=value pairs                                                      |
-| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE | Use insecure OTLP HTTP transport; default(true)                                                           |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE | Use insecure OTLP HTTP transport; default(false)                                                          |
 | GEOIPPOLICYD_OTEL_SAMPLE_RATIO           | OpenTelemetry trace sampling ratio between 0.0 and 1.0; default(1.0)                                      |
 | GEOIPPOLICYD_USE_LDAP                    | Enable LDAP support; default(false)                                                                       |
 | GEOIPPOLICYD_LDAP_SERVER_URIS            | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)      |
@@ -327,12 +327,12 @@ Useful options:
 |----------------------------------|------------|--------------------------------------------------|
 | --prometheus-enabled             | false      | Enables the `/metrics` endpoint                  |
 | --prometheus-path                | /metrics   | Changes the metrics endpoint path                |
-| --prometheus-runtime-metrics     | true       | Adds Go runtime and process collectors           |
+| --prometheus-runtime-metrics     | false      | Adds Go runtime and process collectors           |
 
 Side effects:
 
 * The HTTP listener serves one additional route when Prometheus is enabled.
-* Go runtime and process collectors add standard `go_*` and `process_*` metrics unless disabled.
+* Go runtime and process collectors add standard `go_*` and `process_*` metrics only when explicitly enabled.
 * `/metrics` is not instrumented by the HTTP middleware to avoid self-scrape noise.
 
 ## OpenTelemetry
@@ -342,24 +342,26 @@ OpenTelemetry uses OTLP over HTTP. Enable it with an endpoint:
 ```shell
 geoip-policyd server \
   --otel-enabled \
-  --otel-exporter-otlp-endpoint 127.0.0.1:4318
+  --otel-traces-enabled \
+  --otel-exporter-otlp-endpoint http://127.0.0.1:4318
 ```
 
 The endpoint may be `host:port` or a base URL such as `http://collector.example:4318`. The exporter uses the standard
-OTLP HTTP paths for traces and metrics.
+OTLP HTTP paths for traces and metrics. At least one of `--otel-traces-enabled` or `--otel-metrics-enabled` must be set
+when `--otel-enabled` is set.
 
 Useful options:
 
 | Option                         | Default          | Description                                                     |
 |--------------------------------|------------------|-----------------------------------------------------------------|
 | --otel-enabled                 | false            | Enables OpenTelemetry export                                    |
-| --otel-traces-enabled          | true             | Exports traces when OTel is enabled                             |
+| --otel-traces-enabled          | false            | Exports traces when OTel is enabled                             |
 | --otel-metrics-enabled         | false            | Exports OTel metrics when OTel is enabled                       |
 | --otel-service-name            | geoip-policyd    | Sets the `service.name` resource attribute                      |
 | --otel-service-version         | current version  | Sets the `service.version` resource attribute                   |
 | --otel-exporter-otlp-endpoint  | empty            | OTLP HTTP collector endpoint; required when OTel is enabled     |
 | --otel-exporter-otlp-headers   | empty            | Comma-separated `key=value` headers for the OTLP HTTP exporter  |
-| --otel-exporter-otlp-insecure  | true             | Uses insecure transport for OTLP HTTP                           |
+| --otel-exporter-otlp-insecure  | false            | Uses insecure transport for OTLP HTTP                           |
 | --otel-sample-ratio            | 1.0              | Trace sampling ratio from `0.0` to `1.0`                        |
 
 Example with headers:
@@ -367,8 +369,8 @@ Example with headers:
 ```shell
 geoip-policyd server \
   --otel-enabled \
+  --otel-traces-enabled \
   --otel-exporter-otlp-endpoint https://collector.example:4318 \
-  --otel-exporter-otlp-insecure=false \
   --otel-exporter-otlp-headers "authorization=Bearer token"
 ```
 
