@@ -1805,8 +1805,8 @@ func TestConfigObservabilityDefaults(t *testing.T) {
 		t.Fatal("OTelTracesEnabled = false, want true")
 	}
 
-	if !cfg.Observability.OTelMetricsEnabled {
-		t.Fatal("OTelMetricsEnabled = false, want true")
+	if cfg.Observability.OTelMetricsEnabled {
+		t.Fatal("OTelMetricsEnabled = true, want false")
 	}
 
 	if cfg.Observability.OTelServiceName != otelService {
@@ -1917,6 +1917,27 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 
 	if cfg.Observability.OTelSampleRatio != 0.25 {
 		t.Fatalf("OTelSampleRatio = %v, want 0.25", cfg.Observability.OTelSampleRatio)
+	}
+}
+
+func TestConfigOpenTelemetryMetricsOptIn(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testOTelEnabledFlag,
+		"--otel-exporter-otlp-endpoint", testOTLPEndpoint,
+	})
+
+	if !cfg.Observability.OTelEnabled {
+		t.Fatal("OTelEnabled = false, want true")
+	}
+
+	if !cfg.Observability.OTelTracesEnabled {
+		t.Fatal("OTelTracesEnabled = false, want true")
+	}
+
+	if cfg.Observability.OTelMetricsEnabled {
+		t.Fatal("OTelMetricsEnabled = true, want false")
 	}
 }
 

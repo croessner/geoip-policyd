@@ -151,7 +151,7 @@ Arguments:
       --prometheus-runtime-metrics    Include Go runtime and process metrics. Default: true
       --otel-enabled                  Enable OpenTelemetry export. Default: false
       --otel-traces-enabled           Export OpenTelemetry traces when OTel is enabled. Default: true
-      --otel-metrics-enabled          Export OpenTelemetry metrics when OTel is enabled. Default: true
+      --otel-metrics-enabled          Export OpenTelemetry metrics when OTel is enabled. Default: false
       --otel-service-name             OpenTelemetry service.name resource attribute. Default: geoip-policyd
       --otel-service-version          OpenTelemetry service.version resource attribute. Default: current binary version
       --otel-exporter-otlp-endpoint   OTLP HTTP endpoint as host:port or base URL. Default:
@@ -240,7 +240,7 @@ on running the service as a docker service.
 | GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS  | Include Go runtime and process metrics; default(true)                                                     |
 | GEOIPPOLICYD_OTEL_ENABLED                | Enable OpenTelemetry OTLP HTTP export; default(false)                                                     |
 | GEOIPPOLICYD_OTEL_TRACES_ENABLED         | Export OpenTelemetry traces when OTel is enabled; default(true)                                           |
-| GEOIPPOLICYD_OTEL_METRICS_ENABLED        | Export OpenTelemetry metrics when OTel is enabled; default(true)                                          |
+| GEOIPPOLICYD_OTEL_METRICS_ENABLED        | Export OpenTelemetry metrics when OTel is enabled; default(false)                                         |
 | GEOIPPOLICYD_OTEL_SERVICE_NAME           | OpenTelemetry service.name resource attribute; default(geoip-policyd)                                     |
 | GEOIPPOLICYD_OTEL_SERVICE_VERSION        | OpenTelemetry service.version resource attribute; default(current binary version)                         |
 | GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT | OTLP HTTP endpoint as host:port or base URL                                                               |
@@ -342,7 +342,7 @@ Useful options:
 |--------------------------------|------------------|-----------------------------------------------------------------|
 | --otel-enabled                 | false            | Enables OpenTelemetry export                                    |
 | --otel-traces-enabled          | true             | Exports traces when OTel is enabled                             |
-| --otel-metrics-enabled         | true             | Exports OTel metrics when OTel is enabled                       |
+| --otel-metrics-enabled         | false            | Exports OTel metrics when OTel is enabled                       |
 | --otel-service-name            | geoip-policyd    | Sets the `service.name` resource attribute                      |
 | --otel-service-version         | current version  | Sets the `service.version` resource attribute                   |
 | --otel-exporter-otlp-endpoint  | empty            | OTLP HTTP collector endpoint; required when OTel is enabled     |

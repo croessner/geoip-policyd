@@ -343,7 +343,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	argServerPrometheusRuntimeMetrics := flags.Bool("prometheus-runtime-metrics", true, "Include Go runtime and process metrics")
 	argServerOTelEnabled := flags.Bool("otel-enabled", false, "Enable OpenTelemetry export")
 	argServerOTelTracesEnabled := flags.Bool("otel-traces-enabled", true, "Export OpenTelemetry traces when OTel is enabled")
-	argServerOTelMetricsEnabled := flags.Bool("otel-metrics-enabled", true, "Export OpenTelemetry metrics when OTel is enabled")
+	argServerOTelMetricsEnabled := flags.Bool("otel-metrics-enabled", false, "Export OpenTelemetry metrics when OTel is enabled")
 	argServerOTelServiceName := flags.String("otel-service-name", otelService, "OpenTelemetry service.name resource attribute")
 	argServerOTelServiceVersion := flags.String("otel-service-version", "", "OpenTelemetry service.version resource attribute")
 	argServerOTLPEndpoint := flags.String("otel-exporter-otlp-endpoint", "", "OTLP HTTP endpoint URL")
