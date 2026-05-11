@@ -72,15 +72,21 @@ const (
 )
 
 type CmdLineConfig struct {
+	// DisablePolicyService controls whether the Postfix policy TCP service is skipped.
+	DisablePolicyService bool
+
 	// Listen address for the policy service
-	ServerAddress string `validate:"ip|hostname_rfc1123"`
+	ServerAddress string
 
 	// Prt number for the policy service
-	ServerPort int `validate:"min=1,max=65535"`
+	ServerPort int
+
+	// DisableHTTPService controls whether the HTTP API service is skipped.
+	DisableHTTPService bool
 
 	// REST interface of the policy service
-	HTTPAddress string `validate:"ip|hostname_rfc1123"`
-	HTTPPort    int    `validate:"min=1,max=65535"`
+	HTTPAddress string
+	HTTPPort    int
 	HTTPApp
 
 	// Use 'sender' or 'sasl_username' attribute?
@@ -160,6 +166,16 @@ type CmdLineConfig struct {
 	ignoreNetworkMatcher *NetworkMatcher
 	// observabilityRuntime owns metrics, tracing providers, and shutdown behavior.
 	observabilityRuntime *Observability
+}
+
+// PolicyServiceEnabled reports whether the Postfix policy TCP service should start.
+func (c *CmdLineConfig) PolicyServiceEnabled() bool {
+	return !c.DisablePolicyService
+}
+
+// HTTPServiceEnabled reports whether the HTTP API service should start.
+func (c *CmdLineConfig) HTTPServiceEnabled() bool {
+	return !c.DisableHTTPService
 }
 
 // ObservabilityConfig contains Prometheus and OpenTelemetry operator settings.
@@ -290,6 +306,8 @@ func (c *CmdLineConfig) Init(args []string) {
 	 */
 	argServerAddress := flags.StringP("server-address", "a", serverAddress, "IPv4 or IPv6 address for the policy service")
 	argServerPort := flags.IntP("server-port", "p", serverPort, "Port for the policy service")
+	argDisablePolicyService := flags.Bool("disable-policy-service", false, "Do not start the policy TCP service")
+	argDisableHTTPService := flags.Bool("disable-http-service", false, "Do not start the HTTP service")
 	argServerHTTPAddress := flags.String("http-address", httpAddress, "HTTP address for incoming requests")
 	argHTTPPort := flags.Int("http-port", httpPort, "HTTP port for incoming requests")
 	argServerUseSASLUsername := flags.Bool("sasl-username", false, "Use 'sasl_username' instead of the 'sender' attribute")
@@ -445,11 +463,17 @@ func (c *CmdLineConfig) Init(args []string) {
 
 	if c.CommandServer {
 		// --- Server ---
+		v.SetDefault("disable_policy_service", *argDisablePolicyService)
+		c.DisablePolicyService = v.GetBool("disable_policy_service")
+
 		v.SetDefault("server_address", *argServerAddress)
 		c.ServerAddress = v.GetString("server_address")
 
 		v.SetDefault("server_port", *argServerPort)
 		c.ServerPort = v.GetInt("server_port")
+
+		v.SetDefault("disable_http_service", *argDisableHTTPService)
+		c.DisableHTTPService = v.GetBool("disable_http_service")
 
 		v.SetDefault("http_address", *argServerHTTPAddress)
 		c.HTTPAddress = v.GetString("http_address")

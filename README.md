@@ -35,6 +35,7 @@ they come from too many IP addresses.
     * [PATCH request /modify](#patch-request-modify)
     * [DELETE request /remove](#delete-request-remove)
 5. [Endpoint test client](#endpoint-test-client)
+    * [OpenTelemetry and Prometheus smoke test](#opentelemetry-and-prometheus-smoke-test)
 6. [Actions](#actions)
     * [Operator action](#operator-action)
 7. [LDAP](#ldap)
@@ -115,6 +116,8 @@ Arguments:
   -h  --help                          Print help information
   -a  --server-address                IPv4 or IPv6 address for the policy service. Default: 127.0.0.1
   -p  --server-port                   Port for the policy service. Default: 4646
+      --disable-policy-service        Do not start the policy TCP service. Default: false
+      --disable-http-service          Do not start the HTTP service. Default: false
       --http-address                  HTTP address for incoming requests. Default: 127.0.0.1
       --http-port                     HTTP port for incoming requests. Default 8080
       --sasl-username                 Use 'sasl_username' instead of the 'sender' attribute. Default: false
@@ -203,8 +206,10 @@ on running the service as a docker service.
 
 | Variable                                 | Description                                                                                               |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| GEOIPPOLICYD_DISABLE_POLICY_SERVICE      | Do not start the policy TCP service; default(false)                                                       |
 | GEOIPPOLICYD_SERVER_ADDRESS              | IPv4 or IPv6 address for the policy service; default(127.0.0.1)                                           |
 | GEOIPPOLICYD_SERVER_PORT                 | Port for the policy service; default(4646)                                                                |
+| GEOIPPOLICYD_DISABLE_HTTP_SERVICE        | Do not start the HTTP service; default(false)                                                             |
 | GEOIPPOLICYD_HTTP_ADDRESS                | HTTP address for incoming requests; default(127.0.0.1:8080)                                               |
 | GEOIPPOLICYD_HTTP_PORT                   | HTTP port for incoming requests; default(8080)                                                            |
 | GEOIPPOLICYD_USE_SASL_USERNAME           | Use 'sasl_username' instead of the 'sender' attribute; default(false)                                     |
@@ -278,6 +283,11 @@ on running the service as a docker service.
 | GEOIPPOLICYD_MAIL_SSL_ON_CONNECT         | Use TLS on connect for the e-mail server; default(false)                                                  |
 | GEOIPPOLICYD_VERBOSE_LEVEL               | Log level. One of 'none', 'info' or 'debug'                                                               |
 
+At least one listener must remain enabled. Do not set both
+`GEOIPPOLICYD_DISABLE_POLICY_SERVICE=true` and
+`GEOIPPOLICYD_DISABLE_HTTP_SERVICE=true`. Prometheus export needs the HTTP
+service because the scrape endpoint is registered there.
+
 Back to [table of contents](#table-of-contents)
 
 # Observability
@@ -302,6 +312,8 @@ The default endpoint is:
 ```text
 http://127.0.0.1:8080/metrics
 ```
+
+`--disable-http-service` cannot be combined with `--prometheus-enabled`.
 
 If HTTP basic auth is enabled, the metrics endpoint uses the same credentials as the REST API:
 
@@ -632,6 +644,45 @@ contrib/geoip-policyd-test.py \
 The output is a compact table with the endpoint name, method, target, status,
 expected status, result, and a short response summary. The process exits with
 status `0` only when all selected checks pass.
+
+## OpenTelemetry and Prometheus smoke test
+
+The `contrib/otel_prometheus_smoke.go` helper runs an external observability
+smoke test. It starts a fake Redis server, a fake OTLP/HTTP collector, and a
+real `geoip-policyd server` process on random loopback ports. It then sends a
+real `POST /query`, scrapes Prometheus, terminates the child process cleanly,
+and validates the exported OTLP protobuf payloads.
+
+Run it through the Makefile:
+
+```shell
+make smoke-observability
+```
+
+The smoke checks that Prometheus contains HTTP, policy, Redis, and GeoIP
+metrics. It also checks that OTLP traces contain this graph:
+
+```text
+HTTP POST /query
+`-- policy.request
+    |-- geoip.lookup
+    |-- redis.command GET
+    `-- redis.command SET
+```
+
+OTLP metrics are checked for `geoip_policyd_http_requests`,
+`geoip_policyd_policy_requests`, `geoip_policyd_redis_operations`, and
+`geoip_policyd_geoip_lookups`.
+
+The helper uses only local loopback ports and temporary files. To run it with an
+existing binary or a different GeoIP database, use:
+
+```shell
+go run -mod=vendor ./contrib \
+  --binary /path/to/geoip-policyd \
+  --geoip-path ./GeoIP2-Country.mmdb \
+  --address 8.8.8.8
+```
 
 Back to [table of contents](#table-of-contents)
 

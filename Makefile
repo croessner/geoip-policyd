@@ -61,10 +61,13 @@ race:
 msan:
 	go test -msan -short $$(go list ./... | grep -v /vendor/)
 
+smoke-observability:
+	go run -mod=vendor ./contrib
+
 guardrails: fix vet lint test race build-check
 
 # Print version
 version:
 	@echo $(VERSION)
 
-.PHONY: all build build-check clean version install uninstall fix vet lint test race msan guardrails
+.PHONY: all build build-check clean version install uninstall fix vet lint test race msan smoke-observability guardrails

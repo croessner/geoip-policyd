@@ -531,9 +531,11 @@ func (o *Observability) InstrumentHTTP(next http.Handler) http.Handler {
 		path := normalizeHTTPPath(request.URL.Path)
 		start := time.Now()
 		ctx := otel.GetTextMapPropagator().Extract(request.Context(), propagation.HeaderCarrier(request.Header))
-		ctx, span := o.StartSpan(ctx,
-			"http.request",
+		ctx, span := o.StartSpanWithKind(ctx,
+			httpSpanName(request.Method, path),
+			trace.SpanKindServer,
 			attribute.String("http.request.method", request.Method),
+			attribute.String("http.route", path),
 			attribute.String("url.path", path),
 		)
 		request = request.WithContext(ctx)
@@ -557,6 +559,11 @@ func (o *Observability) InstrumentHTTP(next http.Handler) http.Handler {
 	})
 }
 
+// httpSpanName returns a low-cardinality server span name for one HTTP route.
+func httpSpanName(method, route string) string {
+	return fmt.Sprintf("HTTP %s %s", method, route)
+}
+
 // statusResponseWriter captures the status code emitted by an HTTP handler.
 type statusResponseWriter struct {
 	http.ResponseWriter
@@ -578,8 +585,13 @@ func (w *statusResponseWriter) Write(data []byte) (int, error) {
 	return w.ResponseWriter.Write(data)
 }
 
-// StartSpan creates a trace span when tracing is enabled, otherwise it returns the existing no-op span.
+// StartSpan creates an internal trace span when tracing is enabled, otherwise it returns the existing no-op span.
 func (o *Observability) StartSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
+	return o.StartSpanWithKind(ctx, name, trace.SpanKindInternal, attrs...)
+}
+
+// StartSpanWithKind creates a trace span with the supplied kind when tracing is enabled.
+func (o *Observability) StartSpanWithKind(ctx context.Context, name string, kind trace.SpanKind, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -588,7 +600,7 @@ func (o *Observability) StartSpan(ctx context.Context, name string, attrs ...att
 		return ctx, trace.SpanFromContext(ctx)
 	}
 
-	return o.tracer.Start(ctx, name, trace.WithAttributes(attrs...))
+	return o.tracer.Start(ctx, name, trace.WithSpanKind(kind), trace.WithAttributes(attrs...))
 }
 
 // RecordSpanError annotates a span with an error and marks it failed.
@@ -904,22 +916,9 @@ type redisObservabilityHook struct {
 func (h *redisObservabilityHook) DialHook(next redis.DialHook) redis.DialHook {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		start := time.Now()
-		ctx, span := h.obs.StartSpan(ctx,
-			"redis.dial",
-			attribute.String("server.address", addr),
-			attribute.String("network.transport", network),
-			attribute.String("redis.role", h.role),
-		)
-
 		conn, err := next(ctx, network, addr)
 		result := resultFromError(err)
 		h.obs.ObserveRedisOperation(ctx, h.role, operationRedisDial, result, time.Since(start))
-
-		if err != nil {
-			h.obs.RecordSpanError(span, err)
-		}
-
-		span.End()
 
 		return conn, err
 	}
@@ -930,8 +929,9 @@ func (h *redisObservabilityHook) ProcessHook(next redis.ProcessHook) redis.Proce
 	return func(ctx context.Context, cmd redis.Cmder) error {
 		operation := strings.ToLower(cmd.Name())
 		start := time.Now()
-		ctx, span := h.obs.StartSpan(ctx,
-			"redis.command",
+		ctx, span := h.obs.StartSpanWithKind(ctx,
+			redisCommandSpanName(operation),
+			trace.SpanKindClient,
 			attribute.String("db.system.name", "redis"),
 			attribute.String("db.operation.name", operation),
 			attribute.String("redis.role", h.role),
@@ -956,8 +956,9 @@ func (h *redisObservabilityHook) ProcessHook(next redis.ProcessHook) redis.Proce
 func (h *redisObservabilityHook) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
 	return func(ctx context.Context, cmds []redis.Cmder) error {
 		start := time.Now()
-		ctx, span := h.obs.StartSpan(ctx,
+		ctx, span := h.obs.StartSpanWithKind(ctx,
 			"redis.pipeline",
+			trace.SpanKindClient,
 			attribute.String("db.system.name", "redis"),
 			attribute.Int("redis.command.count", len(cmds)),
 			attribute.String("redis.role", h.role),
@@ -976,6 +977,11 @@ func (h *redisObservabilityHook) ProcessPipelineHook(next redis.ProcessPipelineH
 
 		return err
 	}
+}
+
+// redisCommandSpanName returns a low-cardinality Redis client span name.
+func redisCommandSpanName(operation string) string {
+	return fmt.Sprintf("redis.command %s", strings.ToUpper(operation))
 }
 
 // resultFromError normalizes errors into low-cardinality result labels.

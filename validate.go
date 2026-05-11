@@ -139,6 +139,14 @@ func (c *CmdLineConfig) Validate() error {
 		return err
 	}
 
+	if err := c.validateServiceSelection(); err != nil {
+		return err
+	}
+
+	if err := c.validateListenerSettings(v); err != nil {
+		return err
+	}
+
 	if err := c.validateStructs(v); err != nil {
 		return err
 	}
@@ -148,6 +156,58 @@ func (c *CmdLineConfig) Validate() error {
 	}
 
 	return c.validateObservabilitySettings()
+}
+
+// validateServiceSelection ensures the process exposes at least one listener.
+func (c *CmdLineConfig) validateServiceSelection() error {
+	if !c.PolicyServiceEnabled() && !c.HTTPServiceEnabled() {
+		return errors.New("at least one listener must remain enabled; remove either 'disable-policy-service' or 'disable-http-service'")
+	}
+
+	return nil
+}
+
+// validateListenerSettings validates bind address and port fields for enabled listeners only.
+func (c *CmdLineConfig) validateListenerSettings(v *validator.Validate) error {
+	if c.PolicyServiceEnabled() {
+		if err := validateListenerAddress(v, "server-address", c.ServerAddress); err != nil {
+			return err
+		}
+
+		if err := validateListenerPort("server-port", c.ServerPort); err != nil {
+			return err
+		}
+	}
+
+	if c.HTTPServiceEnabled() {
+		if err := validateListenerAddress(v, "http-address", c.HTTPAddress); err != nil {
+			return err
+		}
+
+		if err := validateListenerPort("http-port", c.HTTPPort); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateListenerAddress checks that a listener address is an IP address or RFC 1123 hostname.
+func validateListenerAddress(v *validator.Validate, name string, value string) error {
+	if err := v.Var(value, "ip|hostname_rfc1123"); err != nil {
+		return fmt.Errorf("'%s' must be a valid IP address or hostname (got '%s')", name, value)
+	}
+
+	return nil
+}
+
+// validateListenerPort checks the TCP port range accepted by net.Listen.
+func validateListenerPort(name string, value int) error {
+	if value < 1 || value > 65535 {
+		return fmt.Errorf("'%s' must be between 1 and 65535 (got %d)", name, value)
+	}
+
+	return nil
 }
 
 // validateStructs validates exported configuration fields and optional nested LDAP fields.
@@ -169,6 +229,10 @@ func (c *CmdLineConfig) validateStructs(v *validator.Validate) error {
 
 // validateHTTPSettings validates unexported HTTPApp fields that struct tags cannot see.
 func (c *CmdLineConfig) validateHTTPSettings() error {
+	if !c.HTTPServiceEnabled() {
+		return nil
+	}
+
 	// HTTPApp contains only unexported fields which are invisible to the struct validator.
 	// Validate them programmatically.
 	if c.useBasicAuth {
@@ -197,6 +261,10 @@ func (c *CmdLineConfig) validateHTTPSettings() error {
 // validateObservabilitySettings validates metrics and tracing cross-field constraints.
 func (c *CmdLineConfig) validateObservabilitySettings() error {
 	if c.Observability.PrometheusEnabled {
+		if !c.HTTPServiceEnabled() {
+			return errors.New("'disable-http-service' cannot be used when prometheus is enabled")
+		}
+
 		if c.Observability.PrometheusPath == "" || !strings.HasPrefix(c.Observability.PrometheusPath, "/") {
 			return errors.New("'prometheus-path' must start with '/' when prometheus is enabled")
 		}

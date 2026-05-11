@@ -24,6 +24,8 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/segmentio/ksuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func clientConnections(listener net.Listener) chan net.Conn {
@@ -85,38 +87,70 @@ func handleConnection(client net.Conn) {
 		if len(items) == 2 {
 			policyRequest[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
 		} else {
-			var (
-				prefix         string
-				actionText     string
-				policyResponse *PolicyResponse
-			)
+			prefix, actionText := handlePostfixPolicyRequest(client, policyRequest)
 
-			policyResponse, err = getObservedPolicyResponse(context.Background(), sourcePostfixTCP, policyRequest, ksuid.New().String(), false)
-			if err != nil {
-				prefix = "DEFER "
-				actionText = deferText
-
-				_ = level.Error(logger).Log("error", err.Error())
-			} else {
-				if policyResponse.fired {
-					prefix = "REJECT "
-					actionText = rejectText
-				} else {
-					if policyResponse.whitelisted {
-						prefix = "INFO "
-						actionText = fmt.Sprintf("Client IP address <%s> is defined in ignore-networks", policyRequest[ClientAddress])
-					} else {
-						prefix = "DUNNO"
-					}
-				}
-			}
-
-			if _, err = client.Write(fmt.Appendf(nil, "action=%s%s\n\n", prefix, actionText)); err != nil {
-				_ = level.Error(logger).Log("error", err.Error())
+			if _, writeErr := client.Write(fmt.Appendf(nil, "action=%s%s\n\n", prefix, actionText)); writeErr != nil {
+				_ = level.Error(logger).Log("error", writeErr.Error())
 			}
 
 			// Clear policy request for next connection
 			policyRequest = make(map[string]string)
 		}
 	}
+}
+
+// handlePostfixPolicyRequest evaluates one complete Postfix policy request and returns the wire action fields.
+func handlePostfixPolicyRequest(client net.Conn, policyRequest map[string]string) (string, string) {
+	requestCtx, requestSpan, obs := startPostfixPolicyRequestSpan(client)
+	defer func() {
+		if requestSpan != nil {
+			requestSpan.End()
+		}
+	}()
+
+	policyResponse, err := getObservedPolicyResponse(requestCtx, sourcePostfixTCP, policyRequest, ksuid.New().String(), false)
+	if err != nil {
+		if obs != nil {
+			obs.RecordSpanError(requestSpan, err)
+		}
+
+		_ = level.Error(logger).Log("error", err.Error())
+
+		return "DEFER ", deferText
+	}
+
+	return postfixPolicyAction(policyRequest, policyResponse)
+}
+
+// startPostfixPolicyRequestSpan creates the root server span for one raw Postfix TCP policy request.
+func startPostfixPolicyRequestSpan(client net.Conn) (context.Context, trace.Span, *Observability) {
+	requestCtx := context.Background()
+
+	obs := currentObservability()
+	if obs == nil {
+		return requestCtx, nil, nil
+	}
+
+	requestCtx, requestSpan := obs.StartSpanWithKind(
+		requestCtx,
+		"postfix.policy.request",
+		trace.SpanKindServer,
+		attribute.String("network.peer.address", client.RemoteAddr().String()),
+		attribute.String("policy.source", sourcePostfixTCP),
+	)
+
+	return requestCtx, requestSpan, obs
+}
+
+// postfixPolicyAction maps an evaluated policy response to the Postfix action prefix and text.
+func postfixPolicyAction(policyRequest map[string]string, policyResponse *PolicyResponse) (string, string) {
+	if policyResponse.fired {
+		return "REJECT ", rejectText
+	}
+
+	if policyResponse.whitelisted {
+		return "INFO ", fmt.Sprintf("Client IP address <%s> is defined in ignore-networks", policyRequest[ClientAddress])
+	}
+
+	return "DUNNO", ""
 }

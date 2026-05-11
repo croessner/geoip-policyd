@@ -28,6 +28,8 @@ import (
 const (
 	testCommandApp            = "app"
 	testCommandServer         = "server"
+	testEnvDisableHTTPService = "GEOIPPOLICYD_DISABLE_HTTP_SERVICE"
+	testEnvDisablePolicy      = "GEOIPPOLICYD_DISABLE_POLICY_SERVICE"
 	testEnvHTTPUseBasicAuth   = "GEOIPPOLICYD_HTTP_USE_BASIC_AUTH"
 	testEnvHTTPUseSSL         = "GEOIPPOLICYD_HTTP_USE_SSL"
 	testEnvLDAPScope          = "GEOIPPOLICYD_LDAP_SCOPE"
@@ -41,6 +43,7 @@ const (
 	testEnvVerboseLevel       = "GEOIPPOLICYD_VERBOSE_LEVEL"
 	testFlagGeoIPPath         = "--geoip-path"
 	testFlagHomeCountries     = "--home-countries"
+	testFlagHTTPAddress       = "--http-address"
 	testFlagHTTPUseBasicAuth  = "--http-use-basic-auth"
 	testFlagHTTPUseSSL        = "--http-use-ssl"
 	testFlagLDAPScope         = "--ldap-scope"
@@ -49,12 +52,17 @@ const (
 	testFlagMaxHomeCountries  = "--max-home-countries"
 	testFlagMaxHomeIPs        = "--max-home-ips"
 	testFlagMaxIPs            = "--max-ips"
+	testFlagDisableHTTP       = "--disable-http-service"
+	testFlagDisablePolicy     = "--disable-policy-service"
+	testFlagPrometheusEnabled = "--prometheus-enabled"
 	testFlagRedisSentinels    = "--redis-sentinels"
 	testFlagRunActionOperator = "--run-action-operator"
 	testFlagRunActions        = "--run-actions"
+	testFlagServerAddress     = "--server-address"
 	testFlagUseLDAP           = "--use-ldap"
 	testFlagVerbose           = "--verbose"
 	testHTTPAddress           = "192.168.0.1"
+	testInvalidAddress        = "bad host"
 	testLDAPBaseDN            = "o=org"
 	testLDAPBindDN            = "cn=admin,o=org"
 	testLDAPFilter            = "(objectClass=*)"
@@ -81,6 +89,7 @@ const (
 	testVerboseNameNone       = verboseNameNone
 	testBooleanFalse          = "false"
 	testOTLPEndpoint          = "http://collector.example:4318"
+	testOTLPEndpointFlag      = "--otel-exporter-otlp-endpoint"
 	testOTLPHeaders           = "tenant=mail,token=secret"
 	testOTLPSampleRatio       = "0.25"
 	testOTLPSecret            = "secret"
@@ -111,6 +120,21 @@ func envSetter(envs map[string]string) (closer func()) {
 			}
 		}
 	}
+}
+
+func tempGeoIPPath(t *testing.T) string {
+	t.Helper()
+
+	geoIPFile, err := os.CreateTemp(t.TempDir(), "geoip-*.mmdb")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+
+	if err = geoIPFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	return geoIPFile.Name()
 }
 
 func TestConfigVerboseNone(t *testing.T) {
@@ -184,7 +208,7 @@ func TestConfigEnvVerboseDebug(t *testing.T) {
 
 func TestConfigServerAddress(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{testCommandApp, testCommandServer, "--server-address", testServerAddress})
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagServerAddress, testServerAddress})
 
 	if cfg.ServerAddress != testServerAddress {
 		t.Errorf("Expected --server-address=172.16.23.45, got value=%v", cfg.ServerAddress)
@@ -253,7 +277,7 @@ func TestConfigEnvUseSASLUsername(t *testing.T) {
 
 func TestConfigHTTPAddress(t *testing.T) {
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{testCommandApp, testCommandServer, "--http-address", testHTTPAddress})
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagHTTPAddress, testHTTPAddress})
 
 	if cfg.HTTPAddress != testHTTPAddress {
 		t.Errorf("Expected --http-address=192.168.0.1, got value=%v", cfg.HTTPAddress)
@@ -294,6 +318,105 @@ func TestConfigEnvHTTPPort(t *testing.T) {
 
 	if cfg.HTTPPort != 80 {
 		t.Errorf("Expected --http-port=80, got value=%v", cfg.HTTPPort)
+	}
+}
+
+func TestConfigServiceEnabledDefaults(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer})
+
+	if cfg.DisablePolicyService {
+		t.Fatal("DisablePolicyService = true, want false")
+	}
+
+	if cfg.DisableHTTPService {
+		t.Fatal("DisableHTTPService = true, want false")
+	}
+
+	if !cfg.PolicyServiceEnabled() {
+		t.Fatal("PolicyServiceEnabled() = false, want true")
+	}
+
+	if !cfg.HTTPServiceEnabled() {
+		t.Fatal("HTTPServiceEnabled() = false, want true")
+	}
+}
+
+func TestConfigDisablePolicyService(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagDisablePolicy})
+
+	if !cfg.DisablePolicyService {
+		t.Fatal("DisablePolicyService = false, want true")
+	}
+
+	if cfg.PolicyServiceEnabled() {
+		t.Fatal("PolicyServiceEnabled() = true, want false")
+	}
+
+	if !cfg.HTTPServiceEnabled() {
+		t.Fatal("HTTPServiceEnabled() = false, want true")
+	}
+}
+
+func TestConfigEnvDisablePolicyService(t *testing.T) {
+	closer := envSetter(map[string]string{
+		testEnvDisablePolicy: testValueTrue,
+	})
+	defer closer()
+
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer})
+
+	if !cfg.DisablePolicyService {
+		t.Fatal("DisablePolicyService = false, want true")
+	}
+
+	if cfg.PolicyServiceEnabled() {
+		t.Fatal("PolicyServiceEnabled() = true, want false")
+	}
+
+	if !cfg.HTTPServiceEnabled() {
+		t.Fatal("HTTPServiceEnabled() = false, want true")
+	}
+}
+
+func TestConfigDisableHTTPService(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagDisableHTTP})
+
+	if !cfg.DisableHTTPService {
+		t.Fatal("DisableHTTPService = false, want true")
+	}
+
+	if !cfg.PolicyServiceEnabled() {
+		t.Fatal("PolicyServiceEnabled() = false, want true")
+	}
+
+	if cfg.HTTPServiceEnabled() {
+		t.Fatal("HTTPServiceEnabled() = true, want false")
+	}
+}
+
+func TestConfigEnvDisableHTTPService(t *testing.T) {
+	closer := envSetter(map[string]string{
+		testEnvDisableHTTPService: testValueTrue,
+	})
+	defer closer()
+
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer})
+
+	if !cfg.DisableHTTPService {
+		t.Fatal("DisableHTTPService = false, want true")
+	}
+
+	if !cfg.PolicyServiceEnabled() {
+		t.Fatal("PolicyServiceEnabled() = false, want true")
+	}
+
+	if cfg.HTTPServiceEnabled() {
+		t.Fatal("HTTPServiceEnabled() = true, want false")
 	}
 }
 
@@ -1826,7 +1949,7 @@ func TestConfigPrometheusObservability(t *testing.T) {
 	cfg := &CmdLineConfig{}
 	cfg.Init([]string{
 		testCommandApp, testCommandServer,
-		"--prometheus-enabled",
+		testFlagPrometheusEnabled,
 		"--prometheus-path", testPrometheusMetrics,
 		"--prometheus-runtime-metrics=" + testBooleanFalse,
 	})
@@ -1877,7 +2000,7 @@ func TestConfigOpenTelemetryObservability(t *testing.T) {
 		"--otel-metrics-enabled",
 		"--otel-service-name", testOTelService,
 		"--otel-service-version", testOTelVersion,
-		"--otel-exporter-otlp-endpoint", testOTLPEndpoint,
+		testOTLPEndpointFlag, testOTLPEndpoint,
 		"--otel-exporter-otlp-headers", testOTLPHeaders,
 		"--otel-exporter-otlp-insecure=" + testBooleanFalse,
 		"--otel-sample-ratio", testOTLPSampleRatio,
@@ -1925,7 +2048,7 @@ func TestConfigOpenTelemetryMetricsOptIn(t *testing.T) {
 	cfg.Init([]string{
 		testCommandApp, testCommandServer,
 		testOTelEnabledFlag,
-		"--otel-exporter-otlp-endpoint", testOTLPEndpoint,
+		testOTLPEndpointFlag, testOTLPEndpoint,
 	})
 
 	if !cfg.Observability.OTelEnabled {
@@ -1996,24 +2119,99 @@ func TestConfigEnvOpenTelemetryObservability(t *testing.T) {
 }
 
 func TestValidateOpenTelemetryRequiresEndpoint(t *testing.T) {
-	geoIPFile, err := os.CreateTemp(t.TempDir(), "geoip-*.mmdb")
-	if err != nil {
-		t.Fatalf("CreateTemp() error = %v", err)
-	}
-
-	if err = geoIPFile.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-
 	cfg := &CmdLineConfig{}
-	cfg.Init([]string{testCommandApp, testCommandServer, testFlagGeoIPPath, geoIPFile.Name(), testOTelEnabledFlag})
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagGeoIPPath, tempGeoIPPath(t), testOTelEnabledFlag})
 
-	err = cfg.Validate()
+	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("Validate() error = nil, want missing OTLP endpoint error")
 	}
 
 	if !strings.Contains(err.Error(), "otel-exporter-otlp-endpoint") {
 		t.Fatalf("Validate() error = %q, want otel-exporter-otlp-endpoint", err.Error())
+	}
+}
+
+func TestValidateRequiresAtLeastOneService(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagDisablePolicy,
+		testFlagDisableHTTP,
+	})
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want disabled services error")
+	}
+
+	if !strings.Contains(err.Error(), "at least one listener must remain enabled") {
+		t.Fatalf("Validate() error = %q, want service selection error", err.Error())
+	}
+}
+
+func TestValidateRejectsEnabledPolicyServiceAddress(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagServerAddress, testInvalidAddress,
+	})
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want policy listener address error")
+	}
+
+	if !strings.Contains(err.Error(), "server-address") {
+		t.Fatalf("Validate() error = %q, want server-address error", err.Error())
+	}
+}
+
+func TestValidateSkipsDisabledPolicyServiceAddress(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagDisablePolicy,
+		testFlagServerAddress, testInvalidAddress,
+	})
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestValidateSkipsDisabledHTTPServiceAddress(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagDisableHTTP,
+		testFlagHTTPAddress, testInvalidAddress,
+	})
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestValidatePrometheusRequiresHTTPService(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagDisableHTTP,
+		testFlagPrometheusEnabled,
+	})
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want prometheus HTTP service error")
+	}
+
+	if !strings.Contains(err.Error(), "disable-http-service") {
+		t.Fatalf("Validate() error = %q, want disable-http-service error", err.Error())
 	}
 }

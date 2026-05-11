@@ -233,7 +233,7 @@ func (h *HTTP) GETReload() {
 	}
 
 	if customSettings = loadCustomSettings(); customSettings != nil {
-		newCustomSettings = NewCustomSettingsService(config, redisHandle, logger).Load()
+		newCustomSettings = NewCustomSettingsService(config, redisHandle, logger).Load(h.request.Context())
 		if newCustomSettings != nil {
 			storeCustomSettings(newCustomSettings)
 
@@ -337,7 +337,7 @@ func (h *HTTP) POSTRemove() {
 		}
 
 		key := fmt.Sprintf("%s%s", config.RedisPrefix, sender)
-		if err := redisHandle.Del(ctx, key).Err(); err != nil {
+		if err := redisHandle.Del(h.request.Context(), key).Err(); err != nil {
 			h.responseWriter.WriteHeader(http.StatusInternalServerError)
 			h.LogError(err)
 

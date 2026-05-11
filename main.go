@@ -47,7 +47,6 @@ var (
 	redisHandle         redis.UniversalClient
 	redisHandleReplica  redis.UniversalClient
 	logger              log.Logger
-	ctx                 = context.Background()
 )
 
 type RedisLogger struct {
@@ -130,7 +129,8 @@ func NewCustomSettingsService(config *CmdLineConfig, redis redis.UniversalClient
 	}
 }
 
-func (s *CustomSettingsService) Load() *CustomSettings {
+// Load reads configured custom settings and flushes affected Redis entries with the supplied context.
+func (s *CustomSettingsService) Load(ctx context.Context) *CustomSettings {
 	customSettings := &CustomSettings{}
 
 	if s.config.CustomSettingsPath == "" {
@@ -157,18 +157,23 @@ func (s *CustomSettingsService) Load() *CustomSettings {
 		_ = level.Error(s.logger).Log("error", err.Error())
 	}
 
-	s.FlushUsers(customSettings)
+	s.FlushUsers(ctx, customSettings)
 
 	return customSettings
 }
 
-func (s *CustomSettingsService) FlushUsers(settings *CustomSettings) {
+// FlushUsers deletes Redis cache entries for all accounts touched by custom settings.
+func (s *CustomSettingsService) FlushUsers(ctx context.Context, settings *CustomSettings) {
 	if settings == nil || settings.Data == nil {
 		return
 	}
 
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	for _, account := range settings.Data {
-		err := s.redis.Del(context.TODO(), fmt.Sprintf("%s%s", s.config.RedisPrefix, account.Sender)).Err()
+		err := s.redis.Del(ctx, fmt.Sprintf("%s%s", s.config.RedisPrefix, account.Sender)).Err()
 		if err != nil && !errors.Is(err, redis.Nil) {
 			_ = level.Error(s.logger).Log("error", err.Error())
 		}
@@ -313,7 +318,7 @@ func configureRedis(redisLogger *RedisLogger) {
 	}
 
 	customSettingsService := NewCustomSettingsService(config, redisHandle, logger)
-	storeCustomSettings(customSettingsService.Load())
+	storeCustomSettings(customSettingsService.Load(context.Background()))
 
 	_ = level.Info(logger).Log("msg", "Starting geoip-policyd", "version", version)
 }
@@ -364,24 +369,60 @@ func startLDAPWorker() {
 	go ldapWorker(context.Background())
 }
 
-// startServer starts the TCP server, listens for client connections, and handles each connection concurrently.
-// It initializes the server using the configuration values and launches the HTTP server in a goroutine.
-// Each client connection is handled concurrently by the handleConnection function.
-// If an error occurs while starting the server, it logs the error and exits the program.
-func startServer() {
-	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.ServerAddress, config.ServerPort))
+// ListenerRuntime owns startup for the policy and HTTP listener pair.
+type ListenerRuntime struct {
+	config *CmdLineConfig
+	logger log.Logger
+}
+
+// NewListenerRuntime creates a listener runtime from validated process configuration.
+func NewListenerRuntime(config *CmdLineConfig, logger log.Logger) *ListenerRuntime {
+	return &ListenerRuntime{
+		config: config,
+		logger: logger,
+	}
+}
+
+// Start launches all enabled listeners and blocks until the active foreground listener stops.
+func (r *ListenerRuntime) Start() {
+	switch {
+	case r.config.PolicyServiceEnabled():
+		r.startPolicyServer()
+	case r.config.HTTPServiceEnabled():
+		_ = level.Info(r.logger).Log("msg", "Skipping geoip-policyd policy service", "reason", "policy service disabled")
+
+		httpApp()
+	default:
+		handleFileError("Unable to start server", errors.New("at least one listener must be enabled"))
+	}
+}
+
+// startPolicyServer listens for policy TCP clients and optionally starts HTTP in the background.
+func (r *ListenerRuntime) startPolicyServer() {
+	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", r.config.ServerAddress, r.config.ServerPort))
 	if err != nil {
 		handleFileError("Unable to start server", err)
 		return
 	}
 
+	_ = level.Info(r.logger).Log("msg", "Starting geoip-policyd policy service", "address", server.Addr().String())
+
 	clientChan := clientConnections(server)
 
-	go httpApp()
+	if r.config.HTTPServiceEnabled() {
+		go httpApp()
+	} else {
+		_ = level.Info(r.logger).Log("msg", "Skipping geoip-policyd HTTP service", "reason", "HTTP service disabled")
+	}
 
 	for {
 		go handleConnection(<-clientChan)
 	}
+}
+
+// startServer creates the listener runtime and starts the configured services.
+func startServer() {
+	NewListenerRuntime(config, logger).Start()
 }
 
 // startCommandServer starts the command server for the geoip-policyd application.
@@ -407,30 +448,11 @@ func startCommandServer() {
 	startServer()
 }
 
-// handleFileError logs an error message and panics with the provided error message.
-// It logs the message and the error using the logger at the Error level.
-// It then panics with the error message as the argument.
-//
-// The function is typically used to handle file-related errors in the application.
-// In the provided usage examples, it is used to handle errors during server startup and database initialization.
-// After logging the error, it exits the program with an error code.
-// The function does not return any value.
-// It takes two parameters: a message string and an error.
-// The message string is a description of the error and is used for logging purposes.
-// The error is the actual error that occurred.
-//
-// The function is not meant to be used directly as it causes a panic.
-// Instead, it is typically called within a context where the panic can be recovered,
-// such as within a defer statement or a separate goroutine.
-//
-// The function assumes the presence of a logger variable of type log.Logger,
-// which is used to log the error message.
-//
-// The function does not provide an example of usage as it is typically used internally in the application.
+// handleFileError logs a fatal startup error and terminates without emitting a panic stack trace.
 func handleFileError(msg string, err error) {
 	_ = level.Error(logger).Log("msg", msg, "error", err.Error())
 
-	panic(err.Error())
+	os.Exit(1)
 }
 
 // initializeCDB initializes and opens a CDB file at the specified path.
