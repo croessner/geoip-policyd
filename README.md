@@ -25,6 +25,7 @@ they come from too many IP addresses.
     * [Server](#server)
 3. [Observability](#observability)
     * [Prometheus](#prometheus)
+    * [Grafana dashboard](#grafana-dashboard)
     * [OpenTelemetry](#opentelemetry)
 4. [REST interface](#rest-interface)
     * [GET request /reload](#get-request-reload)
@@ -334,6 +335,47 @@ Side effects:
 * The HTTP listener serves one additional route when Prometheus is enabled.
 * Go runtime and process collectors add standard `go_*` and `process_*` metrics only when explicitly enabled.
 * `/metrics` is not instrumented by the HTTP middleware to avoid self-scrape noise.
+
+## Grafana dashboard
+
+The repository ships an importable Grafana 11 dashboard at
+`contrib/grafana/geoip-policyd-grafana11-dashboard.json`. It visualizes the
+Prometheus metrics for policy decisions, HTTP routes, GeoIP lookups and reloads,
+Redis operations, LDAP operations and pool state, CDB lookups, operator actions,
+TCP policy-service connections, and optional Go runtime and process collectors.
+
+Prerequisites:
+
+| Requirement                | Default or note                                                     |
+|----------------------------|---------------------------------------------------------------------|
+| Grafana                    | Dashboard JSON targets Grafana 11 schema version 41                 |
+| Prometheus datasource      | Selected through the `DS_PROMETHEUS` dashboard datasource variable  |
+| geoip-policyd Prometheus   | Start the service with `--prometheus-enabled`                       |
+| Runtime/process panels     | Also enable `--prometheus-runtime-metrics`; otherwise these stay empty |
+
+Import it through the Grafana UI with **Dashboards > New > Import**. For API
+imports, wrap the dashboard JSON for Grafana's create/update endpoint:
+
+```shell
+python3 -c 'import json, sys; dashboard = json.load(open(sys.argv[1], encoding="utf-8")); print(json.dumps({"dashboard": dashboard, "overwrite": True, "message": "Import geoip-policyd dashboard"}))' \
+  contrib/grafana/geoip-policyd-grafana11-dashboard.json |
+curl -X POST \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  http://127.0.0.1:3000/api/dashboards/db
+```
+
+After import, choose the Prometheus datasource and, if needed, narrow the
+dashboard variables for `job`, `instance`, policy `source`, and HTTP `route`.
+
+Side effects:
+
+* Importing the JSON creates or updates only the Grafana dashboard with UID
+  `geoip-policyd-g11`.
+* Dashboard queries read from Prometheus only and do not call geoip-policyd.
+* Runtime panels are intentionally optional because `go_*` and `process_*`
+  metrics are exported only when runtime metrics are enabled.
 
 ## OpenTelemetry
 
