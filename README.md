@@ -201,82 +201,82 @@ on running the service as a docker service.
 
 ## Server
 
-| Variable                                | Description                                                                                               |
-|-----------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| GEOIPPOLICYD_SERVER_ADDRESS             | IPv4 or IPv6 address for the policy service; default(127.0.0.1)                                           |
-| GEOIPPOLICYD_SERVER_PORT                | Port for the policy service; default(4646)                                                                |
-| GEOIPPOLICYD_HTTP_ADDRESS               | HTTP address for incoming requests; default(127.0.0.1:8080)                                               |
-| GEOIPPOLICYD_HTTP_PORT                  | HTTP port for incoming requests; default(8080)                                                            |
-| GEOIPPOLICYD_USE_SASL_USERNAME          | Use 'sasl_username' instead of the 'sender' attribute; default(false)                                     |
-| GEOIPPOLICYD_REDIS_ADDRESS              | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)                                            |
-| GEOIPPOLICYD_REDIS_PORT                 | Port for the Redis service; default(6379)                                                                 |
-| GEOIPPOLICYD_REDIS_USERNAME             | Redis username                                                                                            |
-| GEOIPPOLICYD_REDIS_PASSWORD             | Redis password                                                                                            |
-| GEOIPPOLICYD_REDIS_REPLICA_ADDRESS      | IPv4 or IPv6 address for a Redis service (replica)                                                        |
-| GEOIPPOLICYD_REDIS_REPLICA_PORT         | Port for a Redis service (replica)                                                                        |
-| GEOIPPOLICYD_REDIS_SENTINELS            | List of space seperated sentinel servers                                                                  |
-| GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME | Sentinel master name                                                                                      |
-| GEOIPPOLICYD_REDIS_SENTINEL_USERNAME    | Redis sentinel username                                                                                   |
-| GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD    | Redis sentinel password                                                                                   |
-| GEOIPPOLICYD_REDIS_PREFIX               | Redis prefix; default(geopol_)                                                                            |
-| GEOIPPOLICYD_REDIS_DATABASE_NUMBER      | Redis database number                                                                                     |
-| GEOIPPOLICYD_REDIS_TTL                  | Redis TTL; default(3600)                                                                                  |
-| GEOIPPOLICYD_GEOIP_PATH                 | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)                        |
-| GEOIPPOLICYD_MAX_COUNTRIES              | Maximum number of countries before rejecting e-mails; default(3)                                          |
-| GEOIPPOLICYD_MAX_IPS                    | Maximum number of IP addresses before rejecting e-mails; default(10)                                      |
-| GEOIPPOLICYD_HOME_COUNTRIES             | List of known home country codes                                                                          |
-| GEOIPPOLICYD_MAX_HOME_COUNTRIES         | Maximum number of home countries before rejecting e-mails; default(3)                                     |
-| GEOIPPOLICYD_MAX_HOME_IPS               | Maximum number of home IP addresses before rejecting e-mails; default(10)                                 |
-| GEOIPPOLICYD_BLOCK_PERMANENT            | Do not expire senders from Redis, if they were blocked in the past                                        |
-| GEOIPPOLICYD_CUSTOM_SETTINGS_PATH       | Custom settings with different IP and country limits                                                      |
-| GEOIPPOLICYD_HTTP_USE_BASIC_AUTH        | Enable basic HTTP auth; default(false)                                                                    |
-| GEOIPPOLICYD_HTTP_USE_SSL               | Enable HTTPS; default(false)                                                                              |
-| GEOIPPOLICYD_HTTP_BASIC_AUTH_USERNAME   | HTTP basic auth username                                                                                  |
-| GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD   | HTTP basic auth password                                                                                  |
-| GEOIPPOLICYD_HTTP_TLS_CERT              | HTTP TLS server certificate (full chain); default(/localhost.pem)                                         |
-| GEOIPPOLICYD_HTTP_TLS_KEY               | HTTP TLS server key; default(/localhost-key.pem)                                                          |
-| GEOIPPOLICYD_PROMETHEUS_ENABLED         | Enable Prometheus metrics on the HTTP service; default(false)                                             |
-| GEOIPPOLICYD_PROMETHEUS_PATH            | HTTP path for Prometheus metrics; default(/metrics)                                                       |
-| GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS | Include Go runtime and process metrics; default(true)                                                     |
-| GEOIPPOLICYD_OTEL_ENABLED               | Enable OpenTelemetry OTLP HTTP export; default(false)                                                     |
-| GEOIPPOLICYD_OTEL_TRACES_ENABLED        | Export OpenTelemetry traces when OTel is enabled; default(true)                                           |
-| GEOIPPOLICYD_OTEL_METRICS_ENABLED       | Export OpenTelemetry metrics when OTel is enabled; default(true)                                          |
-| GEOIPPOLICYD_OTEL_SERVICE_NAME          | OpenTelemetry service.name resource attribute; default(geoip-policyd)                                     |
-| GEOIPPOLICYD_OTEL_SERVICE_VERSION       | OpenTelemetry service.version resource attribute; default(current binary version)                         |
-| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT| OTLP HTTP endpoint as host:port or base URL                                                               |
-| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_HEADERS | Comma-separated OTLP HTTP headers as key=value pairs                                                      |
-| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE| Use insecure OTLP HTTP transport; default(true)                                                           |
-| GEOIPPOLICYD_OTEL_SAMPLE_RATIO          | OpenTelemetry trace sampling ratio between 0.0 and 1.0; default(1.0)                                      |
-| GEOIPPOLICYD_USE_LDAP                   | Enable LDAP support; default(false)                                                                       |
-| GEOIPPOLICYD_LDAP_SERVER_URIS           | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)      |
-| GEOIPPOLICYD_LDAP_BASEDN                | Base DN                                                                                                   |
-| GEOIPPOLICYD_LDAP_BINDPW                | Bind PW                                                                                                   |
-| GEOIPPOLICYD_LDAP_FILTER                | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )                                   |
-| GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE      | Result attribute for the requested mail sender; default(mailAccount)                                      |
-| GEOIPPOLICYD_LDAP_STARTTLS              | If this option is given, use StartTLS                                                                     |
-| GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY       | Skip TLS server name verification                                                                         |
-| GEOIPPOLICYD_LDAP_TLS_CAFILE            | File containing TLS CA certificate(s)                                                                     |
-| GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT       | File containing a TLS client certificate                                                                  |
-| GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY        | File containing a TLS client key                                                                          |
-| GEOIPPOLICYD_LDAP_SASL_EXTERNAL         | Use SASL/EXTERNAL instead of a simple bind; default(false)                                                |
-| GEOIPPOLICYD_LDAP_SCOPE                 | LDAP search scope [base, one, sub]; default(sub)                                                          |
-| GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE        | LDAP pre-forked (idle) pool size; default(3)                                                              |
-| GEOIPPOLICYD_LDAP_POOL_SIZE             | LDAP max pool size; default(10)                                                                           |
-| GEOIPPOLICYD_RUN_ACTIONS                | Run actions, if a sender is over limits; default(false)                                                   |
-| GEOIPPOLICYD_RUN_ACTION_OPERATOR        | Run the operator action; default(false)                                                                   |
-| GEOIPPOLICYD_OPERATOR_TO                | E-Mail To-header for the operator action                                                                  |
-| GEOIPPOLICYD_OPERATOR_FROM              | E-Mail From-header for the operator action                                                                |
-| GEOIPPOLICYD_OPERATOR_SUBJECT           | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised) |
-| GEOIPPOLICYD_OPERATOR_MESSAGE_CT        | E-Mail Content-Type-header for the operator action; default(text/plain)                                   |
-| GEOIPPOLICYD_OPERATOR_MESSAGE_PATH      | Full path to the e-mail message file for the operator action                                              |
-| GEOIPPOLICYD_MAIL_SERVER_ADDRESS        | E-mail server address for notifications                                                                   |
-| GEOIPPOLICYD_MAIL_SERVER_PORT           | E-mail server port number                                                                                 |
-| GEOIPPOLICYD_MAIL_HELO                  | E-mail server HELO/EHLO hostname; default(localhost)                                                      |
-| GEOIPPOLICYD_MAIL_PORT                  | E-mail server port number; default(587)                                                                   |
-| GEOIPPOLICYD_MAIL_USERNAME              | E-mail server username                                                                                    |
-| GEOIPPOLICYD_MAIL_PASSWORD              | E-mail server password                                                                                    |
-| GEOIPPOLICYD_MAIL_SSL_ON_CONNECT        | Use TLS on connect for the e-mail server; default(false)                                                  |
-| GEOIPPOLICYD_VERBOSE_LEVEL              | Log level. One of 'none', 'info' or 'debug'                                                               |
+| Variable                                 | Description                                                                                               |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| GEOIPPOLICYD_SERVER_ADDRESS              | IPv4 or IPv6 address for the policy service; default(127.0.0.1)                                           |
+| GEOIPPOLICYD_SERVER_PORT                 | Port for the policy service; default(4646)                                                                |
+| GEOIPPOLICYD_HTTP_ADDRESS                | HTTP address for incoming requests; default(127.0.0.1:8080)                                               |
+| GEOIPPOLICYD_HTTP_PORT                   | HTTP port for incoming requests; default(8080)                                                            |
+| GEOIPPOLICYD_USE_SASL_USERNAME           | Use 'sasl_username' instead of the 'sender' attribute; default(false)                                     |
+| GEOIPPOLICYD_REDIS_ADDRESS               | IPv4 or IPv6 address for the Redis service; default(127.0.0.1)                                            |
+| GEOIPPOLICYD_REDIS_PORT                  | Port for the Redis service; default(6379)                                                                 |
+| GEOIPPOLICYD_REDIS_USERNAME              | Redis username                                                                                            |
+| GEOIPPOLICYD_REDIS_PASSWORD              | Redis password                                                                                            |
+| GEOIPPOLICYD_REDIS_REPLICA_ADDRESS       | IPv4 or IPv6 address for a Redis service (replica)                                                        |
+| GEOIPPOLICYD_REDIS_REPLICA_PORT          | Port for a Redis service (replica)                                                                        |
+| GEOIPPOLICYD_REDIS_SENTINELS             | List of space seperated sentinel servers                                                                  |
+| GEOIPPOLICYD_REDIS_SENTINEL_MASTER_NAME  | Sentinel master name                                                                                      |
+| GEOIPPOLICYD_REDIS_SENTINEL_USERNAME     | Redis sentinel username                                                                                   |
+| GEOIPPOLICYD_REDIS_SENTINEL_PASSWORD     | Redis sentinel password                                                                                   |
+| GEOIPPOLICYD_REDIS_PREFIX                | Redis prefix; default(geopol_)                                                                            |
+| GEOIPPOLICYD_REDIS_DATABASE_NUMBER       | Redis database number                                                                                     |
+| GEOIPPOLICYD_REDIS_TTL                   | Redis TTL; default(3600)                                                                                  |
+| GEOIPPOLICYD_GEOIP_PATH                  | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)                        |
+| GEOIPPOLICYD_MAX_COUNTRIES               | Maximum number of countries before rejecting e-mails; default(3)                                          |
+| GEOIPPOLICYD_MAX_IPS                     | Maximum number of IP addresses before rejecting e-mails; default(10)                                      |
+| GEOIPPOLICYD_HOME_COUNTRIES              | List of known home country codes                                                                          |
+| GEOIPPOLICYD_MAX_HOME_COUNTRIES          | Maximum number of home countries before rejecting e-mails; default(3)                                     |
+| GEOIPPOLICYD_MAX_HOME_IPS                | Maximum number of home IP addresses before rejecting e-mails; default(10)                                 |
+| GEOIPPOLICYD_BLOCK_PERMANENT             | Do not expire senders from Redis, if they were blocked in the past                                        |
+| GEOIPPOLICYD_CUSTOM_SETTINGS_PATH        | Custom settings with different IP and country limits                                                      |
+| GEOIPPOLICYD_HTTP_USE_BASIC_AUTH         | Enable basic HTTP auth; default(false)                                                                    |
+| GEOIPPOLICYD_HTTP_USE_SSL                | Enable HTTPS; default(false)                                                                              |
+| GEOIPPOLICYD_HTTP_BASIC_AUTH_USERNAME    | HTTP basic auth username                                                                                  |
+| GEOIPPOLICYD_HTTP_BASIC_AUTH_PASSWORD    | HTTP basic auth password                                                                                  |
+| GEOIPPOLICYD_HTTP_TLS_CERT               | HTTP TLS server certificate (full chain); default(/localhost.pem)                                         |
+| GEOIPPOLICYD_HTTP_TLS_KEY                | HTTP TLS server key; default(/localhost-key.pem)                                                          |
+| GEOIPPOLICYD_PROMETHEUS_ENABLED          | Enable Prometheus metrics on the HTTP service; default(false)                                             |
+| GEOIPPOLICYD_PROMETHEUS_PATH             | HTTP path for Prometheus metrics; default(/metrics)                                                       |
+| GEOIPPOLICYD_PROMETHEUS_RUNTIME_METRICS  | Include Go runtime and process metrics; default(true)                                                     |
+| GEOIPPOLICYD_OTEL_ENABLED                | Enable OpenTelemetry OTLP HTTP export; default(false)                                                     |
+| GEOIPPOLICYD_OTEL_TRACES_ENABLED         | Export OpenTelemetry traces when OTel is enabled; default(true)                                           |
+| GEOIPPOLICYD_OTEL_METRICS_ENABLED        | Export OpenTelemetry metrics when OTel is enabled; default(true)                                          |
+| GEOIPPOLICYD_OTEL_SERVICE_NAME           | OpenTelemetry service.name resource attribute; default(geoip-policyd)                                     |
+| GEOIPPOLICYD_OTEL_SERVICE_VERSION        | OpenTelemetry service.version resource attribute; default(current binary version)                         |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_ENDPOINT | OTLP HTTP endpoint as host:port or base URL                                                               |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_HEADERS  | Comma-separated OTLP HTTP headers as key=value pairs                                                      |
+| GEOIPPOLICYD_OTEL_EXPORTER_OTLP_INSECURE | Use insecure OTLP HTTP transport; default(true)                                                           |
+| GEOIPPOLICYD_OTEL_SAMPLE_RATIO           | OpenTelemetry trace sampling ratio between 0.0 and 1.0; default(1.0)                                      |
+| GEOIPPOLICYD_USE_LDAP                    | Enable LDAP support; default(false)                                                                       |
+| GEOIPPOLICYD_LDAP_SERVER_URIS            | Server URI. Specify multiple times, if you need more than one server; default(ldap://127.0.0.1:389/)      |
+| GEOIPPOLICYD_LDAP_BASEDN                 | Base DN                                                                                                   |
+| GEOIPPOLICYD_LDAP_BINDPW                 | Bind PW                                                                                                   |
+| GEOIPPOLICYD_LDAP_FILTER                 | Filter with %s placeholder; default( (&(objectClass=*)(mailAlias=%s)) )                                   |
+| GEOIPPOLICYD_LDAP_RESULT_ATTRIBUTE       | Result attribute for the requested mail sender; default(mailAccount)                                      |
+| GEOIPPOLICYD_LDAP_STARTTLS               | If this option is given, use StartTLS                                                                     |
+| GEOIPPOLICYD_LDAP_TLS_SKIP_VERIFY        | Skip TLS server name verification                                                                         |
+| GEOIPPOLICYD_LDAP_TLS_CAFILE             | File containing TLS CA certificate(s)                                                                     |
+| GEOIPPOLICYD_LDAP_TLS_CLIENT_CERT        | File containing a TLS client certificate                                                                  |
+| GEOIPPOLICYD_LDAP_TLS_CLIENT_KEY         | File containing a TLS client key                                                                          |
+| GEOIPPOLICYD_LDAP_SASL_EXTERNAL          | Use SASL/EXTERNAL instead of a simple bind; default(false)                                                |
+| GEOIPPOLICYD_LDAP_SCOPE                  | LDAP search scope [base, one, sub]; default(sub)                                                          |
+| GEOIPPOLICYD_LDAP_IDLE_POOL_SIZE         | LDAP pre-forked (idle) pool size; default(3)                                                              |
+| GEOIPPOLICYD_LDAP_POOL_SIZE              | LDAP max pool size; default(10)                                                                           |
+| GEOIPPOLICYD_RUN_ACTIONS                 | Run actions, if a sender is over limits; default(false)                                                   |
+| GEOIPPOLICYD_RUN_ACTION_OPERATOR         | Run the operator action; default(false)                                                                   |
+| GEOIPPOLICYD_OPERATOR_TO                 | E-Mail To-header for the operator action                                                                  |
+| GEOIPPOLICYD_OPERATOR_FROM               | E-Mail From-header for the operator action                                                                |
+| GEOIPPOLICYD_OPERATOR_SUBJECT            | E-Mail Subject-header for the operator action; default([geoip-policyd] An e-mail account was compromised) |
+| GEOIPPOLICYD_OPERATOR_MESSAGE_CT         | E-Mail Content-Type-header for the operator action; default(text/plain)                                   |
+| GEOIPPOLICYD_OPERATOR_MESSAGE_PATH       | Full path to the e-mail message file for the operator action                                              |
+| GEOIPPOLICYD_MAIL_SERVER_ADDRESS         | E-mail server address for notifications                                                                   |
+| GEOIPPOLICYD_MAIL_SERVER_PORT            | E-mail server port number                                                                                 |
+| GEOIPPOLICYD_MAIL_HELO                   | E-mail server HELO/EHLO hostname; default(localhost)                                                      |
+| GEOIPPOLICYD_MAIL_PORT                   | E-mail server port number; default(587)                                                                   |
+| GEOIPPOLICYD_MAIL_USERNAME               | E-mail server username                                                                                    |
+| GEOIPPOLICYD_MAIL_PASSWORD               | E-mail server password                                                                                    |
+| GEOIPPOLICYD_MAIL_SSL_ON_CONNECT         | Use TLS on connect for the e-mail server; default(false)                                                  |
+| GEOIPPOLICYD_VERBOSE_LEVEL               | Log level. One of 'none', 'info' or 'debug'                                                               |
 
 Back to [table of contents](#table-of-contents)
 
@@ -585,14 +585,14 @@ GeoLite file.
 
 Default targets:
 
-| Option | Default |
-| --- | --- |
-| `--base-url` | `http://127.0.0.1:8080` |
-| `--policy-host` | `127.0.0.1` |
-| `--policy-port` | `4646` |
-| `--sender` | `geoip-policyd-test@example.com` |
-| `--address` | `127.0.0.1` |
-| `--recipient` | `postmaster@example.com` |
+| Option          | Default                          |
+|-----------------|----------------------------------|
+| `--base-url`    | `http://127.0.0.1:8080`          |
+| `--policy-host` | `127.0.0.1`                      |
+| `--policy-port` | `4646`                           |
+| `--sender`      | `geoip-policyd-test@example.com` |
+| `--address`     | `127.0.0.1`                      |
+| `--recipient`   | `postmaster@example.com`         |
 
 Run a single endpoint check:
 
