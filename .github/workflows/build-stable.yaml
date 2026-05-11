@@ -28,7 +28,6 @@ jobs:
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .
       - name: Create artifact
         run: |
-          os="${{ runner.os }}"
           assets="${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           echo "$assets"
           mkdir -p "dist/$assets"
@@ -38,7 +37,7 @@ jobs:
           (
             cd dist
             tar czf "$assets.tar.gz" "$assets"
-            ls -lah *.*
+            ls -lah ./*.tar.gz
           )
         shell: bash
 
@@ -64,6 +63,11 @@ jobs:
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
 
+      - name: Export package version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "PACKAGE_VERSION=${version//-/~}" >> "$GITHUB_ENV"
+
       - name: Copy binaries
         run: |
           mkdir -p .debpkg/usr/sbin
@@ -80,7 +84,7 @@ jobs:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
+          version: ${{ env.PACKAGE_VERSION }}
           arch: '${{ matrix.goarch }}'
           desc: '${{ env.DESC }}'
 
@@ -105,15 +109,37 @@ jobs:
           wget https://github.com/git-chglog/git-chglog/releases/download/v${{ env.CHGELOG_VERSION }}/git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           tar xzf git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           chmod +x git-chglog
-          ./git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          latest_tag="$(git describe --tags "$(git rev-list --tags --max-count=1)")"
+          ./git-chglog --output ./changelog "${latest_tag}"
 
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install -y gh
 
+      - name: Detect release type
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "PRERELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "PRERELEASE=false" >> "$GITHUB_ENV"
+          fi
+
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh release create ${{ github.ref_name }} ./changelog --title "Release ${{ github.ref_name }}" --notes-file ./changelog --draft=false --prerelease=false
+        run: |
+          release_args=(
+            "${GITHUB_REF_NAME}"
+            ./changelog
+            --title "Release ${GITHUB_REF_NAME}"
+            --notes-file ./changelog
+            --draft=false
+          )
+
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          gh release create "${release_args[@]}"
 
   upload-release:
     runs-on: ubuntu-latest
@@ -165,9 +191,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
         run: gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.pkg }}
 
-      - run: echo "ASSET_NAME=$(ls *.${{ matrix.pkg }} | head -n 1)" >> "$GITHUB_ENV"
+      - name: Select package asset
+        run: |
+          asset_name="$(find . -maxdepth 1 -type f -name '*.${{ matrix.pkg }}' -print -quit)"
+          asset_name="${asset_name#./}"
+          echo "ASSET_NAME=${asset_name}" >> "$GITHUB_ENV"
 
       - name: Upload Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh release upload ${{ github.ref_name }} $ASSET_NAME
+        run: gh release upload "${GITHUB_REF_NAME}" "${ASSET_NAME}"

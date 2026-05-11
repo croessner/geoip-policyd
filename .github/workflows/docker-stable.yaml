@@ -27,13 +27,21 @@ jobs:
       - name: Extract tag versions
         id: extract_version
         run: |
-          tag=${GITHUB_REF##*/}
-          major=$(echo $tag | cut -d'.' -f1)
-          minor=$(echo $tag | cut -d'.' -f2)
-          patch=$(echo $tag | cut -d'.' -f3)
-          echo "major=${major}" >> $GITHUB_ENV
-          echo "minor=${minor}" >> $GITHUB_ENV
-          echo "patch=${patch}" >> $GITHUB_ENV
+          tag="${GITHUB_REF_NAME}"
+          base="${tag%%-*}"
+          image="ghcr.io/${{ github.repository_owner }}/geoip-policyd"
+          IFS='.' read -r major minor _patch <<< "${base}"
+
+          {
+            echo "docker_tags<<EOF"
+            echo "${image}:${tag}"
+            if [[ "${tag}" != *-* ]]; then
+              echo "${image}:latest"
+              echo "${image}:${major}"
+              echo "${image}:${major}.${minor}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -42,9 +50,5 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/geoip-policyd:latest
-            ghcr.io/${{ github.repository_owner }}/geoip-policyd:${{ env.major }}
-            ghcr.io/${{ github.repository_owner }}/geoip-policyd:${{ env.major }}.${{ env.minor }}
-            ghcr.io/${{ github.repository_owner }}/geoip-policyd:${{ env.major }}.${{ env.minor }}.${{ env.patch }}
+          tags: ${{ steps.extract_version.outputs.docker_tags }}
           outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Policy server that blocks senders based on country and IP diversity
