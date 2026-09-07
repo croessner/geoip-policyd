@@ -86,6 +86,30 @@ Back to [table of contents](#table-of-contents)
 
 ## Preparing a docker image
 
+Builds require Go 1.26.8 or a newer patched Go 1.26 toolchain. Module metadata,
+CI, release packaging, and the container builder use Go 1.26.8. Dependencies
+are vendored; after updates, run `go mod tidy`, `go mod vendor`, and
+`make guardrails`. Run `make smoke-observability` to verify the local HTTP,
+Redis, Prometheus, and OTLP integration after dependency updates.
+
+The Docker image uses Alpine 3.23 and runs as UID/GID `10001:10001`.
+Mounted GeoIP databases, custom settings, TLS keys, CA files, and action
+templates must be readable by that identity, with searchable parent directories.
+Grant access narrowly, especially for private keys. The systemd package
+continues to use its existing `DynamicUser` identity.
+Buildx selects the target architecture for both bundled executables. The OCI
+export below requires a Buildx builder with the `docker-container` driver:
+
+```shell
+docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/geoip-policyd.tar .
+```
+
+There is no built-in container health check. Operators must configure checks
+for their enabled listeners, addresses, TLS, and authentication settings;
+either listener can be disabled. A process-only check does not verify policy
+admission or Redis/LDAP availability. Use the endpoint test client below only
+against a dedicated test instance when exercising mutating endpoints.
+
 The simplest way to use the program is by using a docker image. You can build your own, as the default repository is not
 public for other people.
 

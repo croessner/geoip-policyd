@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.26.x
+          go-version: 1.26.8
       - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.26.x
+          go-version: 1.26.8
       - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -109,8 +109,7 @@ jobs:
           wget https://github.com/git-chglog/git-chglog/releases/download/v${{ env.CHGELOG_VERSION }}/git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           tar xzf git-chglog_${{ env.CHGELOG_VERSION }}_linux_amd64.tar.gz
           chmod +x git-chglog
-          latest_tag="$(git describe --tags "$(git rev-list --tags --max-count=1)")"
-          ./git-chglog --output ./changelog "${latest_tag}"
+          ./git-chglog --output ./changelog "${GITHUB_REF_NAME}"
 
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install -y gh
@@ -162,7 +161,7 @@ jobs:
       - name: Download Artifact
         env:
           GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}
+        run: gh run download "${GITHUB_RUN_ID}" --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - name: Upload Asset
         env:
@@ -189,7 +188,7 @@ jobs:
       - name: Download Artifact
         env:
           GH_TOKEN: ${{ secrets.GEOIP_POLICYD_TOKEN }}
-        run: gh run download --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.pkg }}
+        run: gh run download "${GITHUB_RUN_ID}" --name artifact-${{ matrix.goos }}-${{ matrix.goarch }}-${{ matrix.pkg }}
 
       - name: Select package asset
         run: |
