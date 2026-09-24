@@ -101,3 +101,6 @@ tests.http
 # Python helper script artifacts
 __pycache__/
 *.py[cod]
+
+# Local scratch notes and design drafts
+temp/
