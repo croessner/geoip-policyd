@@ -28,8 +28,7 @@ import (
 
 	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log/level"
-	"github.com/json-iterator/go"
-	"github.com/oschwald/maxminddb-golang"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/segmentio/ksuid"
 )
 
@@ -194,25 +193,13 @@ func (h *HTTP) GETReload() {
 		newCustomSettings *CustomSettings
 	)
 
-	reader, err := maxminddb.Open(config.GeoipPath)
-	if err != nil {
-		if obs := currentObservability(); obs != nil {
-			obs.ObserveGeoIPReload(h.request.Context(), resultError)
-		}
-
+	// Reload logs and records the outcome itself; the handler only adds the request-scoped error.
+	if err = geoIP.Reload(h.request.Context()); err != nil {
 		h.responseWriter.WriteHeader(http.StatusInternalServerError)
 		h.LogError(err)
 
 		return
 	}
-
-	geoIP.SwapReader(reader)
-
-	if obs := currentObservability(); obs != nil {
-		obs.ObserveGeoIPReload(h.request.Context(), resultOK)
-	}
-
-	h.LogInfo("file", config.GeoipPath, "result", "reloaded")
 
 	if config.UseCDB {
 		var db *cdb.CDB

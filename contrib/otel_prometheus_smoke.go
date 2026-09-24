@@ -35,7 +35,7 @@ const (
 	defaultSender      = "otel-smoke@example.test"
 	defaultTimeout     = 30 * time.Second
 	geoIPLookupSpan    = "geoip.lookup"
-	maxMindLookupSpan  = "geoip.maxmind.lookup"
+	mmdbLookupSpan     = "geoip.mmdb.lookup"
 	httpQuerySpanName  = "HTTP POST /query"
 	loopbackAddress    = "127.0.0.1"
 	metricPath         = "/metrics"
@@ -249,7 +249,7 @@ func (r *smokeRunner) assertSmokeResults(collector *fakeOTLPCollector, prometheu
 	}
 
 	_, _ = fmt.Fprintln(r.output, "prometheus metrics: http, policy, redis, geoip")
-	_, _ = fmt.Fprintln(r.output, "otlp trace graph: HTTP POST /query -> policy.request -> geoip.lookup -> geoip.maxmind.lookup, redis.command GET, redis.command SET")
+	_, _ = fmt.Fprintln(r.output, "otlp trace graph: HTTP POST /query -> policy.request -> geoip.lookup -> geoip.mmdb.lookup, redis.command GET, redis.command SET")
 	_, _ = fmt.Fprintln(r.output, "otlp metrics: http, policy, redis, geoip")
 	_, _ = fmt.Fprintln(r.output, "observability smoke passed")
 
@@ -435,7 +435,7 @@ func (c *fakeOTLPCollector) Close(ctx context.Context) {
 // AssertTraceTopology verifies the exported trace graph expected from POST /query.
 func (c *fakeOTLPCollector) AssertTraceTopology() error {
 	spans := c.spanMap()
-	required := []string{httpQuerySpanName, policySpanName, geoIPLookupSpan, maxMindLookupSpan, redisGetSpanName, redisSetSpanName}
+	required := []string{httpQuerySpanName, policySpanName, geoIPLookupSpan, mmdbLookupSpan, redisGetSpanName, redisSetSpanName}
 
 	for _, name := range required {
 		if _, ok := spans[name]; !ok {
@@ -556,7 +556,7 @@ func assertSpanRelationships(spans map[string]collectedSpan) error {
 	httpSpan := spans[httpQuerySpanName]
 	policySpan := spans[policySpanName]
 	geoIPSpan := spans[geoIPLookupSpan]
-	maxMindSpan := spans[maxMindLookupSpan]
+	mmdbSpan := spans[mmdbLookupSpan]
 	redisGETSpan := spans[redisGetSpanName]
 	redisSETSpan := spans[redisSetSpanName]
 
@@ -572,7 +572,7 @@ func assertSpanRelationships(spans map[string]collectedSpan) error {
 		return err
 	}
 
-	return assertTraceChild(geoIPSpan, maxMindSpan)
+	return assertTraceChild(geoIPSpan, mmdbSpan)
 }
 
 // assertPolicyChildren validates all expected child spans under policy.request.

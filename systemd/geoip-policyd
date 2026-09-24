@@ -20,6 +20,9 @@ GEOIPPOLICYD_REDIS_REPLICA_PORT="6379"
 GEOIPPOLICYD_REDIS_DATABASE_NUMBER="0"
 
 GEOIPPOLICYD_GEOIP_PATH="/usr/share/GeoIP/GeoLite2-City.mmdb"
+# auto detects MaxMind or IPinfo Lite from the database metadata; maxmind or ipinfo enforce one schema.
+#GEOIPPOLICYD_GEOIP_PROVIDER="auto"
+#GEOIPPOLICYD_GEOIP_PATH="/usr/share/GeoIP/ipinfo_lite.mmdb"
 
 GEOIPPOLICYD_BLOCKED_PERMANENT="false"
 

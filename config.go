@@ -36,6 +36,7 @@ const (
 	redisAddress   = Localhost4
 	redisPort      = 6379
 	geoipPath      = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+	geoipProvider  = geoIPProviderAuto
 	redisPrefix    = "geopol_"
 	redisTTL       = 3600
 	maxCountries   = 3
@@ -112,6 +113,7 @@ type CmdLineConfig struct {
 	RedisTTL    int    `validate:"min=0"`
 
 	GeoipPath        string   `validate:"required,file"`
+	GeoipProvider    string   `validate:"oneof=auto maxmind ipinfo"`
 	MaxCountries     int      `validate:"min=0"`
 	MaxIPs           int      `validate:"min=0"`
 	HomeCountries    []string `validate:"dive,iso3166_1_alpha2"`
@@ -341,6 +343,7 @@ func (c *CmdLineConfig) Init(args []string) {
 	 * Other config options
 	 */
 	argServerGeoIPDB := flags.StringP("geoip-path", "g", geoipPath, "Full path to the GeoIP database file")
+	argServerGeoIPProvider := flags.String("geoip-provider", geoipProvider, "GeoIP database provider: auto, maxmind or ipinfo")
 	argServerMaxCountries := flags.Int("max-countries", maxCountries, "Maximum number of countries before rejecting e-mails")
 	argServerMaxIPs := flags.Int("max-ips", maxIPs, "Maximum number of IP addresses before rejecting e-mails")
 	argServerHomeCountries := flags.StringArray("home-countries", []string{}, "List of known home country codes")
@@ -535,6 +538,9 @@ func (c *CmdLineConfig) Init(args []string) {
 		// --- GeoIP ---
 		v.SetDefault("geoip_path", *argServerGeoIPDB)
 		c.GeoipPath = v.GetString("geoip_path")
+
+		v.SetDefault("geoip_provider", *argServerGeoIPProvider)
+		c.GeoipProvider = v.GetString("geoip_provider")
 
 		// --- Country / IP limits ---
 		v.SetDefault("max_countries", *argServerMaxCountries)

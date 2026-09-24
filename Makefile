@@ -64,10 +64,14 @@ msan:
 smoke-observability:
 	go run -mod=vendor ./contrib
 
+# Regenerate the synthetic MMDB test fixtures from the standalone generator module.
+fixtures:
+	cd contrib/mmdbfixture && GOFLAGS=-mod=mod go run . -out ../../testdata
+
 guardrails: fix vet lint test race build-check
 
 # Print version
 version:
 	@echo $(VERSION)
 
-.PHONY: all build build-check clean version install uninstall fix vet lint test race msan smoke-observability guardrails
+.PHONY: all build build-check clean version install uninstall fix vet lint test race msan smoke-observability fixtures guardrails

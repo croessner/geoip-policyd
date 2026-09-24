@@ -53,3 +53,10 @@ var (
 var (
 	errPolicyProtocol = errors.New("protocol error")
 )
+
+// geoip.
+var (
+	errGeoIPSchemaMismatch  = errors.New("GeoIP database does not match the expected record schema")
+	errGeoIPUnknownProvider = errors.New("unknown GeoIP provider")
+	errGeoIPLoaderMissing   = errors.New("no GeoIP database loader configured")
+)

@@ -62,6 +62,9 @@ var validationMessageFormatters = map[string]validationMessageFormatter{
 	"cidr_or_ip": func(e validator.FieldError) string {
 		return fmt.Sprintf("'%s' must be a valid IP address or CIDR notation (got '%v')", e.Field(), e.Value())
 	},
+	"oneof": func(e validator.FieldError) string {
+		return fmt.Sprintf("'%s' must be one of [%s] (got '%v')", e.Field(), e.Param(), e.Value())
+	},
 	"contains": func(e validator.FieldError) string {
 		return fmt.Sprintf("'%s' must contain the substring '%s' (got '%v')", e.Field(), e.Param(), e.Value())
 	},

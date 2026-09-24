@@ -20,6 +20,7 @@ they come from too many IP addresses.
     * [Postfix integration](#postfix-integration)
     * [Custom settings](#custom-settings)
     * [Preparing a docker image](#preparing-a-docker-image)
+    * [GeoIP data sources](#geoip-data-sources)
     * [Server options](#server-options)
 2. [Environment variables](#environment-variables)
     * [Server](#server)
@@ -37,6 +38,7 @@ they come from too many IP addresses.
     * [DELETE request /remove](#delete-request-remove)
 5. [Endpoint test client](#endpoint-test-client)
     * [OpenTelemetry and Prometheus smoke test](#opentelemetry-and-prometheus-smoke-test)
+    * [MMDB test fixtures](#mmdb-test-fixtures)
 6. [Actions](#actions)
     * [Operator action](#operator-action)
 7. [LDAP](#ldap)
@@ -125,6 +127,88 @@ For a complete example see [here](docker-compose.yml)
 
 Back to [table of contents](#table-of-contents)
 
+## GeoIP data sources
+
+geoip-policyd reads country data from a local MMDB file. Two providers are
+supported; the file is never bundled with the binary, Docker image, or package,
+so operators download and update it themselves.
+
+| Provider      | Typical file             | Record layout used            | License                        |
+|---------------|--------------------------|-------------------------------|--------------------------------|
+| MaxMind       | `GeoLite2-City.mmdb`, `GeoLite2-Country.mmdb`, `GeoIP2-*` | `country.iso_code` | GeoLite2 EULA |
+| IPinfo Lite   | `ipinfo_lite.mmdb`       | `country_code`                | CC BY-SA 4.0 (attribution)     |
+
+Any other database with a MaxMind-compatible `country.iso_code` layout, such as
+DB-IP Country Lite, uses the MaxMind schema.
+
+`--geoip-provider` (`GEOIPPOLICYD_GEOIP_PROVIDER`) selects how records are
+decoded:
+
+- `auto` (default) reads the `database_type` metadata. IPinfo Lite databases use
+  the IPinfo schema, other IPinfo products (for example the legacy
+  `country_asn.mmdb`) are rejected, and everything else uses the MaxMind schema.
+- `maxmind` or `ipinfo` enforce one schema.
+
+Every load verifies the schema by decoding the first networks of the file. A
+database without usable country codes, such as a GeoLite2-ASN file or a file
+that does not match the enforced provider, is rejected with a `schema_mismatch`
+error instead of silently returning empty country codes.
+
+On startup, a load failure terminates the process. On reload, either through the
+five-minute file modification check or `GET /reload`, a failure keeps the active
+database in service, increments `geoip_policyd_geoip_reloads_total` with
+`result="error"` or `result="schema_mismatch"`, and the file check retries on the
+next tick. The initial load at startup is not counted as a reload. Each successful load logs the provider, database type, and build time,
+and warns when the build is older than 30 days.
+
+### MaxMind
+
+Create a free GeoLite account at <https://www.maxmind.com/en/geolite2/signup> and
+keep the database current with MaxMind's
+[`geoipupdate`](https://github.com/maxmind/geoipupdate), which replaces files
+atomically. Configure `EditionIDs GeoLite2-City` (or `GeoLite2-Country`) and point
+`GEOIPPOLICYD_GEOIP_PATH` at the resulting file, by default
+`/usr/share/GeoIP/GeoLite2-City.mmdb`.
+
+### IPinfo Lite
+
+Create a free account at <https://ipinfo.io/lite> to obtain a download token.
+`contrib/update-ipinfo-lite.sh` downloads the database and replaces the target
+atomically:
+
+```shell
+IPINFO_TOKEN=... contrib/update-ipinfo-lite.sh /usr/share/GeoIP/ipinfo_lite.mmdb
+```
+
+| Setting           | Default                                        |
+|-------------------|------------------------------------------------|
+| target argument   | `/usr/share/GeoIP/ipinfo_lite.mmdb`            |
+| `IPINFO_TOKEN`    | required                                       |
+| `IPINFO_URL`      | `https://ipinfo.io/data/ipinfo_lite.mmdb`      |
+| `IPINFO_MIN_SIZE` | `1048576` bytes; smaller downloads are refused |
+
+Downloads time out after 10 minutes and are retried up to three times. Files
+without the MMDB metadata marker, such as HTML error pages, are refused.
+
+The script writes a temporary file in the target directory, checks its size,
+sets mode `0644`, and moves it over the target. It needs write access to the
+target directory and passes the token to `curl` via standard input, so the token
+does not show up in the process list. Run it from cron or a systemd timer; IPinfo
+refreshes the data daily. geoip-policyd picks up the new file automatically.
+
+Then point geoip-policyd at the file:
+
+```shell
+GEOIPPOLICYD_GEOIP_PATH="/usr/share/GeoIP/ipinfo_lite.mmdb"
+GEOIPPOLICYD_GEOIP_PROVIDER="ipinfo"   # optional, auto detects it as well
+```
+
+IPinfo Lite data is licensed under CC BY-SA 4.0. If you publish or pass on data
+derived from it, credit IPinfo, for example with "IP address data powered by
+[IPinfo](https://ipinfo.io)". geoip-policyd itself does not redistribute the data.
+
+Back to [table of contents](#table-of-contents)
+
 ## Server options
 
 ```shell
@@ -160,6 +244,7 @@ Arguments:
       --redis-database-number         Redis database number. Default: 0
       --redis-ttl                     Redis TTL in seconds. Default: 3600
   -g  --geoip-path                    Full path to the GeoIP database file. Default: /usr/share/GeoIP/GeoLite2-City.mmdb
+      --geoip-provider                GeoIP database provider: auto, maxmind or ipinfo. Default: auto
       --max-countries                 Maximum number of countries before rejecting e-mails. Default: 3
       --max-ips                       Maximum number of IP addresses before rejecting e-mails. Default: 10
       --home-countries                List of known home country codes. Default:
@@ -252,6 +337,7 @@ on running the service as a docker service.
 | GEOIPPOLICYD_REDIS_DATABASE_NUMBER       | Redis database number                                                                                     |
 | GEOIPPOLICYD_REDIS_TTL                   | Redis TTL; default(3600)                                                                                  |
 | GEOIPPOLICYD_GEOIP_PATH                  | Full path to the GeoIP database file; default(/usr/share/GeoIP/GeoLite2-City.mmdb)                        |
+| GEOIPPOLICYD_GEOIP_PROVIDER              | GeoIP database provider: auto, maxmind or ipinfo; default(auto)                                           |
 | GEOIPPOLICYD_MAX_COUNTRIES               | Maximum number of countries before rejecting e-mails; default(3)                                          |
 | GEOIPPOLICYD_MAX_IPS                     | Maximum number of IP addresses before rejecting e-mails; default(10)                                      |
 | GEOIPPOLICYD_HOME_COUNTRIES              | List of known home country codes                                                                          |
@@ -454,6 +540,10 @@ Back to [table of contents](#table-of-contents)
 
 Request: reload     
 Response: No results
+
+The GeoIP database is reloaded through the same verified loader as on startup.
+If it cannot be loaded, the endpoint returns `500` and the active database stays
+in service (see [GeoIP data sources](#geoip-data-sources)).
 
 Example:
 
@@ -661,7 +751,8 @@ standard library and does not require a virtual environment.
 
 The repository contains `testdata/GeoIP2-City-Test.mmdb` for local smoke tests
 that need a valid MaxMind database without depending on an operator-provided
-GeoLite file.
+GeoLite file. `testdata/IPinfo-Lite-Test.mmdb` is a small synthetic IPinfo Lite
+database (see [MMDB test fixtures](#mmdb-test-fixtures)).
 
 Default targets:
 
@@ -734,7 +825,7 @@ metrics. It also checks that OTLP traces contain this graph:
 HTTP POST /query
 `-- policy.request
     |-- geoip.lookup
-    |   `-- geoip.maxmind.lookup
+    |   `-- geoip.mmdb.lookup
     |-- redis.command GET
     `-- redis.command SET
 ```
@@ -752,6 +843,30 @@ go run -mod=vendor ./contrib \
   --geoip-path ./GeoIP2-Country.mmdb \
   --address 8.8.8.8
 ```
+
+Both GeoIP spans carry the `geoip.provider` attribute (`maxmind` or `ipinfo`).
+
+## MMDB test fixtures
+
+`contrib/mmdbfixture` generates the synthetic databases used by the unit tests:
+
+| File                               | Purpose                                                   |
+|------------------------------------|-----------------------------------------------------------|
+| `testdata/IPinfo-Lite-Test.mmdb`   | IPinfo Lite layout, IPv4 and IPv6 networks, one without ASN |
+| `testdata/IPinfo-Legacy-Test.mmdb` | Legacy IPinfo `country_asn` layout, must be rejected      |
+| `testdata/GeoLite2-ASN-Test.mmdb`  | ASN-only database, must fail schema verification          |
+
+The generator is a separate Go module with its own `go.mod`, so its
+`github.com/maxmind/mmdbwriter` dependency never enters the vendored runtime
+module or `./...`. Regenerate the fixtures with:
+
+```shell
+make fixtures
+```
+
+The target downloads the generator dependencies into the Go module cache,
+overwrites the three files in `testdata/`, and changes nothing else. Commit the
+regenerated files together with generator changes.
 
 Back to [table of contents](#table-of-contents)
 

@@ -42,6 +42,7 @@ const (
 	testEnvUseLDAP            = "GEOIPPOLICYD_USE_LDAP"
 	testEnvVerboseLevel       = "GEOIPPOLICYD_VERBOSE_LEVEL"
 	testFlagGeoIPPath         = "--geoip-path"
+	testFlagGeoIPProvider     = "--geoip-provider"
 	testFlagHomeCountries     = "--home-countries"
 	testFlagHTTPAddress       = "--http-address"
 	testFlagHTTPUseBasicAuth  = "--http-use-basic-auth"
@@ -2238,5 +2239,54 @@ func TestValidatePrometheusRequiresHTTPService(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "disable-http-service") {
 		t.Fatalf("Validate() error = %q, want disable-http-service error", err.Error())
+	}
+}
+
+// TestConfigGeoIPProviderDefaultsToAuto verifies that existing deployments keep automatic provider detection.
+func TestConfigGeoIPProviderDefaultsToAuto(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer})
+
+	if cfg.GeoipProvider != geoIPProviderAuto {
+		t.Errorf("GeoipProvider = %q, want %q", cfg.GeoipProvider, geoIPProviderAuto)
+	}
+}
+
+// TestConfigGeoIPProviderFlagAndEnv verifies flag and environment wiring for the provider option.
+func TestConfigGeoIPProviderFlagAndEnv(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer, testFlagGeoIPProvider, geoIPProviderIPinfo})
+
+	if cfg.GeoipProvider != geoIPProviderIPinfo {
+		t.Errorf("flag GeoipProvider = %q, want %q", cfg.GeoipProvider, geoIPProviderIPinfo)
+	}
+
+	closer := envSetter(map[string]string{"GEOIPPOLICYD_GEOIP_PROVIDER": geoIPProviderMaxMind})
+	defer closer()
+
+	cfg = &CmdLineConfig{}
+	cfg.Init([]string{testCommandApp, testCommandServer})
+
+	if cfg.GeoipProvider != geoIPProviderMaxMind {
+		t.Errorf("env GeoipProvider = %q, want %q", cfg.GeoipProvider, geoIPProviderMaxMind)
+	}
+}
+
+// TestValidateGeoIPProviderRejectsUnknownValue verifies the operator-facing message for invalid providers.
+func TestValidateGeoIPProviderRejectsUnknownValue(t *testing.T) {
+	cfg := &CmdLineConfig{}
+	cfg.Init([]string{
+		testCommandApp, testCommandServer,
+		testFlagGeoIPPath, tempGeoIPPath(t),
+		testFlagGeoIPProvider, "dbip",
+	})
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want invalid GeoIP provider error")
+	}
+
+	if !strings.Contains(err.Error(), "must be one of [auto maxmind ipinfo]") {
+		t.Fatalf("Validate() error = %q, want allowed provider list", err.Error())
 	}
 }

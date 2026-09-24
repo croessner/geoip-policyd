@@ -31,7 +31,6 @@ import (
 	"github.com/colinmarc/cdb"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/oschwald/maxminddb-golang"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -335,26 +334,18 @@ func initializeObservability() error {
 	return nil
 }
 
-// setupGeoIP initializes the GeoIP database reader by opening the specified GeoIP database file.
-// It checks if the file exists and returns an error if it doesn't.
-// If the file exists, it creates a new GeoIP instance and assigns the opened reader to its Reader field.
-// It then starts a goroutine to automatically reload the GeoIP database if it is modified.
-// Returns an error if there's an error opening the GeoIP database file.
+// setupGeoIP loads the configured GeoIP database through a verified loader and starts the periodic
+// auto-reload. It returns the load error so startup can fail before serving requests.
 func setupGeoIP() error {
-	if _, err := os.Stat(config.GeoipPath); os.IsNotExist(err) {
-		return fmt.Errorf("file '%s' does not exist", config.GeoipPath)
-	} else if err != nil {
-		return fmt.Errorf("file '%s' may exist, but there's an error accessing it", config.GeoipPath)
-	}
+	service := NewGeoIP(NewGeoIPDatabaseLoader(config.GeoipPath, config.GeoipProvider))
 
-	reader, err := maxminddb.Open(config.GeoipPath)
-	if err != nil {
+	if err := service.Initialize(context.Background()); err != nil {
 		return err
 	}
 
-	geoIP = NewGeoIP(reader)
+	geoIP = service
 
-	go autoReloadGeoIP(geoIP)
+	go geoIP.RunAutoReload(context.Background(), geoIPReloadInterval)
 
 	return nil
 }
@@ -434,7 +425,7 @@ func startCommandServer() {
 	configureRedis(redisLogger)
 
 	if err := setupGeoIP(); err != nil {
-		handleFileError("Unable to open GeoLite2-City database file", err)
+		handleFileError("Unable to open GeoIP database file", err)
 	}
 
 	if config.UseLDAP {
@@ -467,59 +458,6 @@ func initializeCDB(cdbPath string) *cdb.CDB {
 	}
 
 	return db
-}
-
-// autoReloadGeoIP continuously checks for changes in the GeoIP database file.
-// When a change is detected, it closes the existing reader and opens a new one.
-// The function takes a pointer to a `GeoIP` struct as an argument.
-// The `GeoIP` struct contains a `Reader` field which is an instance of `maxminddb.Reader`.
-// The function uses a ticker to run every 300 seconds (5 minutes).
-// If there's an error getting the file info, it logs the error and continues to the next iteration.
-// If the modified time of the file is different from the last checked modified time,
-// it logs that the GeoIP database file has changed and proceeds to update the `Reader`.
-// Before updating the `Reader`, it acquires a lock on the `mu` mutex to prevent concurrent access.
-// It closes the existing `Reader` and attempts to open a new `Reader` using the file path specified in the configuration.
-// If there's an error opening the file, it logs the error and assigns `nil` to the `Reader` field of the `GeoIP` struct.
-// Finally, it releases the lock and continues to the next iteration in the ticker.
-func autoReloadGeoIP(geoIP *GeoIP) {
-	var lastModTime time.Time
-
-	ticker := time.NewTicker(300 * time.Second)
-	for range ticker.C {
-		fileInfo, err := os.Stat(config.GeoipPath)
-		if err != nil {
-			if obs := currentObservability(); obs != nil {
-				obs.ObserveGeoIPReload(context.Background(), resultStatError)
-			}
-
-			_ = level.Error(logger).Log("msg", "Unable to get file info", "error", err.Error())
-
-			continue
-		}
-
-		if !fileInfo.ModTime().Equal(lastModTime) {
-			_ = level.Info(logger).Log("msg", "GeoIP database file has changed")
-
-			lastModTime = fileInfo.ModTime()
-
-			reader, err := maxminddb.Open(config.GeoipPath)
-			if err != nil {
-				if obs := currentObservability(); obs != nil {
-					obs.ObserveGeoIPReload(context.Background(), resultError)
-				}
-
-				_ = level.Error(logger).Log("msg", "Unable to open GeoLite2-City database file", "error", err.Error())
-
-				geoIP.SwapReader(nil)
-			} else {
-				if obs := currentObservability(); obs != nil {
-					obs.ObserveGeoIPReload(context.Background(), resultOK)
-				}
-
-				geoIP.SwapReader(reader)
-			}
-		}
-	}
 }
 
 func main() {

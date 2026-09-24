@@ -16,16 +16,18 @@ import (
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 type recordedSpan struct {
-	name    string
-	traceID oteltrace.TraceID
-	spanID  oteltrace.SpanID
-	parent  oteltrace.SpanContext
-	kind    oteltrace.SpanKind
+	name       string
+	traceID    oteltrace.TraceID
+	spanID     oteltrace.SpanID
+	parent     oteltrace.SpanContext
+	kind       oteltrace.SpanKind
+	attributes []attribute.KeyValue
 }
 
 type spanRecorder struct {
@@ -42,11 +44,12 @@ func (r *spanRecorder) OnEnd(span sdktrace.ReadOnlySpan) {
 	defer r.mu.Unlock()
 
 	r.spans = append(r.spans, recordedSpan{
-		name:    span.Name(),
-		traceID: span.SpanContext().TraceID(),
-		spanID:  span.SpanContext().SpanID(),
-		parent:  span.Parent(),
-		kind:    span.SpanKind(),
+		name:       span.Name(),
+		traceID:    span.SpanContext().TraceID(),
+		spanID:     span.SpanContext().SpanID(),
+		parent:     span.Parent(),
+		kind:       span.SpanKind(),
+		attributes: span.Attributes(),
 	})
 }
 
