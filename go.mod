@@ -1,6 +1,6 @@
 module geoip-policyd
 
-go 1.26.8
+go 1.27.1
 
 require (
 	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70

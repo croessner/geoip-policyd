@@ -86,13 +86,13 @@ Back to [table of contents](#table-of-contents)
 
 ## Preparing a docker image
 
-Builds require Go 1.26.8 or a newer patched Go 1.26 toolchain. Module metadata,
-CI, release packaging, and the container builder use Go 1.26.8. Dependencies
+Builds require Go 1.27.1 or a newer patched Go 1.27 toolchain. Module metadata,
+CI, release packaging, and the container builder use Go 1.27.1. Dependencies
 are vendored; after updates, run `go mod tidy`, `go mod vendor`, and
 `make guardrails`. Run `make smoke-observability` to verify the local HTTP,
 Redis, Prometheus, and OTLP integration after dependency updates.
 
-The Docker image uses Alpine 3.23 and runs as UID/GID `10001:10001`.
+The Docker image uses Alpine 3.24 and runs as UID/GID `10001:10001`.
 Mounted GeoIP databases, custom settings, TLS keys, CA files, and action
 templates must be readable by that identity, with searchable parent directories.
 Grant access narrowly, especially for private keys. The systemd package

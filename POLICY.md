@@ -4,7 +4,7 @@ These rules are mandatory for coding changes in this repository.
 
 ## Must Rules
 
-- MUST: Keep the project on Go 1.26 across module metadata, CI, Docker builds,
+- MUST: Keep the project on Go 1.27 across module metadata, CI, Docker builds,
   release packaging, and documentation.
 - MUST: Run `make guardrails` before committing or opening a pull request.
 - MUST: Keep `.golangci.yml` aligned with the repository guardrail policy and

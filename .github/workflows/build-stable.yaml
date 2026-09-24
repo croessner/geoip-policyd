@@ -19,10 +19,10 @@ jobs:
         goos: [linux]
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: 1.26.8
+          go-version: 1.27.1
       - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} .
@@ -42,7 +42,7 @@ jobs:
         shell: bash
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
@@ -55,10 +55,10 @@ jobs:
         goos: [ linux ]
         goarch: [ amd64, arm64 ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: 1.26.8
+          go-version: 1.27.1
       - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -mod=vendor -ldflags="-s -X main.version=${GITHUB_REF#refs/tags/}-${GITHUB_SHA:0:8}" -o ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -79,7 +79,7 @@ jobs:
           cp systemd/${{ env.APP_NAME }} .debpkg/etc/default/
           cp LICENSE README.md .debpkg/usr/share/doc/${{ env.APP_NAME }}/
 
-      - uses: jiro4989/build-deb-action@v3
+      - uses: jiro4989/build-deb-action@v4
         with:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
@@ -88,7 +88,7 @@ jobs:
           arch: '${{ matrix.goarch }}'
           desc: '${{ env.DESC }}'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact-${{ matrix.goos }}-${{ matrix.goarch }}-deb
           path: |
@@ -100,7 +100,7 @@ jobs:
       - build-artifact
       - build-linux-packages
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -151,7 +151,7 @@ jobs:
           - os: ubuntu-latest
             asset_suffix: .tar.gz
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -178,7 +178,7 @@ jobs:
         include:
           - pkg: deb
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

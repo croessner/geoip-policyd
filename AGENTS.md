@@ -1,7 +1,7 @@
 # geoip-policyd Development Guidelines
 
-This repository is a vendored Go 1.26 project. Keep `go.mod`, Docker builds,
-CI, release packaging, and operator-facing documentation aligned with Go 1.26
+This repository is a vendored Go 1.27 project. Keep `go.mod`, Docker builds,
+CI, release packaging, and operator-facing documentation aligned with Go 1.27
 whenever toolchain details change.
 
 ## Required Workflow
